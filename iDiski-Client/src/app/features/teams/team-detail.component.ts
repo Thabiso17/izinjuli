@@ -485,8 +485,16 @@ export class TeamDetailComponent implements OnInit {
     });
   }
 
-  getPlayersByPosition(position: string): PlayerDto[] {
-    return this.players().filter(p => p.position === position);
+  getPlayersByPosition(positionCategory: string): PlayerDto[] {
+    const positionMap: Record<string, string[]> = {
+      'Goalkeeper': ['GK'],
+      'Defender': ['CB', 'SW', 'RB', 'LB', 'RWB', 'LWB'],
+      'Midfielder': ['CDM', 'CM', 'CAM', 'RM', 'LM'],
+      'Forward': ['ST', 'CF', 'RW', 'LW']
+    };
+
+    const positions = positionMap[positionCategory] || [];
+    return this.players().filter(p => positions.includes(p.position));
   }
 
   setTab(tab: 'squad' | 'fixtures' | 'results') {

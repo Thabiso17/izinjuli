@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiBaseUrl: 'https://your-production-api.com/api', // TODO: replace before deploy
+  apiBaseUrl: 'https://idiski-production.up.railway.app/api',
 };

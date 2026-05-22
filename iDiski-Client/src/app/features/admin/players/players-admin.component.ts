@@ -14,6 +14,7 @@ import {
   PlayerPosition,
   PreferredFoot,
 } from '../../../core/models';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-players-admin',
@@ -112,14 +113,19 @@ import {
               </thead>
               <tbody>
                 @for (player of players(); track player.id) {
-                  <tr>
+                  <tr
+                    class="player-row"
+                    [class.selected]="selectedPlayerId() === player.id"
+                    (click)="selectPlayer(player.id)"
+                  >
                     <td>
-                      @if (player.profileImageUrl) {
+                      @if (getImageUrl(player.profileImageUrl)) {
                         <img
-                          [src]="player.profileImageUrl"
+                          [src]="getImageUrl(player.profileImageUrl)"
                           [alt]="player.fullName"
                           class="rounded-circle"
                           style="width: 40px; height: 40px; object-fit: cover"
+                          (error)="$event.target.style.display='none'"
                         />
                       } @else {
                         <div
@@ -157,30 +163,35 @@ import {
                         <span class="badge bg-secondary">Inactive</span>
                       }
                     </td>
-                    <td>
-                      <button
-                        class="btn btn-sm btn-outline-primary me-2"
-                        (click)="showEditModal(player)"
-                        title="Edit"
-                      >
-                        <i class="bi bi-pencil"></i>
-                      </button>
-                      <button
-                        class="btn btn-sm btn-outline-info me-2"
-                        (click)="showTransferModalFor(player)"
-                        [disabled]="!player.isActive"
-                        [title]="player.isActive ? 'Transfer to another team' : 'Cannot transfer inactive player'"
-                      >
-                        <i class="bi bi-arrow-left-right"></i>
-                      </button>
-                      <button
-                        class="btn btn-sm btn-outline-danger"
-                        (click)="confirmDeactivate(player)"
-                        [disabled]="!player.isActive"
-                        [title]="player.isActive ? 'Deactivate' : 'Already inactive'"
-                      >
-                        <i class="bi bi-person-x"></i>
-                      </button>
+                    <td (click)="$event.stopPropagation()">
+                      <div class="btn-group" role="group">
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-primary"
+                          (click)="showEditModal(player)"
+                          title="Edit player details"
+                        >
+                          <i class="bi bi-pencil"></i> Edit
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-info"
+                          (click)="showTransferModalFor(player)"
+                          [disabled]="!player.isActive"
+                          [title]="player.isActive ? 'Transfer to another team' : 'Cannot transfer inactive player'"
+                        >
+                          <i class="bi bi-arrow-left-right"></i> Transfer
+                        </button>
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-danger"
+                          (click)="confirmDeactivate(player)"
+                          [disabled]="!player.isActive"
+                          [title]="player.isActive ? 'Deactivate player' : 'Already inactive'"
+                        >
+                          <i class="bi bi-person-x"></i> Deactivate
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 }
@@ -394,10 +405,11 @@ import {
                     @if (formData.profileImageUrl) {
                       <div class="mb-2">
                         <img
-                          [src]="formData.profileImageUrl"
+                          [src]="getImageUrl(formData.profileImageUrl) || formData.profileImageUrl"
                           alt="Preview"
                           class="img-thumbnail"
                           style="max-width: 150px; max-height: 150px"
+                          (error)="$event.target.style.display='none'"
                         />
                         <button
                           type="button"
@@ -599,6 +611,34 @@ import {
       .modal.show {
         display: block;
       }
+
+      .table td button {
+        cursor: pointer;
+        position: relative;
+        z-index: 1;
+      }
+
+      .table-responsive {
+        overflow-x: auto;
+      }
+
+      .player-row {
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+
+      .player-row:hover {
+        background-color: #f8f9fa !important;
+      }
+
+      .player-row.selected {
+        background-color: #e7f1ff !important;
+        border-left: 4px solid #0d6efd;
+      }
+
+      .player-row.selected td:first-child {
+        padding-left: 8px;
+      }
     `,
   ],
 })
@@ -624,6 +664,7 @@ export class PlayersAdminComponent implements OnInit {
   showTransferModal = signal(false);
   editingPlayer = signal<PlayerDto | null>(null);
   transferringPlayer = signal<PlayerDto | null>(null);
+  selectedPlayerId = signal<string | null>(null);
 
   filterTeamId: string | undefined;
   filterDivisionId: string | undefined;
@@ -693,6 +734,28 @@ export class PlayersAdminComponent implements OnInit {
     return this.teams().filter(team => team.divisionId === this.formDivisionFilter);
   }
 
+  selectPlayer(playerId: string) {
+    this.selectedPlayerId.set(playerId);
+  }
+
+  getImageUrl(url: string | null): string | null {
+    if (!url) return null;
+    // If it's already a full URL, return as-is
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    // Otherwise, prepend the API server URL (http://localhost:5207)
+    // environment.apiBaseUrl is "http://localhost:5207/api", we need just "http://localhost:5207"
+    const apiBase = environment.apiBaseUrl; // "http://localhost:5207/api"
+    const serverUrl = apiBase.substring(0, apiBase.lastIndexOf('/api')); // "http://localhost:5207"
+
+    // Ensure url starts with /
+    const path = url.startsWith('/') ? url : `/${url}`;
+
+    console.log('Image URL:', `${serverUrl}${path}`);
+    return `${serverUrl}${path}`;
+  }
+
   showAddModal() {
     this.editingPlayer.set(null);
     this.formData = this.getEmptyForm();
@@ -701,6 +764,7 @@ export class PlayersAdminComponent implements OnInit {
   }
 
   showEditModal(player: PlayerDto) {
+    console.log('Edit button clicked for player:', player.fullName);
     this.editingPlayer.set(player);
     this.formData = {
       firstName: player.firstName,
@@ -777,6 +841,7 @@ export class PlayersAdminComponent implements OnInit {
   }
 
   showTransferModalFor(player: PlayerDto) {
+    console.log('Transfer button clicked for player:', player.fullName);
     this.transferringPlayer.set(player);
     this.transferFormData = {
       newTeamId: null,

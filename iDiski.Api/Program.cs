@@ -36,7 +36,21 @@ builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins("http://localhost:4200", "https://localhost:4200")
+        // Development URLs
+        var origins = new List<string>
+        {
+            "http://localhost:4200",
+            "https://localhost:4200"
+        };
+
+        // Production URLs (add your actual Vercel URL after deployment)
+        var productionOrigin = builder.Configuration["ProductionOrigin"];
+        if (!string.IsNullOrEmpty(productionOrigin))
+        {
+            origins.Add(productionOrigin);
+        }
+
+        policy.WithOrigins(origins.ToArray())
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
@@ -62,6 +76,10 @@ app.UseCors(); // Enable CORS
 app.UseStaticFiles(); // Serve static files from wwwroot (uploaded images)
 app.UseHttpsRedirection();
 app.MapControllers(); // This maps your ArticlesController, TeamsController, etc.
+
+// Health check endpoint for Railway
+app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
+   .WithTags("Health");
 
 // ── SEED DATA ENDPOINTS ───────────────────────────────────────────────────────
 // Call these endpoints to seed the database with sample data
