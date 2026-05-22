@@ -127,11 +127,14 @@ public sealed class GenerateFixturesCommandHandler
         var rounds = teamCount - 1; // Number of rounds in single round-robin
         var matchesPerRound = teamCount / 2;
 
+        // Ensure startDate is UTC to satisfy PostgreSQL
+        var utcStartDate = DateTime.SpecifyKind(startDate, DateTimeKind.Utc);
+
         // Generate first round (single round-robin)
         for (int round = 0; round < rounds; round++)
         {
             var matchweek = round + 1;
-            var matchDate = startDate.AddDays(round * daysBetweenMatchweeks);
+            var matchDate = utcStartDate.AddDays(round * daysBetweenMatchweeks);
 
             // Generate matches for this round using rotation algorithm
             for (int match = 0; match < matchesPerRound; match++)
@@ -193,7 +196,7 @@ public sealed class GenerateFixturesCommandHandler
             foreach (var fixture in firstRoundFixtures)
             {
                 var returnMatchweek = fixture.MatchweekNumber + rounds;
-                var returnMatchDate = startDate.AddDays(returnMatchweek * daysBetweenMatchweeks - daysBetweenMatchweeks);
+                var returnMatchDate = utcStartDate.AddDays(returnMatchweek * daysBetweenMatchweeks - daysBetweenMatchweeks);
 
                 fixtures.Add(new MatchResult
                 {
