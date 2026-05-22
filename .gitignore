@@ -1,0 +1,146 @@
+# ========================================
+# .NET / C# / Visual Studio
+# ========================================
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio cache/options
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Mono auto generated files
+mono_crash.*
+
+# Build Results
+*_i.c
+*_p.c
+*_h.h
+*.ilk
+*.meta
+*.obj
+*.iobj
+*.pch
+*.pdb
+*.ipdb
+*.pgc
+*.pgd
+*.rsp
+*.sbr
+*.tlb
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj
+*.log
+*.tlog
+*.vspscc
+*.vssscc
+.builds
+*.pidb
+*.svclog
+*.scc
+
+# NuGet Packages
+*.nupkg
+*.snupkg
+**/packages/*
+!**/packages/build/
+*.nuget.props
+*.nuget.targets
+
+# NuGet Symbol Packages
+*.snupkg
+
+# Paket dependency manager
+.paket/paket.exe
+paket-files/
+
+# ========================================
+# Angular / Node.js
+# ========================================
+
+# Node modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Angular build output
+dist/
+tmp/
+out-tsc/
+.angular/
+
+# IDEs and editors
+.idea/
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# ========================================
+# Project-specific
+# ========================================
+
+# Uploaded files (images, documents)
+wwwroot/uploads/
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Connection strings & secrets
+appsettings.Development.json
+appsettings.Production.json
+secrets.json
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+logs/
+
+# Editor backups
+*~
+*.swp
+*.swo
+*#
+
+# Claude Code artifacts
+.claude/

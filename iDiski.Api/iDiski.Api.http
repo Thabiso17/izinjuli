@@ -1,0 +1,6 @@
+@iDiski.Api_HostAddress = http://localhost:5207
+
+GET {{iDiski.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
