@@ -8,7 +8,10 @@ using FluentValidation;
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Get Connection String
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+// In production (Railway), use DATABASE_URL environment variable
+// In development, use appsettings.json connection string
+var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
+    ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
 // 2. Register DbContext in the DI Container
 builder.Services.AddDbContext<LeagueDbContext>(options =>
