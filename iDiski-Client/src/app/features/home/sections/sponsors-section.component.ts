@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../../environments/environment';
 
 interface SponsorDto {
   id: string;
@@ -93,7 +94,7 @@ interface SponsorDto {
 })
 export class SponsorsSectionComponent implements OnInit {
   private http = inject(HttpClient);
-  private baseUrl = 'http://localhost:5207/api/sponsors';
+  private baseUrl = `${environment.apiBaseUrl}/sponsors`;
 
   sponsors = signal<SponsorDto[]>([]);
   loading = signal(false);
