@@ -83,6 +83,8 @@ namespace iDiski.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("IsPinned");
+
                     b.HasIndex("PublishedAt");
 
                     b.HasIndex("Slug")

@@ -17,6 +17,7 @@ export interface ArticleSummaryDto {
   author: string;
   publishedAt: string | null; // ISO 8601 — pipe through DatePipe in templates
   tags: string[];
+  isPinned: boolean;
 }
 
 /**
@@ -39,6 +40,7 @@ export interface ArticleDto {
   isPublished: boolean;
   publishedAt: string | null;
   tags: string[];
+  isPinned: boolean;
   viewCount: number;
   createdAt: string;
   updatedAt: string | null;

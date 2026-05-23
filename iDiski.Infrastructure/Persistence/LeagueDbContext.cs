@@ -131,6 +131,7 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
             entity.Property(a => a.Tags).HasColumnType("text[]");
 
             entity.HasIndex(a => a.PublishedAt);
+            entity.HasIndex(a => a.IsPinned);
         });
 
         // ── Video ─────────────────────────────────────────────────────────────
