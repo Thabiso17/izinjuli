@@ -99,37 +99,6 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// AUTO-APPLY MIGRATIONS ON STARTUP (Railway Production)
-// ═══════════════════════════════════════════════════════════════════════════════
-// This ensures the database schema is always up-to-date when the API starts.
-// Safe for single-instance deployments like Railway. For multi-instance production,
-// consider using a separate migration job or blue-green deployment strategy.
-Console.WriteLine("Checking for pending database migrations...");
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<LeagueDbContext>();
-    try
-    {
-        var pendingMigrations = await db.Database.GetPendingMigrationsAsync();
-        if (pendingMigrations.Any())
-        {
-            Console.WriteLine($"Applying {pendingMigrations.Count()} pending migration(s): {string.Join(", ", pendingMigrations)}");
-            await db.Database.MigrateAsync();
-            Console.WriteLine("✓ Database migrations applied successfully!");
-        }
-        else
-        {
-            Console.WriteLine("✓ Database is up to date. No migrations needed.");
-        }
-    }
-    catch (Exception ex)
-    {
-        Console.WriteLine($"✗ Migration error: {ex.Message}");
-        // Don't crash the app - let it start and use the manual migration endpoints if needed
-    }
-}
-
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
