@@ -13,8 +13,8 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
     ?? builder.Configuration.GetConnectionString("DefaultConnection");
 
-// Railway provides DATABASE_URL in postgres:// format, convert to Host= format if needed
-if (!string.IsNullOrEmpty(connectionString) && connectionString.StartsWith("postgres://"))
+// Railway provides DATABASE_URL in postgres:// or postgresql:// format, convert to Host= format if needed
+if (!string.IsNullOrEmpty(connectionString) && (connectionString.StartsWith("postgres://") || connectionString.StartsWith("postgresql://")))
 {
     // Parse postgres://user:password@host:port/database format
     var uri = new Uri(connectionString);
