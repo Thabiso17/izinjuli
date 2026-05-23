@@ -32,7 +32,20 @@
    - Key: `ASPNETCORE_ENVIRONMENT`, Value: `Production`
    - Key: `ProductionOrigin`, Value: `https://idiski.vercel.app` (update after Vercel deployment)
 
-### Step 6: Seed Database
+### Step 6: Database Migrations (Automatic ✨)
+**No action needed!** Migrations run automatically when the API starts. You'll see this in the logs:
+```
+Checking for pending database migrations...
+Applying 2 pending migration(s): InitialCreate, AddVideoEntity
+✓ Database migrations applied successfully!
+```
+
+If automatic migrations fail, you can use the manual endpoint:
+```
+curl -X POST https://your-railway-url.up.railway.app/api/migrate/manual
+```
+
+### Step 7: Seed Database
 Once deployed, visit:
 ```
 https://your-railway-url.up.railway.app/api/seed/comprehensive
@@ -126,6 +139,12 @@ To deploy changes:
 2. Commit: `git add . && git commit -m "Your message"`
 3. Push: `git push origin main`
 4. Railway and Vercel will **automatically** rebuild and deploy! 🎉
+
+**Database Schema Changes:**
+When you add new migrations (e.g., new tables, columns):
+1. Create migration: `dotnet ef migrations add YourMigrationName --project iDiski.Infrastructure --startup-project iDiski.Api`
+2. Commit and push - migrations run automatically on Railway startup!
+3. No manual migration steps needed! ✨
 
 ---
 
