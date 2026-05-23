@@ -129,6 +129,64 @@ app.MapPost("/api/migrate", async (LeagueDbContext db) =>
     }
 }).WithTags("Database");
 
+// Manual SQL execution endpoint - for applying migrations when EF Core fails
+app.MapPost("/api/migrate/manual", async (LeagueDbContext db) =>
+{
+    try
+    {
+        // Add IsPinned column to Articles if it doesn't exist
+        await db.Database.ExecuteSqlRawAsync(@"
+            DO $$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                               WHERE table_name='Articles' AND column_name='IsPinned') THEN
+                    ALTER TABLE ""Articles"" ADD COLUMN ""IsPinned"" boolean NOT NULL DEFAULT false;
+                    CREATE INDEX ""IX_Articles_IsPinned"" ON ""Articles"" (""IsPinned"");
+                END IF;
+            END $$;
+        ");
+
+        // Create Videos table if it doesn't exist
+        await db.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS ""Videos"" (
+                ""Id"" uuid NOT NULL,
+                ""Title"" character varying(300) NOT NULL,
+                ""VideoUrl"" character varying(500) NOT NULL,
+                ""Description"" text,
+                ""ThumbnailUrl"" text,
+                ""Author"" character varying(100) NOT NULL,
+                ""IsPublished"" boolean NOT NULL,
+                ""PublishedAt"" timestamp with time zone,
+                ""IsPinned"" boolean NOT NULL,
+                ""ViewCount"" integer NOT NULL,
+                ""CreatedAt"" timestamp with time zone NOT NULL,
+                ""UpdatedAt"" timestamp with time zone NOT NULL,
+                CONSTRAINT ""PK_Videos"" PRIMARY KEY (""Id"")
+            );
+
+            CREATE INDEX IF NOT EXISTS ""IX_Videos_IsPinned"" ON ""Videos"" (""IsPinned"");
+            CREATE INDEX IF NOT EXISTS ""IX_Videos_PublishedAt"" ON ""Videos"" (""PublishedAt"");
+        ");
+
+        // Update migration history
+        await db.Database.ExecuteSqlRawAsync(@"
+            INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
+            VALUES ('20260523160000_AddIsPinnedToArticle', '9.0.0')
+            ON CONFLICT DO NOTHING;
+
+            INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
+            VALUES ('20260523160100_AddVideoEntity', '9.0.0')
+            ON CONFLICT DO NOTHING;
+        ");
+
+        return Results.Ok(new { message = "Manual migrations applied successfully!" });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Manual migration failed: {ex.Message}");
+    }
+}).WithTags("Database");
+
 // ── SEED DATA ENDPOINTS ───────────────────────────────────────────────────────
 // Call these endpoints to seed the database with sample data
 
