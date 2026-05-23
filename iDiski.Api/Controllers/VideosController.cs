@@ -74,7 +74,7 @@ public sealed class VideosController : BaseApiController
     /// <summary>
     /// Publishes a video.
     /// </summary>
-    [HttpPost("{id:guid}/publish")]
+    [HttpPatch("{id:guid}/publish")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Publish(Guid id, CancellationToken ct)
@@ -86,12 +86,24 @@ public sealed class VideosController : BaseApiController
     /// <summary>
     /// Unpublishes a video.
     /// </summary>
-    [HttpPost("{id:guid}/unpublish")]
+    [HttpPatch("{id:guid}/unpublish")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Unpublish(Guid id, CancellationToken ct)
     {
         await Sender.Send(new UnpublishVideoCommand(id), ct);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Toggles the pinned status of a video.
+    /// </summary>
+    [HttpPatch("{id:guid}/toggle-pin")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> TogglePin(Guid id, CancellationToken ct)
+    {
+        await Sender.Send(new TogglePinVideoCommand(id), ct);
         return NoContent();
     }
 
