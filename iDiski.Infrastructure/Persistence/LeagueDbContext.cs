@@ -13,6 +13,7 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
     public DbSet<Player> Players => Set<Player>();
     public DbSet<MatchResult> MatchResults => Set<MatchResult>();
     public DbSet<Article> Articles => Set<Article>();
+    public DbSet<Video> Videos => Set<Video>();
     public DbSet<Sponsor> Sponsors => Set<Sponsor>();
     public DbSet<PageLayoutConfig> PageLayoutConfigs => Set<PageLayoutConfig>();
     public DbSet<Division> Divisions => Set<Division>();
@@ -130,6 +131,27 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
             entity.Property(a => a.Tags).HasColumnType("text[]");
 
             entity.HasIndex(a => a.PublishedAt);
+        });
+
+        // ── Video ─────────────────────────────────────────────────────────────
+        modelBuilder.Entity<Video>(entity =>
+        {
+            entity.HasKey(v => v.Id);
+
+            entity.Property(v => v.Title)
+                  .IsRequired()
+                  .HasMaxLength(300);
+
+            entity.Property(v => v.VideoUrl)
+                  .IsRequired()
+                  .HasMaxLength(500);
+
+            entity.Property(v => v.Author)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.HasIndex(v => v.PublishedAt);
+            entity.HasIndex(v => v.IsPinned);
         });
 
         // ── Sponsor ───────────────────────────────────────────────────────────

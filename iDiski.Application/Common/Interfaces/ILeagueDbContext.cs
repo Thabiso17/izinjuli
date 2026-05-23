@@ -13,6 +13,7 @@ public interface ILeagueDbContext
     DbSet<Player>           Players           { get; }
     DbSet<MatchResult>      MatchResults      { get; }
     DbSet<Article>          Articles          { get; }
+    DbSet<Video>            Videos            { get; }
     DbSet<Sponsor>          Sponsors          { get; }
     DbSet<PageLayoutConfig> PageLayoutConfigs { get; }
     DbSet<Division>         Divisions         { get; }
