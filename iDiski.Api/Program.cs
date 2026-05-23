@@ -16,9 +16,24 @@ var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
 // Railway provides DATABASE_URL in postgres:// or postgresql:// format, convert to Host= format if needed
 if (!string.IsNullOrEmpty(connectionString) && (connectionString.StartsWith("postgres://") || connectionString.StartsWith("postgresql://")))
 {
-    // Parse postgres://user:password@host:port/database format
-    var uri = new Uri(connectionString);
-    connectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={uri.UserInfo.Split(':')[0]};Password={uri.UserInfo.Split(':')[1]};SSL Mode=Require;Trust Server Certificate=true";
+    // Parse postgres://user:password@host:port/database format manually
+    // System.Uri doesn't recognize postgres:// as a valid scheme
+    var url = connectionString.Replace("postgresql://", "").Replace("postgres://", "");
+
+    // Split by @ to separate credentials from host
+    var parts = url.Split('@');
+    var credentials = parts[0].Split(':');
+    var username = credentials[0];
+    var password = credentials.Length > 1 ? credentials[1] : "";
+
+    // Split host part by / to separate host:port from database
+    var hostParts = parts[1].Split('/');
+    var hostAndPort = hostParts[0].Split(':');
+    var host = hostAndPort[0];
+    var port = hostAndPort.Length > 1 ? hostAndPort[1] : "5432";
+    var database = hostParts.Length > 1 ? hostParts[1] : "";
+
+    connectionString = $"Host={host};Port={port};Database={database};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true";
 }
 
 Console.WriteLine($"Using connection string: {connectionString?.Substring(0, Math.Min(50, connectionString?.Length ?? 0))}...");
