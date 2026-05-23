@@ -40,9 +40,15 @@ Console.WriteLine($"Using connection string: {connectionString?.Substring(0, Mat
 
 // 2. Register DbContext in the DI Container
 builder.Services.AddDbContext<LeagueDbContext>(options =>
-    options.UseNpgsql(connectionString, 
+{
+    options.UseNpgsql(connectionString,
         // Tell EF to look for migrations in the Infrastructure project
-        b => b.MigrationsAssembly("iDiski.Infrastructure")));
+        b => b.MigrationsAssembly("iDiski.Infrastructure"));
+
+    // Suppress pending model changes warning during migration
+    options.ConfigureWarnings(warnings =>
+        warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+});
 
 // 3. Register the Interface for the Application Layer
 builder.Services.AddScoped<ILeagueDbContext>(provider =>
