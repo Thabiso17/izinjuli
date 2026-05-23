@@ -41,7 +41,8 @@ public sealed record ArticleSummaryDto(
     string?   FeaturedImageUrl,
     string    Author,
     DateTime? PublishedAt,
-    string[]  Tags
+    string[]  Tags,
+    bool      IsPinned = false
 );
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -115,11 +116,12 @@ public sealed class GetPublishedArticlesQueryHandler
             query = query.Where(a => a.Author == request.AuthorName.Trim());
 
         var projected = query
-            .OrderByDescending(a => a.PublishedAt)
+            .OrderByDescending(a => a.IsPinned)    // Pinned articles first
+            .ThenByDescending(a => a.PublishedAt)  // Then by most recent
             .Select(a => new ArticleSummaryDto(
                 a.Id, a.Title, a.Slug, a.Excerpt,
                 a.CoverImageUrl, a.VideoUrl, a.FeaturedImageUrl,
-                a.Author, a.PublishedAt, a.Tags));
+                a.Author, a.PublishedAt, a.Tags, a.IsPinned));
 
         return await PaginatedList<ArticleSummaryDto>.CreateAsync(
             projected, request.PageNumber, request.PageSize, cancellationToken);
@@ -153,11 +155,12 @@ public sealed class GetAllArticlesAdminQueryHandler
             query = query.Where(a => a.IsPublished == request.PublishedOnly.Value);
 
         var projected = query
-            .OrderByDescending(a => a.CreatedAt)
+            .OrderByDescending(a => a.IsPinned)
+            .ThenByDescending(a => a.CreatedAt)
             .Select(a => new ArticleSummaryDto(
                 a.Id, a.Title, a.Slug, a.Excerpt,
                 a.CoverImageUrl, a.VideoUrl, a.FeaturedImageUrl,
-                a.Author, a.PublishedAt, a.Tags));
+                a.Author, a.PublishedAt, a.Tags, a.IsPinned));
 
         return await PaginatedList<ArticleSummaryDto>.CreateAsync(
             projected, request.PageNumber, request.PageSize, cancellationToken);

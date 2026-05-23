@@ -11,7 +11,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
         <!-- Brand -->
         <a class="navbar-brand d-flex align-items-center" routerLink="/">
           <i class="bi bi-shield-fill-check me-2" style="font-size: 1.5rem;"></i>
-          <span class="fw-bold">iDiski League</span>
+          <span class="fw-bold">izinjuli league</span>
         </a>
 
         <!-- Mobile Toggle -->

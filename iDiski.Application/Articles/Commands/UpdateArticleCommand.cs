@@ -23,7 +23,8 @@ public sealed record UpdateArticleCommand(
     string?  VideoUrl,
     string?  FeaturedImageUrl,
     string   Author,
-    string[] Tags
+    string[] Tags,
+    bool     IsPinned = false
 ) : IRequest;
 
 // ── Validator ─────────────────────────────────────────────────────────────────
@@ -111,6 +112,7 @@ public sealed class UpdateArticleCommandHandler : IRequestHandler<UpdateArticleC
         article.VideoUrl         = request.VideoUrl;
         article.FeaturedImageUrl = request.FeaturedImageUrl;
         article.Author           = request.Author.Trim();
+        article.IsPinned         = request.IsPinned;
         article.Tags = request.Tags
             .Select(t => t.Trim())
             .Where(t => !string.IsNullOrWhiteSpace(t))

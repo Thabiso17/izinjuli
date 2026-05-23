@@ -74,4 +74,5 @@ export interface UpdateArticleRequest {
   featuredImageUrl?: string;
   author: string;
   tags: string[];
+  isPinned?: boolean;
 }

@@ -25,6 +25,9 @@ public class Article : BaseEntity
     public bool IsPublished { get; set; } = false;
     public DateTime? PublishedAt { get; set; }
 
+    /// <summary>Pinned articles appear first in lists, regardless of publish date.</summary>
+    public bool IsPinned { get; set; } = false;
+
     /// <summary>
     /// Stored as a native PostgreSQL text[] column via Npgsql.
     /// EF config: .HasColumnType("text[]")

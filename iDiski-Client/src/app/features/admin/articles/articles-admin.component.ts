@@ -69,6 +69,7 @@ interface ArticleFormData {
                   <th>Tags</th>
                   <th>Status</th>
                   <th>Published</th>
+                  <th>Pinned</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -102,6 +103,13 @@ interface ArticleFormData {
                       }
                     </td>
                     <td>
+                      @if (article.isPinned) {
+                        <i class="bi bi-pin-angle-fill text-primary" title="Pinned"></i>
+                      } @else {
+                        <span class="text-muted">-</span>
+                      }
+                    </td>
+                    <td>
                       <div class="btn-group btn-group-sm">
                         <button
                           class="btn btn-outline-primary"
@@ -110,6 +118,17 @@ interface ArticleFormData {
                         >
                           <i class="bi bi-pencil"></i>
                         </button>
+                        @if (article.publishedAt) {
+                          <button
+                            [class.btn-warning]="!article.isPinned"
+                            [class.btn-outline-warning]="article.isPinned"
+                            class="btn btn-sm"
+                            (click)="togglePin(article)"
+                            [title]="article.isPinned ? 'Unpin' : 'Pin to top'"
+                          >
+                            <i [class.bi-pin-angle-fill]="article.isPinned" [class.bi-pin-angle]="!article.isPinned" class="bi"></i>
+                          </button>
+                        }
                         @if (!article.publishedAt) {
                           <button
                             class="btn btn-outline-success"
@@ -457,6 +476,43 @@ export class ArticlesAdminComponent implements OnInit {
       },
       error: (err) => {
         this.error.set(`Failed to unpublish article: ${err.error?.message || err.message}`);
+      },
+    });
+  }
+
+  togglePin(article: ArticleSummaryDto) {
+    const action = article.isPinned ? 'unpin' : 'pin';
+    const newPinnedState = !article.isPinned;
+
+    // For now, we'll fetch the full article, toggle the pin status, and update it
+    this.articleService.getBySlug(article.slug).subscribe({
+      next: (fullArticle) => {
+        const updateRequest: UpdateArticleRequest = {
+          id: article.id,
+          title: fullArticle.title,
+          content: fullArticle.content,
+          excerpt: fullArticle.excerpt || '',
+          coverImageUrl: fullArticle.coverImageUrl || '',
+          videoUrl: fullArticle.videoUrl || '',
+          featuredImageUrl: fullArticle.featuredImageUrl || '',
+          author: fullArticle.author,
+          tags: fullArticle.tags,
+          isPinned: newPinnedState
+        };
+
+        this.articleService.update(article.id, updateRequest).subscribe({
+          next: () => {
+            this.success.set(`Article ${action}ned successfully`);
+            this.loadArticles();
+            setTimeout(() => this.success.set(null), 3000);
+          },
+          error: (err) => {
+            this.error.set(`Failed to ${action} article: ${err.error?.message || err.message}`);
+          },
+        });
+      },
+      error: (err) => {
+        this.error.set(`Failed to fetch article details: ${err.error?.message || err.message}`);
       },
     });
   }
