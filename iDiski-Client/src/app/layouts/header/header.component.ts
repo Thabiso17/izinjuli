@@ -157,6 +157,16 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
                 <li>
                   <a
                     class="dropdown-item"
+                    routerLink="/admin/videos"
+                    routerLinkActive="active"
+                    (click)="closeMenu()"
+                  >
+                    <i class="bi bi-camera-video me-2"></i>Videos
+                  </a>
+                </li>
+                <li>
+                  <a
+                    class="dropdown-item"
                     routerLink="/admin/sponsors"
                     routerLinkActive="active"
                     (click)="closeMenu()"

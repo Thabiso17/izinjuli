@@ -1,15 +1,8 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { HttpClient } from '@angular/common/http';
-import { environment } from '../../../../environments/environment';
-
-interface VideoArticle {
-  id: string;
-  title: string;
-  videoUrl: string;
-  publishedAt: string;
-}
+import { VideoService } from '../../../core/services/video.service';
+import { VideoSummaryDto } from '../../../core/models/video.model';
 
 @Component({
   selector: 'app-videos-section',
@@ -55,10 +48,10 @@ interface VideoArticle {
   `,
 })
 export class VideosSectionComponent implements OnInit {
-  private readonly http = inject(HttpClient);
+  private readonly videoService = inject(VideoService);
   private readonly sanitizer = inject(DomSanitizer);
 
-  videos = signal<VideoArticle[]>([]);
+  videos = signal<VideoSummaryDto[]>([]);
   loading = signal(true);
 
   ngOnInit() {
@@ -66,21 +59,11 @@ export class VideosSectionComponent implements OnInit {
   }
 
   loadVideos() {
-    this.http
-      .get<{ items: any[] }>(`${environment.apiBaseUrl}/articles?pageSize=10`)
+    this.videoService
+      .getPublished({ maxResults: 2 })
       .subscribe({
-        next: (response) => {
-          // Filter only articles with videoUrl
-          const videoArticles = response.items
-            .filter((a) => a.videoUrl)
-            .slice(0, 2)
-            .map((a) => ({
-              id: a.id,
-              title: a.title,
-              videoUrl: a.videoUrl,
-              publishedAt: a.publishedAt,
-            }));
-          this.videos.set(videoArticles);
+        next: (videos) => {
+          this.videos.set(videos);
           this.loading.set(false);
         },
         error: (err) => {

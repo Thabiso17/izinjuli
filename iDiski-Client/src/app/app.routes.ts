@@ -118,6 +118,13 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'videos',
+        loadComponent: () =>
+          import('./features/admin/videos/videos-admin.component').then(
+            (m) => m.VideosAdminComponent
+          ),
+      },
+      {
         path: 'sponsors',
         loadComponent: () =>
           import('./features/admin/sponsors/sponsors-admin.component').then(
