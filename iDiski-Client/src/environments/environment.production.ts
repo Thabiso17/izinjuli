@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiBaseUrl: 'https://idiski-production.up.railway.app/api',
+  apiBaseUrl: 'https://izinjuli-production.up.railway.app/api',
 };
