@@ -109,6 +109,20 @@ app.MapControllers(); // This maps your ArticlesController, TeamsController, etc
 app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
    .WithTags("Health");
 
+// Migration endpoint - run this first on Railway to create database schema
+app.MapPost("/api/migrate", async (LeagueDbContext db) =>
+{
+    try
+    {
+        await db.Database.MigrateAsync();
+        return Results.Ok(new { message = "Database migrations applied successfully!" });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Migration failed: {ex.Message}");
+    }
+}).WithTags("Database");
+
 // ── SEED DATA ENDPOINTS ───────────────────────────────────────────────────────
 // Call these endpoints to seed the database with sample data
 
