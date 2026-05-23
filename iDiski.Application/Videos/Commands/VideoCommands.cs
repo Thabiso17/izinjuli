@@ -153,6 +153,32 @@ public sealed class UnpublishVideoCommandHandler : IRequestHandler<UnpublishVide
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// TOGGLE PIN VIDEO
+// ═════════════════════════════════════════════════════════════════════════════
+
+public sealed record TogglePinVideoCommand(Guid Id) : IRequest;
+
+public sealed class TogglePinVideoCommandHandler : IRequestHandler<TogglePinVideoCommand>
+{
+    private readonly ILeagueDbContext _db;
+
+    public TogglePinVideoCommandHandler(ILeagueDbContext db) => _db = db;
+
+    public async Task Handle(TogglePinVideoCommand request, CancellationToken cancellationToken)
+    {
+        var video = await _db.Videos.FindAsync([request.Id], cancellationToken)
+            ?? throw new NotFoundException(nameof(Video), request.Id);
+
+        if (!video.IsPublished)
+            throw new InvalidOperationException("Cannot pin an unpublished video.");
+
+        video.IsPinned = !video.IsPinned;
+
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // DELETE VIDEO
 // ═════════════════════════════════════════════════════════════════════════════
 
