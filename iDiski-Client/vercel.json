@@ -4,6 +4,7 @@
   "buildCommand": "ng build --configuration=production",
   "outputDirectory": "dist/iDiski-Client/browser",
   "framework": "angular",
+  "cleanUrls": true,
   "rewrites": [
     {
       "source": "/(.*)",
