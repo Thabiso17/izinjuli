@@ -26,7 +26,7 @@ namespace iDiski.Infrastructure.Migrations
                     IsPinned = table.Column<bool>(type: "boolean", nullable: false),
                     ViewCount = table.Column<int>(type: "integer", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true)
                 },
                 constraints: table =>
                 {

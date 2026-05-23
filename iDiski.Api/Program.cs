@@ -187,6 +187,23 @@ app.MapPost("/api/migrate/manual", async (LeagueDbContext db) =>
     }
 }).WithTags("Database");
 
+// Fix UpdatedAt column nullability in Videos table
+app.MapPost("/api/migrate/fix-videos", async (LeagueDbContext db) =>
+{
+    try
+    {
+        await db.Database.ExecuteSqlRawAsync(@"
+            ALTER TABLE ""Videos"" ALTER COLUMN ""UpdatedAt"" DROP NOT NULL;
+        ");
+
+        return Results.Ok(new { message = "Videos table UpdatedAt column fixed successfully!" });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Fix failed: {ex.Message}");
+    }
+}).WithTags("Database");
+
 // ── SEED DATA ENDPOINTS ───────────────────────────────────────────────────────
 // Call these endpoints to seed the database with sample data
 
