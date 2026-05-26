@@ -1,4 +1,4 @@
 export const environment = {
-  production: false,
-  apiBaseUrl: 'http://localhost:5207/api',
+  production: true,
+  apiBaseUrl: 'https://izinjuli-production.up.railway.app/api',
 };

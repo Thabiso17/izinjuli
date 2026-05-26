@@ -30,23 +30,23 @@
 3. Click **"+ New Variable"**
 4. Add:
    - Key: `ASPNETCORE_ENVIRONMENT`, Value: `Production`
-   - Key: `ProductionOrigin`, Value: `https://idiski.vercel.app` (update after Vercel deployment)
+   - Key: `ProductionOrigin`, Value: `https://izinjuli.vercel.app`
 
 ### Step 6: Run Database Migrations
 After deployment, apply migrations by calling:
 ```bash
-curl -X POST https://your-railway-url.up.railway.app/api/migrate
+curl -X POST https://izinjuli-production.up.railway.app/api/migrate
 ```
 
 Or use the manual SQL endpoint if needed:
 ```bash
-curl -X POST https://your-railway-url.up.railway.app/api/migrate/manual
+curl -X POST https://izinjuli-production.up.railway.app/api/migrate/manual
 ```
 
 ### Step 7: Seed Database
 Once deployed, visit:
 ```
-https://your-railway-url.up.railway.app/api/seed/comprehensive
+https://izinjuli-production.up.railway.app/api/seed/comprehensive
 ```
 
 This will populate your database with sample data.
@@ -85,21 +85,21 @@ After deployment completes, copy your Vercel URL (e.g., `https://idiski.vercel.a
 ## ✅ Test Your Deployment
 
 ### Backend Tests:
-- Health: `https://your-railway-url.up.railway.app/api/health`
-- Teams: `https://your-railway-url.up.railway.app/api/teams`
-- Swagger: `https://your-railway-url.up.railway.app/openapi/v1.json`
+- Health: `https://izinjuli-production.up.railway.app/api/health`
+- Teams: `https://izinjuli-production.up.railway.app/api/teams`
+- Swagger: `https://izinjuli-production.up.railway.app/openapi/v1.json`
 
 ### Frontend Tests:
-- Home: `https://your-vercel-url.vercel.app`
-- Teams: `https://your-vercel-url.vercel.app/teams`
-- Admin: `https://your-vercel-url.vercel.app/admin/players`
+- Home: `https://izinjuli.vercel.app`
+- Teams: `https://izinjuli.vercel.app/teams`
+- Admin: `https://izinjuli.vercel.app/admin/players`
 
 ---
 
 ## 🔧 Troubleshooting
 
 ### Backend not loading data?
-Visit the seed endpoint: `https://your-railway-url/api/seed/comprehensive`
+Visit the seed endpoint: `https://izinjuli-production.up.railway.app/api/seed/comprehensive`
 
 ### Frontend showing CORS errors?
 1. Check that `ProductionOrigin` in Railway matches your Vercel URL exactly
@@ -123,8 +123,8 @@ The `vercel.json` file should handle this. If issues persist:
 After deployment, save these for reference:
 
 ```
-Backend API: https://______________.up.railway.app
-Frontend:    https://______________.vercel.app
+Backend API: https://izinjuli-production.up.railway.app
+Frontend:    https://izinjuli.vercel.app
 Database:    (managed by Railway, accessible only via API)
 ```
 
@@ -142,7 +142,7 @@ To deploy changes:
 When you add new migrations (e.g., new tables, columns):
 1. Create migration: `dotnet ef migrations add YourMigrationName --project iDiski.Infrastructure --startup-project iDiski.Api`
 2. Commit and push to trigger deployment
-3. Run migration endpoint: `curl -X POST https://your-railway-url/api/migrate`
+3. Run migration endpoint: `curl -X POST https://izinjuli-production.up.railway.app/api/migrate`
 
 ---
 
