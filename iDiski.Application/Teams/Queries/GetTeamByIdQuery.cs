@@ -24,6 +24,7 @@ public sealed class GetTeamByIdQueryHandler
     {
         var team = await _db.Teams
             .AsNoTracking()
+            .Include(t => t.Division)
             .Where(t => t.Id == request.Id)
             .Select(t => new TeamDto(
                 t.Id,
@@ -35,7 +36,9 @@ public sealed class GetTeamByIdQueryHandler
                 t.City,
                 t.PrimaryColour,
                 t.SecondaryColour,
-                t.Players.Count(p => p.IsActive)))
+                t.Players.Count(p => p.IsActive),
+                t.DivisionId,
+                t.Division != null ? t.Division.Name : null))
             .FirstOrDefaultAsync(cancellationToken);
 
         return team ?? throw new NotFoundException(nameof(Domain.Entities.Team), request.Id);

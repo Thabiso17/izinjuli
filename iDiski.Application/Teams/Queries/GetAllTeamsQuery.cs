@@ -23,6 +23,7 @@ public sealed class GetAllTeamsQueryHandler
     {
         return await _db.Teams
             .AsNoTracking()
+            .Include(t => t.Division)
             .OrderBy(t => t.Name)
             .Select(t => new TeamDto(
                 t.Id,
@@ -34,7 +35,9 @@ public sealed class GetAllTeamsQueryHandler
                 t.City,
                 t.PrimaryColour,
                 t.SecondaryColour,
-                t.Players.Count(p => p.IsActive)))
+                t.Players.Count(p => p.IsActive),
+                t.DivisionId,
+                t.Division != null ? t.Division.Name : null))
             .ToListAsync(cancellationToken);
     }
 }

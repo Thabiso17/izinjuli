@@ -10,5 +10,7 @@ public sealed record TeamDto(
     string? City,
     string? PrimaryColour,
     string? SecondaryColour,
-    int    PlayerCount
+    int    PlayerCount,
+    Guid?  DivisionId,
+    string? DivisionName
 );

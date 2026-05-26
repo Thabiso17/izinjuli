@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PlayerService } from '../../../core/services/player.service';
@@ -15,6 +15,7 @@ import {
   PreferredFoot,
 } from '../../../core/models';
 import { environment } from '../../../../environments/environment';
+import { COUNTRIES } from '../../../core/data/countries';
 
 @Component({
   selector: 'app-players-admin',
@@ -395,8 +396,16 @@ import { environment } from '../../../../environments/environment';
                       class="form-control"
                       [(ngModel)]="formData.nationality"
                       name="nationality"
-                      placeholder="e.g., South African"
+                      list="countries-list"
+                      placeholder="e.g., South Africa"
+                      (input)="filterCountries($event)"
                     />
+                    <datalist id="countries-list">
+                      @for (country of filteredCountries(); track country) {
+                        <option [value]="country">{{ country }}</option>
+                      }
+                    </datalist>
+                    <small class="text-muted">Start typing to see suggestions</small>
                   </div>
 
                   <div class="col-12">
@@ -679,6 +688,19 @@ export class PlayersAdminComponent implements OnInit {
     newJerseyNumber: 1,
   };
 
+  // Countries autocomplete
+  allCountries = COUNTRIES;
+  countrySearchTerm = signal('');
+  filteredCountries = computed(() => {
+    const search = this.countrySearchTerm().toLowerCase().trim();
+    if (!search) {
+      return this.allCountries.slice(0, 20); // Show first 20 by default
+    }
+    return this.allCountries
+      .filter(country => country.toLowerCase().includes(search))
+      .slice(0, 20); // Limit to 20 results
+  });
+
   ngOnInit() {
     this.loadDivisions();
     this.loadTeams();
@@ -736,6 +758,11 @@ export class PlayersAdminComponent implements OnInit {
 
   selectPlayer(playerId: string) {
     this.selectedPlayerId.set(playerId);
+  }
+
+  filterCountries(event: Event) {
+    const input = event.target as HTMLInputElement;
+    this.countrySearchTerm.set(input.value);
   }
 
   getImageUrl(url: string | null): string | null {
