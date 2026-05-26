@@ -74,7 +74,8 @@ builder.Services.AddCors(options =>
         var origins = new List<string>
         {
             "http://localhost:4200",
-            "https://localhost:4200"
+            "https://localhost:4200",
+            "https://izinjuli.vercel.app" // Production Vercel URL
         };
 
         // Production URLs (add your actual Vercel URL after deployment)
