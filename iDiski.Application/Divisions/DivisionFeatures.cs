@@ -72,8 +72,8 @@ public sealed class CreateDivisionCommandHandler
             Season = request.Season,
             AgeGroup = request.AgeGroup,
             Gender = gender,
-            StartDate = request.StartDate,
-            EndDate = request.EndDate,
+            StartDate = request.StartDate.HasValue ? DateTime.SpecifyKind(request.StartDate.Value, DateTimeKind.Utc) : null,
+            EndDate = request.EndDate.HasValue ? DateTime.SpecifyKind(request.EndDate.Value, DateTimeKind.Utc) : null,
             Description = request.Description
         };
 
@@ -139,8 +139,8 @@ public sealed class UpdateDivisionCommandHandler
         division.AgeGroup = request.AgeGroup;
         division.Gender = gender;
         division.IsActive = request.IsActive;
-        division.StartDate = request.StartDate;
-        division.EndDate = request.EndDate;
+        division.StartDate = request.StartDate.HasValue ? DateTime.SpecifyKind(request.StartDate.Value, DateTimeKind.Utc) : null;
+        division.EndDate = request.EndDate.HasValue ? DateTime.SpecifyKind(request.EndDate.Value, DateTimeKind.Utc) : null;
         division.Description = request.Description;
 
         await _db.SaveChangesAsync(cancellationToken);
