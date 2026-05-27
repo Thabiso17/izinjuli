@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { StandingsService, DivisionService } from '../../core/services';
 import { LeagueTableDto, StandingDto, DivisionDto, TopScorerDto } from '../../core/models';
+import { getImageUrl } from '../../core/utils/image.utils';
 
 @Component({
   selector: 'app-standings',
@@ -226,9 +227,9 @@ import { LeagueTableDto, StandingDto, DivisionDto, TopScorerDto } from '../../co
 
                           <!-- Player Info -->
                           <div class="flex-grow-1">
-                            @if (scorer.profileImageUrl) {
+                            @if (getImageUrl(scorer.profileImageUrl)) {
                               <img
-                                [src]="scorer.profileImageUrl"
+                                [src]="getImageUrl(scorer.profileImageUrl)"
                                 [alt]="scorer.fullName"
                                 class="player-avatar-sm mb-2"
                               />
@@ -401,6 +402,9 @@ export class StandingsComponent implements OnInit {
   filterSeason = this.currentYear;
   filterDivisionId?: string;
   filterMatchweek?: number;
+
+  // Use shared utility for image URL handling
+  getImageUrl = getImageUrl;
 
   ngOnInit() {
     this.loadAvailableSeasons();

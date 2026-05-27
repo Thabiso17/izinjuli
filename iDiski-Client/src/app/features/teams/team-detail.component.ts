@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TeamService, PlayerService, MatchService } from '../../core/services';
 import { TeamDto, PlayerDto, MatchResultDto } from '../../core/models';
+import { getImageUrl } from '../../core/utils/image.utils';
 
 @Component({
   selector: 'app-team-detail',
@@ -149,9 +150,9 @@ import { TeamDto, PlayerDto, MatchResultDto } from '../../core/models';
                                 <div class="card-body">
                                   <div class="d-flex align-items-center">
                                     <div class="position-relative me-3">
-                                      @if (player.profileImageUrl) {
+                                      @if (getImageUrl(player.profileImageUrl)) {
                                         <img
-                                          [src]="player.profileImageUrl"
+                                          [src]="getImageUrl(player.profileImageUrl)"
                                           [alt]="player.fullName"
                                           class="player-avatar"
                                         />
@@ -418,6 +419,9 @@ export class TeamDetailComponent implements OnInit {
   loadingPlayers = signal(false);
   loadingMatches = signal(false);
   activeTab = signal<'squad' | 'fixtures' | 'results'>('squad');
+
+  // Use shared utility for image URL handling
+  getImageUrl = getImageUrl;
 
   ngOnInit() {
     this.route.params.subscribe((params) => {

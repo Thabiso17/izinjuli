@@ -14,8 +14,8 @@ import {
   PlayerPosition,
   PreferredFoot,
 } from '../../../core/models';
-import { environment } from '../../../../environments/environment';
 import { COUNTRIES } from '../../../core/data/countries';
+import { getImageUrl } from '../../../core/utils/image.utils';
 
 @Component({
   selector: 'app-players-admin',
@@ -765,23 +765,8 @@ export class PlayersAdminComponent implements OnInit {
     this.countrySearchTerm.set(input.value);
   }
 
-  getImageUrl(url: string | null): string | null {
-    if (!url) return null;
-    // If it's already a full URL, return as-is
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
-    }
-    // Otherwise, prepend the API server URL (http://localhost:5207)
-    // environment.apiBaseUrl is "http://localhost:5207/api", we need just "http://localhost:5207"
-    const apiBase = environment.apiBaseUrl; // "http://localhost:5207/api"
-    const serverUrl = apiBase.substring(0, apiBase.lastIndexOf('/api')); // "http://localhost:5207"
-
-    // Ensure url starts with /
-    const path = url.startsWith('/') ? url : `/${url}`;
-
-    console.log('Image URL:', `${serverUrl}${path}`);
-    return `${serverUrl}${path}`;
-  }
+  // Use shared utility for image URL handling
+  getImageUrl = getImageUrl;
 
   showAddModal() {
     this.editingPlayer.set(null);

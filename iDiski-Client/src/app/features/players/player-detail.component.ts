@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { PlayerService, MatchEventService, SuspensionService } from '../../core/services';
 import { PlayerDto, MatchEventDto, SuspensionDto } from '../../core/models';
+import { getImageUrl } from '../../core/utils/image.utils';
 
 @Component({
   selector: 'app-player-detail',
@@ -23,9 +24,9 @@ import { PlayerDto, MatchEventDto, SuspensionDto } from '../../core/models';
               <div class="card-body">
                 <div class="row align-items-center">
                   <div class="col-md-2 text-center">
-                    @if (player()!.profileImageUrl) {
+                    @if (getImageUrl(player()!.profileImageUrl)) {
                       <img
-                        [src]="player()!.profileImageUrl"
+                        [src]="getImageUrl(player()!.profileImageUrl)"
                         [alt]="player()!.fullName"
                         class="player-photo"
                       />
@@ -359,6 +360,9 @@ export class PlayerDetailComponent implements OnInit {
   loadingEvents = signal(false);
   loadingSuspensions = signal(false);
   activeTab = signal<'events' | 'suspensions'>('events');
+
+  // Use shared utility for image URL handling
+  getImageUrl = getImageUrl;
 
   ngOnInit() {
     this.route.params.subscribe((params) => {
