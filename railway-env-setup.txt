@@ -1,0 +1,14 @@
+# Railway Environment Variables Configuration
+# Copy and paste these into Railway Dashboard → Project Settings → Variables
+
+# Cloudinary Configuration
+USE_CLOUDINARY=true
+Cloudinary__CloudName=dukiokxss
+Cloudinary__ApiKey=688649726873936
+Cloudinary__ApiSecret=tfJmSO20wE_BHKUPHCK82WcI4K4
+
+# Frontend CORS (if not already set)
+ProductionOrigin=https://izinjuli.vercel.app
+
+# Note: DATABASE_URL is automatically provided by Railway Postgres addon
+# Note: Use double underscores (__) in Railway to represent nested config

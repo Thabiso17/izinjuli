@@ -28,9 +28,16 @@
 1. Click on your API service
 2. Go to **"Variables"** tab
 3. Click **"+ New Variable"**
-4. Add:
-   - Key: `ASPNETCORE_ENVIRONMENT`, Value: `Production`
-   - Key: `ProductionOrigin`, Value: `https://izinjuli.vercel.app`
+4. Add these variables (copy exact values):
+   ```
+   ASPNETCORE_ENVIRONMENT=Production
+   ProductionOrigin=https://izinjuli.vercel.app
+   USE_CLOUDINARY=true
+   Cloudinary__CloudName=dukiokxss
+   Cloudinary__ApiKey=688649726873936
+   Cloudinary__ApiSecret=tfJmSO20wE_BHKUPHCK82WcI4K4
+   ```
+   ⚠️ **Important**: Use double underscores `__` for Cloudinary variables
 
 ### Step 6: Run Database Migrations
 After deployment, apply migrations by calling:

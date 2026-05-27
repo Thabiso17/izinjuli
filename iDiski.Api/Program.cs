@@ -62,8 +62,22 @@ builder.Services.AddMediatR(cfg =>
 builder.Services.AddValidatorsFromAssembly(typeof(iDiski.Application.Teams.TeamDto).Assembly);
 
 // 5.5. Register File Storage Service
-builder.Services.AddScoped<iDiski.Application.Common.Interfaces.IFileStorageService,
-    iDiski.Infrastructure.Services.LocalFileStorageService>();
+// Use Cloudinary in production (Railway), local storage in development
+var useCloudinary = Environment.GetEnvironmentVariable("USE_CLOUDINARY") == "true"
+    || !builder.Environment.IsDevelopment();
+
+if (useCloudinary)
+{
+    Console.WriteLine("Using Cloudinary for file storage");
+    builder.Services.AddScoped<iDiski.Application.Common.Interfaces.IFileStorageService,
+        iDiski.Infrastructure.Services.CloudinaryFileStorageService>();
+}
+else
+{
+    Console.WriteLine("Using local file storage (wwwroot/uploads)");
+    builder.Services.AddScoped<iDiski.Application.Common.Interfaces.IFileStorageService,
+        iDiski.Infrastructure.Services.LocalFileStorageService>();
+}
 
 // 6. Configure CORS for Angular frontend
 builder.Services.AddCors(options =>
