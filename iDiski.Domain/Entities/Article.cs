@@ -35,4 +35,7 @@ public class Article : BaseEntity
     public string[] Tags { get; set; } = Array.Empty<string>();
 
     public int ViewCount { get; set; }
+
+    // Navigation properties
+    public ICollection<ArticleAttachment> Attachments { get; set; } = new List<ArticleAttachment>();
 }

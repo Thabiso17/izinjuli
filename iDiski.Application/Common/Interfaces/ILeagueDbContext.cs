@@ -9,16 +9,17 @@ namespace iDiski.Application.Common.Interfaces;
 /// </summary>
 public interface ILeagueDbContext
 {
-    DbSet<Team>             Teams             { get; }
-    DbSet<Player>           Players           { get; }
-    DbSet<MatchResult>      MatchResults      { get; }
-    DbSet<Article>          Articles          { get; }
-    DbSet<Video>            Videos            { get; }
-    DbSet<Sponsor>          Sponsors          { get; }
-    DbSet<PageLayoutConfig> PageLayoutConfigs { get; }
-    DbSet<Division>         Divisions         { get; }
-    DbSet<MatchEvent>       MatchEvents       { get; }
-    DbSet<Suspension>       Suspensions       { get; }
+    DbSet<Team>               Teams               { get; }
+    DbSet<Player>             Players             { get; }
+    DbSet<MatchResult>        MatchResults        { get; }
+    DbSet<Article>            Articles            { get; }
+    DbSet<ArticleAttachment>  ArticleAttachments  { get; }
+    DbSet<Video>              Videos              { get; }
+    DbSet<Sponsor>            Sponsors            { get; }
+    DbSet<PageLayoutConfig>   PageLayoutConfigs   { get; }
+    DbSet<Division>           Divisions           { get; }
+    DbSet<MatchEvent>         MatchEvents         { get; }
+    DbSet<Suspension>         Suspensions         { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -24,7 +24,8 @@ public sealed record ArticleDto(
     DateTime? PublishedAt,
     string[]  Tags,
     int       ViewCount,
-    DateTime  CreatedAt
+    DateTime  CreatedAt,
+    IReadOnlyList<ArticleAttachmentDto> Attachments
 );
 
 /// <summary>Lightweight card version — omits full Content for list views.</summary>
@@ -95,12 +96,19 @@ public sealed class GetArticleBySlugQueryHandler
     {
         var article = await _db.Articles
             .AsNoTracking()
+            .Include(a => a.Attachments)
             .Where(a => a.Slug == request.Slug && a.IsPublished)
             .Select(a => new ArticleDto(
                 a.Id, a.Title, a.Slug, a.Content, a.Excerpt,
                 a.CoverImageUrl, a.VideoUrl, a.FeaturedImageUrl,
                 a.Author, a.IsPublished, a.PublishedAt, a.Tags,
-                a.ViewCount, a.CreatedAt))
+                a.ViewCount, a.CreatedAt,
+                a.Attachments.OrderBy(att => att.DisplayOrder)
+                    .Select(att => new ArticleAttachmentDto(
+                        att.Id, att.FileName, att.FileUrl,
+                        att.Type.ToString(), att.FileSizeBytes,
+                        att.Caption, att.DisplayOrder))
+                    .ToList()))
             .FirstOrDefaultAsync(cancellationToken);
 
         return article ?? throw new NotFoundException(nameof(Article), request.Slug);

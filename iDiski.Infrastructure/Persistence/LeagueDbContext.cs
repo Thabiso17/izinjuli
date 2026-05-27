@@ -13,6 +13,7 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
     public DbSet<Player> Players => Set<Player>();
     public DbSet<MatchResult> MatchResults => Set<MatchResult>();
     public DbSet<Article> Articles => Set<Article>();
+    public DbSet<ArticleAttachment> ArticleAttachments => Set<ArticleAttachment>();
     public DbSet<Video> Videos => Set<Video>();
     public DbSet<Sponsor> Sponsors => Set<Sponsor>();
     public DbSet<PageLayoutConfig> PageLayoutConfigs => Set<PageLayoutConfig>();
@@ -132,6 +133,35 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
 
             entity.HasIndex(a => a.PublishedAt);
             entity.HasIndex(a => a.IsPinned);
+        });
+
+        // ── ArticleAttachment ─────────────────────────────────────────────────
+        modelBuilder.Entity<ArticleAttachment>(entity =>
+        {
+            entity.HasKey(aa => aa.Id);
+
+            entity.Property(aa => aa.FileName)
+                  .IsRequired()
+                  .HasMaxLength(255);
+
+            entity.Property(aa => aa.FileUrl)
+                  .IsRequired()
+                  .HasMaxLength(500);
+
+            entity.Property(aa => aa.Type)
+                  .HasConversion<string>()
+                  .HasMaxLength(20);
+
+            entity.Property(aa => aa.Caption)
+                  .HasMaxLength(500);
+
+            entity.HasIndex(aa => aa.ArticleId);
+            entity.HasIndex(aa => aa.DisplayOrder);
+
+            entity.HasOne(aa => aa.Article)
+                  .WithMany(a => a.Attachments)
+                  .HasForeignKey(aa => aa.ArticleId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         // ── Video ─────────────────────────────────────────────────────────────
