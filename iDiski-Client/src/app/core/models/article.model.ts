@@ -1,4 +1,5 @@
 // src/app/core/models/article.model.ts
+import { ArticleAttachmentDto } from './article-attachment.model';
 
 /**
  * Lightweight card variant returned by the article list endpoints.
@@ -44,6 +45,7 @@ export interface ArticleDto {
   viewCount: number;
   createdAt: string;
   updatedAt: string | null;
+  attachments: ArticleAttachmentDto[];
 }
 
 /** Returned by POST /api/articles — contains both the ID and the auto-generated slug. */

@@ -2,6 +2,7 @@
 // Single import point: import { ArticleDto, StandingDto, ... } from '@core/models';
 
 export * from './article.model';
+export * from './article-attachment.model';
 export * from './standing.model';
 export * from './team.model';
 export * from './player.model';
