@@ -75,7 +75,7 @@ public sealed class CloudinaryFileStorageService : IFileStorageService
         }
 
         var deletionParams = new DeletionParams(publicId);
-        await _cloudinary.DestroyAsync(deletionParams, cancellationToken);
+        await _cloudinary.DestroyAsync(deletionParams);
     }
 
     private static string? ExtractPublicIdFromUrl(string url)
