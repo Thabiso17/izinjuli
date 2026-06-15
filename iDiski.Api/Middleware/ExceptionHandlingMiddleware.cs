@@ -42,7 +42,8 @@ public class ExceptionHandlingMiddleware
                 context.Response.StatusCode = StatusCodes.Status422UnprocessableEntity;
                 response.Title = "One or more validation errors occurred.";
                 response.Status = StatusCodes.Status422UnprocessableEntity;
-                response.Detail = string.Join(", ", validationException.Errors.Select(e => e.ErrorMessage));
+                var errorMessages = validationException.Errors.SelectMany(e => e.Value).ToList();
+                response.Detail = string.Join("; ", errorMessages);
                 break;
 
             case NotFoundException notFoundException:

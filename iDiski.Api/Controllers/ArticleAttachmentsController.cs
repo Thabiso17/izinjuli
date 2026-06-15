@@ -9,10 +9,12 @@ namespace iDiski.Api.Controllers;
 public class ArticleAttachmentsController : BaseApiController
 {
     private readonly IFileStorageService _fileStorage;
+    private readonly ILogger<ArticleAttachmentsController> _logger;
 
-    public ArticleAttachmentsController(IFileStorageService fileStorage)
+    public ArticleAttachmentsController(IFileStorageService fileStorage, ILogger<ArticleAttachmentsController> logger)
     {
         _fileStorage = fileStorage;
+        _logger = logger;
     }
 
     /// <summary>
