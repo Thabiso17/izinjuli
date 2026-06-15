@@ -1,4 +1,5 @@
 using iDiski.Application.Articles;
+using iDiski.Application.Common.Constants;
 using iDiski.Application.Common.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -42,16 +43,18 @@ public class ArticleAttachmentsController : BaseApiController
         if (file == null || file.Length == 0)
             return BadRequest(new { error = "No file uploaded" });
 
-        // Check file size (max 10MB)
-        if (file.Length > 10 * 1024 * 1024)
-            return BadRequest(new { error = "File size exceeds 10MB limit" });
+        // Check file size
+        if (file.Length > FileUploadConstants.MaxDocumentFileSizeBytes)
+            return BadRequest(new { error = $"File size exceeds {FileUploadConstants.MaxDocumentFileSizeBytes / 1024 / 1024}MB limit" });
 
         // Validate file type
-        var allowedExtensions = new[] { ".pdf", ".jpg", ".jpeg", ".png", ".gif" };
         var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
 
-        if (!allowedExtensions.Contains(fileExtension))
-            return BadRequest(new { error = "Invalid file type. Allowed: PDF, JPG, PNG, GIF" });
+        if (!FileUploadConstants.AllowedDocumentExtensions.Contains(fileExtension))
+            return BadRequest(new { error = $"Invalid file type. Allowed: {string.Join(", ", FileUploadConstants.AllowedDocumentExtensions)}" });
+
+        if (file.ContentType != null && !FileUploadConstants.AllowedDocumentMimeTypes.Contains(file.ContentType))
+            return BadRequest(new { error = "Invalid file content type. File may be corrupted or of wrong type." });
 
         // Determine attachment type
         var attachmentType = fileExtension == ".pdf" ? "PDF" : "Image";
@@ -61,7 +64,7 @@ public class ArticleAttachmentsController : BaseApiController
         {
             // Upload file
             await using var stream = file.OpenReadStream();
-            fileUrl = await _fileStorage.SaveFileAsync(stream, file.FileName, "articles");
+            fileUrl = await _fileStorage.SaveFileAsync(stream, file.FileName, FileUploadConstants.ArticleAttachmentsFolder);
 
             // Create attachment record
             var command = new AddArticleAttachmentCommand(

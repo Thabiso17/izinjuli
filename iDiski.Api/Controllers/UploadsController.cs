@@ -1,3 +1,4 @@
+using iDiski.Application.Common.Constants;
 using iDiski.Application.Common.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,11 +13,6 @@ public sealed class UploadsController : ControllerBase
 {
     private readonly IFileStorageService _fileStorage;
     private readonly ILogger<UploadsController> _logger;
-
-    // Allowed file extensions
-    private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
-    private static readonly string[] AllowedMimeTypes = { "image/jpeg", "image/png", "image/gif", "image/webp" };
-    private const long MaxFileSize = 5 * 1024 * 1024; // 5 MB
 
     public UploadsController(
         IFileStorageService fileStorage,
@@ -47,21 +43,21 @@ public sealed class UploadsController : ControllerBase
             return BadRequest(new { message = "No file uploaded" });
         }
 
-        if (file.Length > MaxFileSize)
+        if (file.Length > FileUploadConstants.MaxImageFileSizeBytes)
         {
-            return BadRequest(new { message = $"File size exceeds maximum of {MaxFileSize / 1024 / 1024} MB" });
+            return BadRequest(new { message = $"File size exceeds maximum of {FileUploadConstants.MaxImageFileSizeBytes / 1024 / 1024} MB" });
         }
 
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (!AllowedExtensions.Contains(extension))
+        if (!FileUploadConstants.AllowedImageExtensions.Contains(extension))
         {
             return BadRequest(new
             {
-                message = $"Invalid file type. Allowed types: {string.Join(", ", AllowedExtensions)}"
+                message = $"Invalid file type. Allowed types: {string.Join(", ", FileUploadConstants.AllowedImageExtensions)}"
             });
         }
 
-        if (file.ContentType != null && !AllowedMimeTypes.Contains(file.ContentType))
+        if (file.ContentType != null && !FileUploadConstants.AllowedImageMimeTypes.Contains(file.ContentType))
         {
             return BadRequest(new
             {
@@ -71,6 +67,8 @@ public sealed class UploadsController : ControllerBase
 
         try
         {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
             // Save file
             using var stream = file.OpenReadStream();
             var fileUrl = await _fileStorage.SaveFileAsync(
@@ -79,13 +77,20 @@ public sealed class UploadsController : ControllerBase
                 folder,
                 cancellationToken);
 
-            _logger.LogInformation("File uploaded successfully: {FileUrl}", fileUrl);
+            sw.Stop();
+
+            _logger.LogInformation(
+                "File uploaded successfully. Duration: {DurationMs}ms, Size: {FileSizeKB}KB, Folder: {Folder}, FileName: {FileName}",
+                sw.ElapsedMilliseconds,
+                file.Length / 1024,
+                folder,
+                file.FileName);
 
             return Ok(new UploadResponse(fileUrl));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to upload file");
+            _logger.LogError(ex, "Failed to upload file: {FileName} to {Folder}", file.FileName, folder);
             return StatusCode(500, new { message = "Failed to upload file" });
         }
     }
