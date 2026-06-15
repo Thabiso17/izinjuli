@@ -1,9 +1,13 @@
 using iDiski.Infrastructure.Persistence;
 using iDiski.Application.Common.Interfaces;
+using iDiski.Infrastructure.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerUI;
 using FluentValidation;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,6 +59,71 @@ builder.Services.AddMediatR(cfg =>
 
 // 5. Register FluentValidation
 builder.Services.AddValidatorsFromAssembly(typeof(iDiski.Application.Teams.TeamDto).Assembly);
+
+// 5.4. Register Authentication Services
+builder.Services.AddScoped<IPasswordHasher, Argon2PasswordHasher>();
+builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddHttpContextAccessor();
+
+// 5.4.1 Configure JWT Authentication
+var jwtSecret = builder.Configuration["Jwt:SecretKey"]
+    ?? throw new InvalidOperationException("Jwt:SecretKey is not configured");
+
+var jwtIssuer = builder.Configuration["Jwt:Issuer"]
+    ?? throw new InvalidOperationException("Jwt:Issuer is not configured");
+
+var jwtAudience = builder.Configuration["Jwt:Audience"]
+    ?? throw new InvalidOperationException("Jwt:Audience is not configured");
+
+var key = Encoding.ASCII.GetBytes(jwtSecret);
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+            IssuerSigningKey = new SymmetricSecurityKey(key),
+            ClockSkew = TimeSpan.Zero // No tolerance for token expiry
+        };
+
+        // Extract claims from JWT and set HttpContext.User
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = context =>
+            {
+                var userId = context.Principal?.FindFirst("userId")?.Value;
+                var email = context.Principal?.FindFirst("email")?.Value;
+
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    Console.WriteLine($"✅ JWT validated for user: {email} ({userId})");
+                }
+
+                return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = context =>
+            {
+                if (context.Exception is SecurityTokenExpiredException)
+                {
+                    context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    context.Response.ContentType = "application/json";
+                    return context.Response.WriteAsJsonAsync(new { error = "Token has expired" });
+                }
+
+                Console.WriteLine($"⚠️ Authentication failed: {context.Exception?.Message}");
+                return Task.CompletedTask;
+            }
+        };
+    });
 
 // 5.5. Register File Storage Service
 // Use Cloudinary in production (Railway), local storage in development
@@ -136,6 +205,11 @@ app.UseMiddleware<iDiski.Api.Middleware.ExceptionHandlingMiddleware>();
 app.UseCors(); // Enable CORS
 app.UseStaticFiles(); // Serve static files from wwwroot (uploaded images)
 app.UseHttpsRedirection();
+
+// Add JWT Authentication Middleware
+app.UseAuthentication(); // Validates JWT tokens
+app.UseAuthorization();  // Checks [Authorize] attributes
+
 app.MapControllers(); // This maps your ArticlesController, TeamsController, etc.
 
 // Health check endpoint for Railway
