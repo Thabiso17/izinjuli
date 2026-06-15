@@ -1,4 +1,5 @@
 using iDiski.Domain.Entities;
+using iDiski.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using iDiski.Application.Common.Interfaces;
 
@@ -20,6 +21,10 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
     public DbSet<Division> Divisions => Set<Division>();
     public DbSet<MatchEvent> MatchEvents => Set<MatchEvent>();
     public DbSet<Suspension> Suspensions => Set<Suspension>();
+    public DbSet<User> Users => Set<User>();
+    public DbSet<UserRole> UserRoles => Set<UserRole>();
+    public DbSet<UserTeam> UserTeams => Set<UserTeam>();
+    public DbSet<UserDivision> UserDivisions => Set<UserDivision>();
 
     // ── Model Configuration ───────────────────────────────────────────────────
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -329,6 +334,76 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
             .WithMany(d => d.Matches)
             .HasForeignKey(m => m.DivisionId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // ── User ──────────────────────────────────────────────────────────────
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasKey(u => u.Id);
+
+            entity.Property(u => u.Email)
+                  .IsRequired()
+                  .HasMaxLength(255);
+
+            entity.HasIndex(u => u.Email).IsUnique();
+
+            entity.Property(u => u.PasswordHash).IsRequired();
+            entity.Property(u => u.FirstName).IsRequired().HasMaxLength(100);
+            entity.Property(u => u.LastName).IsRequired().HasMaxLength(100);
+            entity.Property(u => u.PasswordResetToken).HasMaxLength(500);
+        });
+
+        // ── UserRole ──────────────────────────────────────────────────────────
+        modelBuilder.Entity<UserRole>(entity =>
+        {
+            entity.HasKey(ur => ur.Id);
+
+            entity.Property(ur => ur.Role)
+                  .HasConversion<int>()
+                  .IsRequired();
+
+            entity.HasIndex(ur => new { ur.UserId, ur.Role }).IsUnique();
+
+            entity.HasOne(ur => ur.User)
+                  .WithMany(u => u.UserRoles)
+                  .HasForeignKey(ur => ur.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── UserTeam ──────────────────────────────────────────────────────────
+        modelBuilder.Entity<UserTeam>(entity =>
+        {
+            entity.HasKey(ut => ut.Id);
+
+            entity.HasIndex(ut => new { ut.UserId, ut.TeamId }).IsUnique();
+
+            entity.HasOne(ut => ut.User)
+                  .WithMany(u => u.UserTeams)
+                  .HasForeignKey(ut => ut.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(ut => ut.Team)
+                  .WithMany()
+                  .HasForeignKey(ut => ut.TeamId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── UserDivision ──────────────────────────────────────────────────────
+        modelBuilder.Entity<UserDivision>(entity =>
+        {
+            entity.HasKey(ud => ud.Id);
+
+            entity.HasIndex(ud => new { ud.UserId, ud.DivisionId }).IsUnique();
+
+            entity.HasOne(ud => ud.User)
+                  .WithMany(u => u.UserDivisions)
+                  .HasForeignKey(ud => ud.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(ud => ud.Division)
+                  .WithMany()
+                  .HasForeignKey(ud => ud.DivisionId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
     }
 
     // ── Auto-stamp UpdatedAt ──────────────────────────────────────────────────

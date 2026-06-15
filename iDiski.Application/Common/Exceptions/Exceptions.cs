@@ -26,3 +26,21 @@ public sealed class ValidationException : Exception
             .ToDictionary(g => g.Key, g => g.ToArray());
     }
 }
+
+/// <summary>
+/// Thrown when authentication fails (invalid credentials, inactive user, etc.)
+/// The global exception handler maps this to HTTP 401 Unauthorized.
+/// </summary>
+public sealed class UnauthorizedException : Exception
+{
+    public UnauthorizedException(string message) : base(message) { }
+}
+
+/// <summary>
+/// Thrown when a user lacks permission for a resource or operation.
+/// The global exception handler maps this to HTTP 403 Forbidden.
+/// </summary>
+public sealed class ForbiddenException : Exception
+{
+    public ForbiddenException(string message) : base(message) { }
+}

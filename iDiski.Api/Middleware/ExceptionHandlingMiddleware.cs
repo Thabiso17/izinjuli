@@ -60,6 +60,20 @@ public class ExceptionHandlingMiddleware
                 response.Detail = invalidOpException.Message;
                 break;
 
+            case UnauthorizedException unauthorizedException:
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                response.Title = "Authentication failed.";
+                response.Status = StatusCodes.Status401Unauthorized;
+                response.Detail = unauthorizedException.Message;
+                break;
+
+            case ForbiddenException forbiddenException:
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                response.Title = "Access denied.";
+                response.Status = StatusCodes.Status403Forbidden;
+                response.Detail = forbiddenException.Message;
+                break;
+
             default:
                 context.Response.StatusCode = StatusCodes.Status500InternalServerError;
                 response.Title = "An internal server error occurred.";

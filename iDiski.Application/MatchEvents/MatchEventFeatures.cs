@@ -40,81 +40,70 @@ public sealed class RecordMatchEventsCommandHandler
         Commands.RecordMatchEventsCommand request,
         CancellationToken cancellationToken)
     {
-        using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        // 1. Verify match exists and get team IDs
+        var match = await _db.MatchResults
+            .Include(m => m.HomeTeam)
+            .Include(m => m.AwayTeam)
+            .FirstOrDefaultAsync(m => m.Id == request.MatchId, cancellationToken)
+            ?? throw new KeyNotFoundException($"Match with ID {request.MatchId} not found.");
 
-        try
+        // 2. Delete existing events for this match (allows re-entry)
+        var existingEvents = await _db.MatchEvents
+            .Where(e => e.MatchId == request.MatchId)
+            .ToListAsync(cancellationToken);
+
+        if (existingEvents.Any())
         {
-            // 1. Verify match exists and get team IDs
-            var match = await _db.MatchResults
-                .Include(m => m.HomeTeam)
-                .Include(m => m.AwayTeam)
-                .FirstOrDefaultAsync(m => m.Id == request.MatchId, cancellationToken)
-                ?? throw new KeyNotFoundException($"Match with ID {request.MatchId} not found.");
-
-            // 2. Delete existing events for this match (allows re-entry)
-            var existingEvents = await _db.MatchEvents
-                .Where(e => e.MatchId == request.MatchId)
-                .ToListAsync(cancellationToken);
-
-            if (existingEvents.Any())
-            {
-                // Reverse the stats from existing events before deleting
-                await ReversePlayerStats(existingEvents, cancellationToken);
-                _db.MatchEvents.RemoveRange(existingEvents);
-            }
-
-            // 3. Validate all players belong to either home or away team
-            var playerIds = request.Events.Select(e => e.PlayerId).Distinct().ToList();
-            var players = await _db.Players
-                .Where(p => playerIds.Contains(p.Id))
-                .ToListAsync(cancellationToken);
-
-            foreach (var eventInput in request.Events)
-            {
-                var player = players.FirstOrDefault(p => p.Id == eventInput.PlayerId)
-                    ?? throw new KeyNotFoundException($"Player with ID {eventInput.PlayerId} not found.");
-
-                if (player.TeamId != match.HomeTeamId && player.TeamId != match.AwayTeamId)
-                {
-                    throw new InvalidOperationException(
-                        $"Player {player.FirstName} {player.LastName} does not belong to either team in this match.");
-                }
-            }
-
-            // 4. Create new match events
-            foreach (var eventInput in request.Events)
-            {
-                if (!Enum.TryParse<EventType>(eventInput.EventType, out var eventType))
-                    continue;
-
-                var matchEvent = new MatchEvent
-                {
-                    MatchId = request.MatchId,
-                    PlayerId = eventInput.PlayerId,
-                    EventType = eventType,
-                    Minute = eventInput.Minute,
-                    AdditionalInfo = eventInput.AdditionalInfo
-                };
-
-                _db.MatchEvents.Add(matchEvent);
-            }
-
-            // 5. Update player cumulative stats
-            await UpdatePlayerStats(request.Events, players, cancellationToken);
-
-            // 6. Check and create suspensions based on card rules
-            await CheckAndCreateSuspensions(request.Events, players, cancellationToken);
-
-            await _db.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
-            return Unit.Value;
+            // Reverse the stats from existing events before deleting
+            await ReversePlayerStats(existingEvents, cancellationToken);
+            _db.MatchEvents.RemoveRange(existingEvents);
         }
-        catch
+
+        // 3. Validate all players belong to either home or away team
+        var playerIds = request.Events.Select(e => e.PlayerId).Distinct().ToList();
+        var players = await _db.Players
+            .Where(p => playerIds.Contains(p.Id))
+            .ToListAsync(cancellationToken);
+
+        foreach (var eventInput in request.Events)
         {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
+            var player = players.FirstOrDefault(p => p.Id == eventInput.PlayerId)
+                ?? throw new KeyNotFoundException($"Player with ID {eventInput.PlayerId} not found.");
+
+            if (player.TeamId != match.HomeTeamId && player.TeamId != match.AwayTeamId)
+            {
+                throw new InvalidOperationException(
+                    $"Player {player.FirstName} {player.LastName} does not belong to either team in this match.");
+            }
         }
+
+        // 4. Create new match events
+        foreach (var eventInput in request.Events)
+        {
+            if (!Enum.TryParse<EventType>(eventInput.EventType, out var eventType))
+                continue;
+
+            var matchEvent = new MatchEvent
+            {
+                MatchId = request.MatchId,
+                PlayerId = eventInput.PlayerId,
+                EventType = eventType,
+                Minute = eventInput.Minute,
+                AdditionalInfo = eventInput.AdditionalInfo
+            };
+
+            _db.MatchEvents.Add(matchEvent);
+        }
+
+        // 5. Update player cumulative stats
+        await UpdatePlayerStats(request.Events, players, cancellationToken);
+
+        // 6. Check and create suspensions based on card rules
+        await CheckAndCreateSuspensions(request.Events, players, cancellationToken);
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return Unit.Value;
     }
 
     private async Task ReversePlayerStats(

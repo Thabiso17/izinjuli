@@ -20,6 +20,10 @@ public interface ILeagueDbContext
     DbSet<Division>           Divisions           { get; }
     DbSet<MatchEvent>         MatchEvents         { get; }
     DbSet<Suspension>         Suspensions         { get; }
+    DbSet<User>               Users               { get; }
+    DbSet<UserRole>           UserRoles           { get; }
+    DbSet<UserTeam>           UserTeams           { get; }
+    DbSet<UserDivision>       UserDivisions       { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
