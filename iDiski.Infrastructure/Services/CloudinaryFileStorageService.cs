@@ -25,7 +25,7 @@ public sealed class CloudinaryFileStorageService : IFileStorageService
         var account = new Account(cloudName, apiKey, apiSecret);
         _cloudinary = new Cloudinary(account)
         {
-            Api = { Timeout = TimeSpan.FromSeconds(30) }
+            Api = { Timeout = 30000 }
         };
     }
 
