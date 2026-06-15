@@ -2,6 +2,8 @@ using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
 using iDiski.Application.Common.Interfaces;
 using Microsoft.Extensions.Configuration;
+using Polly;
+using Polly.Retry;
 
 namespace iDiski.Infrastructure.Services;
 
@@ -12,6 +14,7 @@ namespace iDiski.Infrastructure.Services;
 public sealed class CloudinaryFileStorageService : IFileStorageService
 {
     private readonly Cloudinary _cloudinary;
+    private readonly IAsyncPolicy<ImageUploadResult> _uploadRetryPolicy;
 
     public CloudinaryFileStorageService(IConfiguration configuration)
     {
@@ -27,6 +30,27 @@ public sealed class CloudinaryFileStorageService : IFileStorageService
         {
             Api = { Timeout = 30000 }
         };
+
+        _uploadRetryPolicy = Policy
+            .Handle<Exception>()
+            .OrResult<ImageUploadResult>(r => r.Error != null && IsTransientError(r.Error.Message))
+            .WaitAndRetryAsync(
+                retryCount: 3,
+                sleepDurationProvider: retryAttempt =>
+                    TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                onRetry: (outcome, delay, retryCount, context) =>
+                {
+                    var errorMsg = outcome.Exception?.Message ?? outcome.Result?.Error?.Message ?? "Unknown error";
+                    System.Diagnostics.Debug.WriteLine($"Cloudinary upload retry {retryCount} after {delay.TotalSeconds}s: {errorMsg}");
+                });
+    }
+
+    private static bool IsTransientError(string errorMessage)
+    {
+        return errorMessage.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
+               errorMessage.Contains("temporarily", StringComparison.OrdinalIgnoreCase) ||
+               errorMessage.Contains("unavailable", StringComparison.OrdinalIgnoreCase) ||
+               errorMessage.Contains("rate limit", StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task<string> SaveFileAsync(
@@ -50,7 +74,8 @@ public sealed class CloudinaryFileStorageService : IFileStorageService
             UseFilename = false
         };
 
-        var uploadResult = await _cloudinary.UploadAsync(uploadParams, cancellationToken);
+        var uploadResult = await _uploadRetryPolicy.ExecuteAsync(
+            async () => await _cloudinary.UploadAsync(uploadParams, cancellationToken));
 
         if (uploadResult.Error != null)
         {

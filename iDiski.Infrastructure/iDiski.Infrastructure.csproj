@@ -9,6 +9,7 @@
     <PackageReference Include="CloudinaryDotNet" Version="1.29.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.0" />
+    <PackageReference Include="Polly" Version="8.7.0" />
   </ItemGroup>
 
   <PropertyGroup>

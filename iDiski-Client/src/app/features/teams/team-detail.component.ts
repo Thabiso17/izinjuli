@@ -4,16 +4,25 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TeamService, PlayerService, MatchService } from '../../core/services';
 import { TeamDto, PlayerDto, MatchResultDto } from '../../core/models';
 import { getImageUrl } from '../../core/utils/image.utils';
+import { ErrorStateComponent } from '../../shared/components/error-state/error-state.component';
 
 @Component({
   selector: 'app-team-detail',
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, ErrorStateComponent],
   template: `
     <div class="container py-5">
       @if (loading()) {
         <div class="text-center py-5">
           <div class="spinner-border text-primary" role="status"></div>
         </div>
+      }
+
+      @if (error()) {
+        <app-error-state
+          title="Failed to Load Team"
+          [message]="error()!"
+          [onRetry]="() => reloadTeam()"
+        ></app-error-state>
       }
 
       @if (team()) {
@@ -416,6 +425,7 @@ export class TeamDetailComponent implements OnInit {
   pastMatches = signal<MatchResultDto[]>([]);
 
   loading = signal(false);
+  error = signal<string | null>(null);
   loadingPlayers = signal(false);
   loadingMatches = signal(false);
   activeTab = signal<'squad' | 'fixtures' | 'results'>('squad');
@@ -434,8 +444,12 @@ export class TeamDetailComponent implements OnInit {
     });
   }
 
+  teamId: string | null = null;
+
   loadTeam(id: string) {
+    this.teamId = id;
     this.loading.set(true);
+    this.error.set(null);
     this.teamService.getById(id).subscribe({
       next: (data) => {
         this.team.set(data);
@@ -443,9 +457,16 @@ export class TeamDetailComponent implements OnInit {
       },
       error: (err) => {
         console.error('Failed to load team:', err);
+        this.error.set('Failed to load team details. Please try again.');
         this.loading.set(false);
       },
     });
+  }
+
+  reloadTeam() {
+    if (this.teamId) {
+      this.loadTeam(this.teamId);
+    }
   }
 
   loadPlayers(teamId: string) {

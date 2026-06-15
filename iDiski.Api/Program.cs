@@ -34,8 +34,11 @@ Console.WriteLine("Database connection configured.");
 builder.Services.AddDbContext<LeagueDbContext>(options =>
 {
     options.UseNpgsql(connectionString,
-        // Tell EF to look for migrations in the Infrastructure project
-        b => b.MigrationsAssembly("iDiski.Infrastructure"));
+        b =>
+        {
+            b.MigrationsAssembly("iDiski.Infrastructure");
+            b.CommandTimeout(60); // 60 seconds for complex queries
+        });
 
     // Suppress pending model changes warning during migration
     options.ConfigureWarnings(warnings =>
