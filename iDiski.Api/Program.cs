@@ -109,6 +109,22 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+// Auto-migrate database on startup
+try
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var db = scope.ServiceProvider.GetRequiredService<LeagueDbContext>();
+        await db.Database.MigrateAsync();
+        Console.WriteLine("✅ Database migration applied successfully on startup");
+    }
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"⚠️ Database migration failed on startup: {ex.Message}");
+    throw;
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
