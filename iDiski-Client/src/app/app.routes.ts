@@ -1,11 +1,34 @@
 import { Routes } from '@angular/router';
-import { adminGuard } from './core/guards/admin.guard';
+import { adminGuard, authGuard, noAuthGuard } from './core/guards/auth.guards';
 
 export const routes: Routes = [
   {
     path: '',
     loadComponent: () =>
       import('./features/home/home.component').then((m) => m.HomeComponent),
+  },
+  // ── AUTHENTICATION PAGES ──────────────────────────────────────────────────
+  {
+    path: 'login',
+    canActivate: [noAuthGuard],
+    loadComponent: () =>
+      import('./features/auth/login/login.component').then((m) => m.LoginComponent),
+  },
+  {
+    path: 'forgot-password',
+    canActivate: [noAuthGuard],
+    loadComponent: () =>
+      import('./features/auth/forgot-password/forgot-password.component').then(
+        (m) => m.ForgotPasswordComponent
+      ),
+  },
+  {
+    path: 'reset-password',
+    canActivate: [noAuthGuard],
+    loadComponent: () =>
+      import('./features/auth/reset-password/reset-password.component').then(
+        (m) => m.ResetPasswordComponent
+      ),
   },
   // ── PUBLIC PAGES ──────────────────────────────────────────────────────────
   {
@@ -70,7 +93,7 @@ export const routes: Routes = [
   // ── ADMIN PAGES ───────────────────────────────────────────────────────────
   {
     path: 'admin',
-    canActivate: [adminGuard],
+    canActivate: [authGuard, adminGuard],
     children: [
       {
         path: '',
