@@ -14,7 +14,8 @@ public sealed class UploadsController : ControllerBase
     private readonly ILogger<UploadsController> _logger;
 
     // Allowed file extensions
-    private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg" };
+    private static readonly string[] AllowedExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
+    private static readonly string[] AllowedMimeTypes = { "image/jpeg", "image/png", "image/gif", "image/webp" };
     private const long MaxFileSize = 5 * 1024 * 1024; // 5 MB
 
     public UploadsController(
@@ -57,6 +58,14 @@ public sealed class UploadsController : ControllerBase
             return BadRequest(new
             {
                 message = $"Invalid file type. Allowed types: {string.Join(", ", AllowedExtensions)}"
+            });
+        }
+
+        if (file.ContentType != null && !AllowedMimeTypes.Contains(file.ContentType))
+        {
+            return BadRequest(new
+            {
+                message = "Invalid file content type. File may be corrupted or of wrong type."
             });
         }
 

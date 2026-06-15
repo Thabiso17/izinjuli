@@ -54,11 +54,12 @@ public class ArticleAttachmentsController : BaseApiController
         // Determine attachment type
         var attachmentType = fileExtension == ".pdf" ? "PDF" : "Image";
 
+        string fileUrl = null;
         try
         {
             // Upload file
-            using var stream = file.OpenReadStream();
-            var fileUrl = await _fileStorage.SaveFileAsync(stream, file.FileName, "articles");
+            await using var stream = file.OpenReadStream();
+            fileUrl = await _fileStorage.SaveFileAsync(stream, file.FileName, "articles");
 
             // Create attachment record
             var command = new AddArticleAttachmentCommand(
@@ -86,7 +87,20 @@ public class ArticleAttachmentsController : BaseApiController
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { error = $"Upload failed: {ex.Message}" });
+            if (!string.IsNullOrEmpty(fileUrl))
+            {
+                try
+                {
+                    await _fileStorage.DeleteFileAsync(fileUrl);
+                }
+                catch (Exception deleteEx)
+                {
+                    _logger.LogError(deleteEx, "Failed to clean up uploaded file after attachment creation error");
+                }
+            }
+
+            _logger.LogError(ex, "Article attachment upload failed");
+            return StatusCode(500, new { error = "Upload failed. Please try again." });
         }
     }
 

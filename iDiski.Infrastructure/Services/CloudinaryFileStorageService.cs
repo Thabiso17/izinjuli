@@ -23,7 +23,10 @@ public sealed class CloudinaryFileStorageService : IFileStorageService
             ?? throw new InvalidOperationException("Cloudinary:ApiSecret not configured");
 
         var account = new Account(cloudName, apiKey, apiSecret);
-        _cloudinary = new Cloudinary(account);
+        _cloudinary = new Cloudinary(account)
+        {
+            Api = { Timeout = TimeSpan.FromSeconds(30) }
+        };
     }
 
     public async Task<string> SaveFileAsync(
@@ -66,16 +69,26 @@ public sealed class CloudinaryFileStorageService : IFileStorageService
             return;
         }
 
-        // Extract public ID from Cloudinary URL
-        // Example: https://res.cloudinary.com/{cloud}/image/upload/v123456/{folder}/{filename}.jpg
         var publicId = ExtractPublicIdFromUrl(fileUrl);
         if (string.IsNullOrEmpty(publicId))
         {
             return;
         }
 
-        var deletionParams = new DeletionParams(publicId);
-        await _cloudinary.DestroyAsync(deletionParams);
+        try
+        {
+            var deletionParams = new DeletionParams(publicId);
+            var result = await _cloudinary.DestroyAsync(deletionParams);
+
+            if (result.Error != null)
+            {
+                throw new InvalidOperationException($"Failed to delete file from Cloudinary: {result.Error.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to delete file from Cloudinary: {ex.Message}", ex);
+        }
     }
 
     private static string? ExtractPublicIdFromUrl(string url)

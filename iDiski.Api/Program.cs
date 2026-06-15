@@ -16,27 +16,19 @@ var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
 // Railway provides DATABASE_URL in postgres:// or postgresql:// format, convert to Host= format if needed
 if (!string.IsNullOrEmpty(connectionString) && (connectionString.StartsWith("postgres://") || connectionString.StartsWith("postgresql://")))
 {
-    // Parse postgres://user:password@host:port/database format manually
-    // System.Uri doesn't recognize postgres:// as a valid scheme
-    var url = connectionString.Replace("postgresql://", "").Replace("postgres://", "");
+    var url = connectionString.Replace("postgresql://", "postgres://");
+    var uri = new Uri(url);
 
-    // Split by @ to separate credentials from host
-    var parts = url.Split('@');
-    var credentials = parts[0].Split(':');
-    var username = credentials[0];
-    var password = credentials.Length > 1 ? credentials[1] : "";
-
-    // Split host part by / to separate host:port from database
-    var hostParts = parts[1].Split('/');
-    var hostAndPort = hostParts[0].Split(':');
-    var host = hostAndPort[0];
-    var port = hostAndPort.Length > 1 ? hostAndPort[1] : "5432";
-    var database = hostParts.Length > 1 ? hostParts[1] : "";
+    var username = uri.UserInfo.Split(':')[0];
+    var password = uri.UserInfo.Contains(':') ? uri.UserInfo.Split(':')[1] : "";
+    var host = uri.Host;
+    var port = uri.Port > 0 ? uri.Port : 5432;
+    var database = uri.AbsolutePath.TrimStart('/');
 
     connectionString = $"Host={host};Port={port};Database={database};Username={username};Password={password};SSL Mode=Require;Trust Server Certificate=true";
 }
 
-Console.WriteLine($"Using connection string: {connectionString?.Substring(0, Math.Min(50, connectionString?.Length ?? 0))}...");
+Console.WriteLine("Database connection configured.");
 
 // 2. Register DbContext in the DI Container
 builder.Services.AddDbContext<LeagueDbContext>(options =>
@@ -121,6 +113,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(options => options.SwaggerEndpoint("/openapi/v1.json", "v1"));
 }
 
+app.UseMiddleware<iDiski.Api.Middleware.ExceptionHandlingMiddleware>();
 app.UseCors(); // Enable CORS
 app.UseStaticFiles(); // Serve static files from wwwroot (uploaded images)
 app.UseHttpsRedirection();
