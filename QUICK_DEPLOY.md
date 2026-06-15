@@ -1,162 +1,66 @@
-# Quick Deployment Guide
+# Quick Deployment Reference - Authentication Migration
 
-## 🚀 Deploy to Railway.app (Backend + Database)
+## TL;DR - 3 Command Steps
 
-### Step 1: Create Railway Account
-1. Go to https://railway.app
-2. Click **"Login"** → **"Login with GitHub"**
-3. Authorize Railway
-
-### Step 2: Deploy Backend
-1. Click **"Start a New Project"**
-2. Select **"Deploy from GitHub repo"**
-3. Choose **"izinjuli"** repository (or your repo name)
-4. Railway will start building automatically
-
-### Step 3: Add Database
-1. In your project, click **"+ New"** → **"Database"** → **"Add PostgreSQL"**
-2. Database will be provisioned automatically
-3. `DATABASE_URL` is automatically linked to your service
-
-### Step 4: Generate Public URL
-1. Click on your API service (not database)
-2. Go to **"Settings"** → **"Networking"**
-3. Click **"Generate Domain"**
-4. Copy the URL (e.g., `https://idiski-production.up.railway.app`)
-
-### Step 5: Set Environment Variables
-1. Click on your API service
-2. Go to **"Variables"** tab
-3. Click **"+ New Variable"**
-4. Add these variables (copy exact values):
-   ```
-   ASPNETCORE_ENVIRONMENT=Production
-   ProductionOrigin=https://izinjuli.vercel.app
-   USE_CLOUDINARY=true
-   Cloudinary__CloudName=dukiokxss
-   Cloudinary__ApiKey=688649726873936
-   Cloudinary__ApiSecret=tfJmSO20wE_BHKUPHCK82WcI4K4
-   ```
-   ⚠️ **Important**: Use double underscores `__` for Cloudinary variables
-
-### Step 6: Run Database Migrations
-After deployment, apply migrations by calling:
+### Step 1: Verify Code is Deployed
 ```bash
-curl -X POST https://izinjuli-production.up.railway.app/api/migrate
+git push origin main
 ```
+Wait for Railway auto-deploy to complete (check dashboard)
 
-Or use the manual SQL endpoint if needed:
+### Step 2: Run Migration
 ```bash
-curl -X POST https://izinjuli-production.up.railway.app/api/migrate/manual
+npm install -g @railway/cli
+railway login
+railway link
+railway run dotnet ef database update --project iDiski.Infrastructure --startup-project iDiski.Api
 ```
 
-### Step 7: Seed Database
-Once deployed, visit:
-```
-https://izinjuli-production.up.railway.app/api/seed/comprehensive
-```
+### Step 3: Set Environment Variables in Railway Dashboard
 
-This will populate your database with sample data.
-
----
-
-## 🌐 Deploy to Vercel (Frontend)
-
-### Step 1: Create Vercel Account
-1. Go to https://vercel.com
-2. Click **"Sign Up"** → **"Continue with GitHub"**
-3. Authorize Vercel
-
-### Step 2: Import Project
-1. Click **"Add New..."** → **"Project"**
-2. Click **"Import"** next to your **izinjuli** repository
-3. Configure:
-   - **Framework Preset:** Vite (or Other if Vite not available)
-   - **Root Directory:** Click **"Edit"** → Select `iDiski-Client`
-   - **Build Command:** `npm run build`
-   - **Output Directory:** `dist/idisi-client/browser`
-
-4. Click **"Deploy"**
-
-### Step 3: Copy Vercel URL
-After deployment completes, copy your Vercel URL (e.g., `https://idiski.vercel.app`)
-
-### Step 4: Update Railway CORS
-1. Go back to Railway
-2. Click on your API service → **"Variables"**
-3. Edit `ProductionOrigin` and paste your Vercel URL
-4. Railway will automatically redeploy
-
----
-
-## ✅ Test Your Deployment
-
-### Backend Tests:
-- Health: `https://izinjuli-production.up.railway.app/api/health`
-- Teams: `https://izinjuli-production.up.railway.app/api/teams`
-- Swagger: `https://izinjuli-production.up.railway.app/openapi/v1.json`
-
-### Frontend Tests:
-- Home: `https://izinjuli.vercel.app`
-- Teams: `https://izinjuli.vercel.app/teams`
-- Admin: `https://izinjuli.vercel.app/admin/players`
-
----
-
-## 🔧 Troubleshooting
-
-### Backend not loading data?
-Visit the seed endpoint: `https://izinjuli-production.up.railway.app/api/seed/comprehensive`
-
-### Frontend showing CORS errors?
-1. Check that `ProductionOrigin` in Railway matches your Vercel URL exactly
-2. Make sure it's HTTPS (not HTTP)
-3. Railway will redeploy when you update the variable
-
-### 404 errors on frontend routes?
-The `vercel.json` file should handle this. If issues persist:
-1. Check Vercel build logs
-2. Verify output directory is correct: `dist/idisi-client/browser`
-
-### Railway build failing?
-1. Check build logs in Railway dashboard
-2. Verify `railway.json` and `nixpacks.toml` are in repository root
-3. Ensure .NET 9 is being used
-
----
-
-## 📝 Your URLs
-
-After deployment, save these for reference:
+**iDiski API Service → Variables Tab:**
 
 ```
-Backend API: https://izinjuli-production.up.railway.app
-Frontend:    https://izinjuli.vercel.app
-Database:    (managed by Railway, accessible only via API)
+Jwt__SecretKey = [paste output from: openssl rand -base64 64]
+Jwt__Issuer = https://api.izinjuli.vercel.app
+Jwt__Audience = https://izinjuli.vercel.app
 ```
 
----
-
-## 🔄 Future Updates
-
-To deploy changes:
-1. Make changes locally
-2. Commit: `git add . && git commit -m "Your message"`
-3. Push: `git push origin main`
-4. Railway and Vercel will **automatically** rebuild and deploy! 🎉
-
-**Database Schema Changes:**
-When you add new migrations (e.g., new tables, columns):
-1. Create migration: `dotnet ef migrations add YourMigrationName --project iDiski.Infrastructure --startup-project iDiski.Api`
-2. Commit and push to trigger deployment
-3. Run migration endpoint: `curl -X POST https://izinjuli-production.up.railway.app/api/migrate`
+Then click **Redeploy** on API service.
 
 ---
 
-## 💰 Cost
+## Verify Success
 
-Both services are **completely FREE** for your usage:
-- Railway: 500 hours/month, 500MB PostgreSQL
-- Vercel: Unlimited for personal projects
+**Check these tables exist in PostgreSQL:**
+- ✅ Users
+- ✅ UserRoles
+- ✅ UserTeams
+- ✅ UserDivisions
 
-No credit card required! ✨
+**Check API logs show:**
+```
+Applying migration '20260615101737_AddAuthenticationSystem'.
+Done.
+```
+
+**No errors = ✅ Deployment Complete!**
+
+---
+
+## If Something Goes Wrong
+
+1. Check Railway **Deployments** → Latest → **Logs**
+2. Look for `error` or `failed` messages
+3. Refer to full guide: `RAILWAY_DEPLOYMENT.md`
+
+---
+
+## Files Pushed to GitHub (main branch)
+
+- ✅ Domain entities (User, UserRole, UserTeam, UserDivision)
+- ✅ Backend services (Password hashing, JWT generation, email)
+- ✅ Database migration (creates 5 new tables)
+- ✅ This deployment guide
+
+Ready to deploy!
