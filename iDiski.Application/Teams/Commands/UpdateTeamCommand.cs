@@ -1,7 +1,9 @@
 using iDiski.Application.Common.Interfaces;
 using iDiski.Application.Common.Exceptions;
+using iDiski.Domain.Enums;
 using MediatR;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 
 namespace iDiski.Application.Teams.Commands;
 
@@ -44,8 +46,13 @@ public sealed class UpdateTeamCommandValidator : AbstractValidator<UpdateTeamCom
 public sealed class UpdateTeamCommandHandler : IRequestHandler<UpdateTeamCommand>
 {
     private readonly ILeagueDbContext _db;
+    private readonly ICurrentUserService _currentUserService;
 
-    public UpdateTeamCommandHandler(ILeagueDbContext db) => _db = db;
+    public UpdateTeamCommandHandler(ILeagueDbContext db, ICurrentUserService currentUserService)
+    {
+        _db = db;
+        _currentUserService = currentUserService;
+    }
 
     public async Task Handle(
         UpdateTeamCommand request,
@@ -54,6 +61,9 @@ public sealed class UpdateTeamCommandHandler : IRequestHandler<UpdateTeamCommand
         var team = await _db.Teams.FindAsync([request.Id], cancellationToken)
             ?? throw new NotFoundException(nameof(Domain.Entities.Team), request.Id);
 
+        // Authorization: Check if user is Super Admin or assigned to this team
+        await AuthorizeTeamAccess(request.Id, cancellationToken);
+
         team.Name            = request.Name;
         team.LogoUrl         = request.LogoUrl;
         team.Founded         = request.Founded;
@@ -61,7 +71,29 @@ public sealed class UpdateTeamCommandHandler : IRequestHandler<UpdateTeamCommand
         team.City            = request.City;
         team.PrimaryColour   = request.PrimaryColour;
         team.SecondaryColour = request.SecondaryColour;
+        team.UpdatedByUserId = _currentUserService.UserId;
 
         await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task AuthorizeTeamAccess(Guid teamId, CancellationToken cancellationToken)
+    {
+        var userId = _currentUserService.UserId;
+        if (userId == null)
+            throw new UnauthorizedException();
+
+        // Check if Super Admin
+        var isSuperAdmin = await _db.UserRoles
+            .AnyAsync(ur => ur.UserId == userId && ur.Role == (int)Role.SuperAdmin, cancellationToken);
+
+        if (isSuperAdmin)
+            return;
+
+        // Check if Team Admin assigned to this team
+        var isAssignedToTeam = await _db.UserTeams
+            .AnyAsync(ut => ut.UserId == userId && ut.TeamId == teamId, cancellationToken);
+
+        if (!isAssignedToTeam)
+            throw new ForbiddenException($"User is not authorized to manage team {teamId}");
     }
 }

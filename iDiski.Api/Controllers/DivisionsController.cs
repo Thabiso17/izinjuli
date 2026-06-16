@@ -1,6 +1,7 @@
 using iDiski.Application.Divisions;
 using iDiski.Application.Divisions.Commands;
 using iDiski.Application.Divisions.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace iDiski.Api.Controllers;
@@ -47,9 +48,10 @@ public class DivisionsController : BaseApiController
     }
 
     /// <summary>
-    /// Create a new division
+    /// Create a new division (SuperAdmin only)
     /// </summary>
     [HttpPost]
+    [Authorize(Policy = "SuperAdminOnly")]
     public async Task<IActionResult> Create([FromBody] CreateDivisionCommand command)
     {
         var divisionId = await Sender.Send(command);
@@ -57,9 +59,10 @@ public class DivisionsController : BaseApiController
     }
 
     /// <summary>
-    /// Update an existing division
+    /// Update an existing division (Division Admin or SuperAdmin required)
     /// </summary>
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "CanManageDivisions")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateDivisionCommand command)
     {
         if (id != command.Id)
@@ -70,9 +73,10 @@ public class DivisionsController : BaseApiController
     }
 
     /// <summary>
-    /// Delete a division (only if no teams or matches assigned)
+    /// Delete a division (SuperAdmin only, only if no teams or matches assigned)
     /// </summary>
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "SuperAdminOnly")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var command = new DeleteDivisionCommand(id);

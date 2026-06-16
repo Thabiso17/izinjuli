@@ -1,6 +1,7 @@
 using iDiski.Application.Players;
 using iDiski.Application.Players.Commands;
 using iDiski.Application.Players.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace iDiski.Api.Controllers;
@@ -32,12 +33,17 @@ public sealed class PlayersController : BaseApiController
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct) =>
         Ok(await Sender.Send(new GetPlayerByIdQuery(id), ct));
 
-    /// <summary>Adds a player to a team.</summary>
+    /// <summary>Adds a player to a team (Team Admin or SuperAdmin with team assignment required).</summary>
     /// <response code="201">Player created.</response>
+    /// <response code="401">Not authenticated.</response>
+    /// <response code="403">Not authorized (must be admin for the team).</response>
     /// <response code="404">TeamId not found.</response>
     /// <response code="422">Validation failure (e.g. duplicate jersey number).</response>
     [HttpPost]
+    [Authorize(Policy = "CanManageTeams")]
     [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> Create(
@@ -49,12 +55,17 @@ public sealed class PlayersController : BaseApiController
         return CreatedAtAction(nameof(GetAll), new { teamId = command.TeamId }, id);
     }
 
-    /// <summary>Updates a player's details, team, or status.</summary>
+    /// <summary>Updates a player's details, team, or status (Team Admin with team assignment required).</summary>
     /// <response code="204">Player updated.</response>
+    /// <response code="401">Not authenticated.</response>
+    /// <response code="403">Not authorized (must be admin for the team).</response>
     /// <response code="404">Player not found.</response>
     /// <response code="422">Validation failure.</response>
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "CanManageTeams")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> Update(
@@ -70,13 +81,18 @@ public sealed class PlayersController : BaseApiController
     }
 
     /// <summary>
-    /// Transfers a player to a different team with a new jersey number.
+    /// Transfers a player to a different team with a new jersey number (Team Admin required for both teams).
     /// </summary>
     /// <response code="204">Player transferred successfully.</response>
+    /// <response code="401">Not authenticated.</response>
+    /// <response code="403">Not authorized (must be admin for both teams).</response>
     /// <response code="404">Player or team not found.</response>
     /// <response code="422">Validation failure (e.g. jersey number already taken).</response>
     [HttpPost("{id:guid}/transfer")]
+    [Authorize(Policy = "CanManageTeams")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> Transfer(
@@ -93,12 +109,17 @@ public sealed class PlayersController : BaseApiController
 
     /// <summary>
     /// Soft-deletes a player (sets IsActive = false).
-    /// Historical stats are preserved.
+    /// Historical stats are preserved. Team Admin required.
     /// </summary>
     /// <response code="204">Player deactivated.</response>
+    /// <response code="401">Not authenticated.</response>
+    /// <response code="403">Not authorized (must be admin for the team).</response>
     /// <response code="404">Player not found.</response>
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "CanManageTeams")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {

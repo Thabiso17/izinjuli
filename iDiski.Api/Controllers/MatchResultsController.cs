@@ -2,6 +2,7 @@ using iDiski.Application.Common.Models;
 using iDiski.Application.MatchResults;
 using iDiski.Application.Matches.Commands;
 using iDiski.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace iDiski.Api.Controllers;
@@ -41,11 +42,16 @@ public sealed class MatchResultsController : BaseApiController
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct) =>
         Ok(await Sender.Send(new GetMatchByIdQuery(id), ct));
 
-    /// <summary>Schedules a new match fixture.</summary>
+    /// <summary>Schedules a new match fixture (Division Admin required for the division).</summary>
     /// <response code="201">Match created.</response>
+    /// <response code="401">Not authenticated.</response>
+    /// <response code="403">Not authorized (must be admin for the division).</response>
     /// <response code="422">Validation failure (e.g. same home and away team).</response>
     [HttpPost]
+    [Authorize(Policy = "CanManageDivisions")]
     [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> Create(
         [FromBody] CreateMatchResultCommand command,
@@ -56,14 +62,19 @@ public sealed class MatchResultsController : BaseApiController
     }
 
     /// <summary>
-    /// Submits or updates the score and status of a match.
+    /// Submits or updates the score and status of a match (Division Admin required).
     /// Use this endpoint to record final results, flag postponements, etc.
     /// </summary>
     /// <response code="204">Score updated.</response>
+    /// <response code="401">Not authenticated.</response>
+    /// <response code="403">Not authorized (must be admin for the division).</response>
     /// <response code="404">Match not found.</response>
     /// <response code="422">Validation failure.</response>
     [HttpPut("{id:guid}/score")]
+    [Authorize(Policy = "CanManageDivisions")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> UpdateScore(
@@ -79,15 +90,20 @@ public sealed class MatchResultsController : BaseApiController
     }
 
     /// <summary>
-    /// Generates fixtures for a division using round-robin algorithm.
+    /// Generates fixtures for a division using round-robin algorithm (SuperAdmin only).
     /// </summary>
     /// <param name="command">Generation parameters (division, season, home-and-away, start date)</param>
     /// <param name="ct">Cancellation token</param>
     /// <response code="200">Fixtures generated successfully.</response>
+    /// <response code="401">Not authenticated.</response>
+    /// <response code="403">Not authorized (SuperAdmin only).</response>
     /// <response code="404">Division not found.</response>
     /// <response code="422">Validation failure (e.g., not enough teams).</response>
     [HttpPost("generate")]
+    [Authorize(Policy = "SuperAdminOnly")]
     [ProducesResponseType(typeof(GenerateFixturesResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<IActionResult> GenerateFixtures(
