@@ -35,7 +35,7 @@ public sealed class AssignUserRoleCommandHandler : IRequestHandler<AssignUserRol
     {
         // Only Super Admin can assign roles
         var isSuperAdmin = await _db.UserRoles
-            .AnyAsync(ur => ur.UserId == _currentUserService.UserId && ur.Role == 3, cancellationToken);
+            .AnyAsync(ur => ur.UserId == _currentUserService.UserId && ur.Role == iDiski.Domain.Enums.Role.SuperAdmin, cancellationToken);
 
         if (!isSuperAdmin)
             throw new ForbiddenException("Only Super Admin can assign roles");
@@ -46,17 +46,17 @@ public sealed class AssignUserRoleCommandHandler : IRequestHandler<AssignUserRol
 
         // Check if role already assigned
         var existingRole = await _db.UserRoles
-            .FirstOrDefaultAsync(ur => ur.UserId == request.UserId && ur.Role == request.Role, cancellationToken);
+            .FirstOrDefaultAsync(ur => ur.UserId == request.UserId && ur.Role == (iDiski.Domain.Enums.Role)request.Role, cancellationToken);
 
         if (existingRole != null)
-            throw new ValidationException(new[] { new FluentValidation.Results.ValidationFailure("Role", "User already has this role") });
+            throw new iDiski.Application.Common.Exceptions.ValidationException(new[] { new FluentValidation.Results.ValidationFailure("Role", "User already has this role") });
 
         // Create new role assignment
         var userRole = new iDiski.Domain.Entities.UserRole
         {
             Id = Guid.NewGuid(),
             UserId = request.UserId,
-            Role = request.Role,
+            Role = (iDiski.Domain.Enums.Role)request.Role,
             AssignedAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow
         };

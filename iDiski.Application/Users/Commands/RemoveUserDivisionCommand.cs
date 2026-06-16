@@ -35,7 +35,7 @@ public sealed class RemoveUserDivisionCommandHandler : IRequestHandler<RemoveUse
     {
         // Only Super Admin can remove division assignments
         var isSuperAdmin = await _db.UserRoles
-            .AnyAsync(ur => ur.UserId == _currentUserService.UserId && ur.Role == 3, cancellationToken);
+            .AnyAsync(ur => ur.UserId == _currentUserService.UserId && ur.Role == iDiski.Domain.Enums.Role.SuperAdmin, cancellationToken);
 
         if (!isSuperAdmin)
             throw new ForbiddenException("Only Super Admin can remove division assignments");

@@ -120,11 +120,11 @@ public sealed class UpdateTeamCommandHandler : IRequestHandler<UpdateTeamCommand
     {
         var userId = _currentUserService.UserId;
         if (userId == null)
-            throw new UnauthorizedException();
+            throw new UnauthorizedException("User must be authenticated");
 
         // Super Admin has full access
         var isSuperAdmin = await _db.UserRoles
-            .AnyAsync(ur => ur.UserId == userId && ur.Role == (int)Role.SuperAdmin, cancellationToken);
+            .AnyAsync(ur => ur.UserId == userId && ur.Role == Role.SuperAdmin, cancellationToken);
 
         if (isSuperAdmin)
             return;

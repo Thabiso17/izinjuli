@@ -2,6 +2,7 @@ using Serilog;
 using Serilog.Core;
 using Serilog.Events;
 using System;
+using System.IO;
 
 namespace iDiski.Tests.Unit.Common;
 

@@ -35,14 +35,14 @@ public sealed class RemoveUserRoleCommandHandler : IRequestHandler<RemoveUserRol
     {
         // Only Super Admin can remove roles
         var isSuperAdmin = await _db.UserRoles
-            .AnyAsync(ur => ur.UserId == _currentUserService.UserId && ur.Role == 3, cancellationToken);
+            .AnyAsync(ur => ur.UserId == _currentUserService.UserId && ur.Role == iDiski.Domain.Enums.Role.SuperAdmin, cancellationToken);
 
         if (!isSuperAdmin)
             throw new ForbiddenException("Only Super Admin can remove roles");
 
         // Find and remove the role assignment
         var userRole = await _db.UserRoles
-            .FirstOrDefaultAsync(ur => ur.UserId == request.UserId && ur.Role == request.Role, cancellationToken)
+            .FirstOrDefaultAsync(ur => ur.UserId == request.UserId && ur.Role == (iDiski.Domain.Enums.Role)request.Role, cancellationToken)
             ?? throw new NotFoundException("UserRole", $"User does not have role {request.Role}");
 
         _db.UserRoles.Remove(userRole);

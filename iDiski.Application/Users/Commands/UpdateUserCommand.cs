@@ -38,7 +38,7 @@ public sealed class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand
     {
         // Only Super Admin can update users
         var isSuperAdmin = await _db.UserRoles
-            .AnyAsync(ur => ur.UserId == _currentUserService.UserId && ur.Role == 3, cancellationToken);
+            .AnyAsync(ur => ur.UserId == _currentUserService.UserId && ur.Role == iDiski.Domain.Enums.Role.SuperAdmin, cancellationToken);
 
         if (!isSuperAdmin)
             throw new ForbiddenException("Only Super Admin can update users");

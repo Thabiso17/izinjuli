@@ -72,9 +72,9 @@ public class AuditLogsController : BaseApiController
         CancellationToken ct = default)
     {
         var query = new GetAuditLogsQuery(
-            entityType: entityType,
-            entityId: entityId,
-            pageSize: 1000); // No pagination for history
+            EntityType: entityType,
+            EntityId: entityId,
+            PageSize: 1000); // No pagination for history
 
         var auditLogs = await Sender.Send(query, ct);
         return Ok(auditLogs);

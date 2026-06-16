@@ -35,7 +35,7 @@ public sealed class AssignUserTeamCommandHandler : IRequestHandler<AssignUserTea
     {
         // Only Super Admin can assign teams
         var isSuperAdmin = await _db.UserRoles
-            .AnyAsync(ur => ur.UserId == _currentUserService.UserId && ur.Role == 3, cancellationToken);
+            .AnyAsync(ur => ur.UserId == _currentUserService.UserId && ur.Role == iDiski.Domain.Enums.Role.SuperAdmin, cancellationToken);
 
         if (!isSuperAdmin)
             throw new ForbiddenException("Only Super Admin can assign teams to users");
@@ -53,7 +53,7 @@ public sealed class AssignUserTeamCommandHandler : IRequestHandler<AssignUserTea
             .FirstOrDefaultAsync(ut => ut.UserId == request.UserId && ut.TeamId == request.TeamId, cancellationToken);
 
         if (existingAssignment != null)
-            throw new ValidationException(new[] { new FluentValidation.Results.ValidationFailure("TeamId", "User already assigned to this team") });
+            throw new iDiski.Application.Common.Exceptions.ValidationException(new[] { new FluentValidation.Results.ValidationFailure("TeamId", "User already assigned to this team") });
 
         // Create new assignment
         var userTeam = new iDiski.Domain.Entities.UserTeam

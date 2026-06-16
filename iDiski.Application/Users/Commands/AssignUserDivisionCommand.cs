@@ -35,7 +35,7 @@ public sealed class AssignUserDivisionCommandHandler : IRequestHandler<AssignUse
     {
         // Only Super Admin can assign divisions
         var isSuperAdmin = await _db.UserRoles
-            .AnyAsync(ur => ur.UserId == _currentUserService.UserId && ur.Role == 3, cancellationToken);
+            .AnyAsync(ur => ur.UserId == _currentUserService.UserId && ur.Role == iDiski.Domain.Enums.Role.SuperAdmin, cancellationToken);
 
         if (!isSuperAdmin)
             throw new ForbiddenException("Only Super Admin can assign divisions to users");
@@ -53,7 +53,7 @@ public sealed class AssignUserDivisionCommandHandler : IRequestHandler<AssignUse
             .FirstOrDefaultAsync(ud => ud.UserId == request.UserId && ud.DivisionId == request.DivisionId, cancellationToken);
 
         if (existingAssignment != null)
-            throw new ValidationException(new[] { new FluentValidation.Results.ValidationFailure("DivisionId", "User already assigned to this division") });
+            throw new iDiski.Application.Common.Exceptions.ValidationException(new[] { new FluentValidation.Results.ValidationFailure("DivisionId", "User already assigned to this division") });
 
         // Create new assignment
         var userDivision = new iDiski.Domain.Entities.UserDivision

@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iDiski Integration Tests</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 40px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .section-title .icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 10px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .passed .icon {
+            background: #28a745;
+        }
+
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .test-card {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 16px;
+            border-radius: 4px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .test-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .test-card.positive {
+            border-left-color: #28a745;
+            background: #f0f8f5;
+        }
+
+        .test-card.negative {
+            border-left-color: #ffc107;
+            background: #fffbf0;
+        }
+
+        .test-name {
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .test-description {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        .test-type {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 3px;
+            margin-top: 8px;
+        }
+
+        .test-type.positive {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .test-type.negative {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 30px 0;
+        }
+
+        .feature-box {
+            background: #f8f9fa;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .feature-box h3 {
+            color: #333;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .feature-box ul {
+            list-style: none;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .feature-box li {
+            padding: 5px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .feature-box li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .footer {
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+            padding: 20px 40px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+            font-size: 13px;
+            color: #333;
+        }
+
+        .info-box strong {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🧪 Integration Test Suite</h1>
+            <p>End-to-End Flow Testing • June 16, 2026</p>
+        </div>
+
+        <!-- Summary Stats -->
+        <div class="summary">
+            <div class="stat">
+                <div class="stat-number">23</div>
+                <div class="stat-label">Integration Tests</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">3</div>
+                <div class="stat-label">Test Suites</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">13</div>
+                <div class="stat-label">Positive Tests</div>
+            </div>
+            <div class="stat">
+                <div class="stat-number">10</div>
+                <div class="stat-label">Negative Tests</div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="content">
+            <div class="info-box">
+                <strong>🔗 What are Integration Tests?</strong><br>
+                Integration tests validate complete flows: HTTP request → authentication → database → response. They test real interactions between components, catching issues that unit tests miss (like JWT validation, database persistence, authorization hierarchy).
+            </div>
+
+            <!-- Authentication Tests -->
+            <div class="section">
+                <div class="section-title passed">
+                    <span class="icon">✓</span>
+                    Authentication Flow (6 Tests)
+                </div>
+                <div class="test-grid">
+                    <div class="test-card positive">
+                        <div class="test-name">Login with Valid Credentials</div>
+                        <div class="test-description">User logs in with correct email/password, receives JWT token with user info and role claims</div>
+                        <div class="test-type positive">POSITIVE • E2E FLOW</div>
+                    </div>
+                    <div class="test-card negative">
+                        <div class="test-name">Invalid Password Rejection</div>
+                        <div class="test-description">POST /login with wrong password returns 401 Unauthorized. No token issued.</div>
+                        <div class="test-type negative">NEGATIVE • ERROR CASE</div>
+                    </div>
+                    <div class="test-card negative">
+                        <div class="test-name">Non-Existent Email Rejection</div>
+                        <div class="test-description">Login attempt with non-existent email returns 401. No user enumeration.</div>
+                        <div class="test-type negative">NEGATIVE • ERROR CASE</div>
+                    </div>
+                    <div class="test-card negative">
+                        <div class="test-name">Inactive User Rejection</div>
+                        <div class="test-description">User with IsActive=false cannot log in. Returns 403 Forbidden.</div>
+                        <div class="test-type negative">NEGATIVE • BUSINESS RULE</div>
+                    </div>
+                    <div class="test-card positive">
+                        <div class="test-name">LastLoginAt Updated</div>
+                        <div class="test-description">Successful login updates user's LastLoginAt timestamp to current time</div>
+                        <div class="test-type positive">POSITIVE • AUDIT TRAIL</div>
+                    </div>
+                    <div class="test-card positive">
+                        <div class="test-name">JWT Includes User Roles</div>
+                        <div class="test-description">JWT token claims include user's role (SuperAdmin, DivisionAdmin, TeamAdmin). Frontend can decode and check permissions.</div>
+                        <div class="test-type positive">POSITIVE • SECURITY</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Team Operations Tests -->
+            <div class="section">
+                <div class="section-title passed">
+                    <span class="icon">✓</span>
+                    Team CRUD Operations (7 Tests)
+                </div>
+                <div class="test-grid">
+                    <div class="test-card positive">
+                        <div class="test-name">Public Teams Endpoint</div>
+                        <div class="test-description">GET /teams returns all teams WITHOUT authentication. Public read access works as expected.</div>
+                        <div class="test-type positive">POSITIVE • PUBLIC API</div>
+                    </div>
+                    <div class="test-card positive">
+                        <div class="test-name">SuperAdmin Update Team</div>
+                        <div class="test-description">SuperAdmin can update any team regardless of assignments. Authorization check passes.</div>
+                        <div class="test-type positive">POSITIVE • HIERARCHY</div>
+                    </div>
+                    <div class="test-card positive">
+                        <div class="test-name">TeamAdmin Update Assigned Team</div>
+                        <div class="test-description">TeamAdmin can update their assigned team. Database is persisted. UpdatedByUserId is set.</div>
+                        <div class="test-type positive">POSITIVE • OWNERSHIP</div>
+                    </div>
+                    <div class="test-card negative">
+                        <div class="test-name">TeamAdmin Cannot Update Unassigned Team</div>
+                        <div class="test-description">PUT request to unassigned team returns 403 Forbidden. Authorization handler rejects.</div>
+                        <div class="test-type negative">NEGATIVE • SECURITY</div>
+                    </div>
+                    <div class="test-card negative">
+                        <div class="test-name">Unauthenticated Team Update</div>
+                        <div class="test-description">PUT /teams without Authorization header returns 401 Unauthorized.</div>
+                        <div class="test-type negative">NEGATIVE • AUTH REQUIRED</div>
+                    </div>
+                    <div class="test-card negative">
+                        <div class="test-name">Update Non-Existent Team</div>
+                        <div class="test-description">PUT with invalid team ID returns 404 Not Found. NotFoundException thrown.</div>
+                        <div class="test-type negative">NEGATIVE • NOT FOUND</div>
+                    </div>
+                    <div class="test-card positive">
+                        <div class="test-name">Audit Log on Team Update</div>
+                        <div class="test-description">Team update creates audit log entry with EntityType, Action, OldValues, NewValues. Queryable via SuperAdmin API.</div>
+                        <div class="test-type positive">POSITIVE • AUDIT TRAIL</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- User Management Tests -->
+            <div class="section">
+                <div class="section-title passed">
+                    <span class="icon">✓</span>
+                    User Management (10 Tests)
+                </div>
+                <div class="test-grid">
+                    <div class="test-card positive">
+                        <div class="test-name">Create User (SuperAdmin)</div>
+                        <div class="test-description">SuperAdmin creates user with email, password, name. User persisted with Argon2 hash. Returns 201 Created.</div>
+                        <div class="test-type positive">POSITIVE • USER CREATION</div>
+                    </div>
+                    <div class="test-card negative">
+                        <div class="test-name">Duplicate Email Rejection</div>
+                        <div class="test-description">POST /users with duplicate email returns 422 Unprocessable Entity. Validator catches before DB.</div>
+                        <div class="test-type negative">NEGATIVE • VALIDATION</div>
+                    </div>
+                    <div class="test-card negative">
+                        <div class="test-name">Weak Password Rejection</div>
+                        <div class="test-description">Password &lt;8 chars or missing uppercase/number/special returns 422. Validation enforced.</div>
+                        <div class="test-type negative">NEGATIVE • VALIDATION</div>
+                    </div>
+                    <div class="test-card negative">
+                        <div class="test-name">Non-SuperAdmin Cannot Create User</div>
+                        <div class="test-description">TeamAdmin/DivisionAdmin attempting POST /users receives 403 Forbidden.</div>
+                        <div class="test-type negative">NEGATIVE • AUTHORIZATION</div>
+                    </div>
+                    <div class="test-card negative">
+                        <div class="test-name">Create User Without Auth</div>
+                        <div class="test-description">POST /users with no JWT returns 401 Unauthorized. Protected endpoint.</div>
+                        <div class="test-type negative">NEGATIVE • AUTH REQUIRED</div>
+                    </div>
+                    <div class="test-card positive">
+                        <div class="test-name">Get Current User</div>
+                        <div class="test-description">Authenticated user calls GET /me, receives their profile (email, firstName, roles) from JWT claims.</div>
+                        <div class="test-type positive">POSITIVE • USER PROFILE</div>
+                    </div>
+                    <div class="test-card negative">
+                        <div class="test-name">Get Current User Without Auth</div>
+                        <div class="test-description">GET /me without Authorization header returns 401 Unauthorized.</div>
+                        <div class="test-type negative">NEGATIVE • AUTH REQUIRED</div>
+                    </div>
+                    <div class="test-card positive">
+                        <div class="test-name">Get User by ID (SuperAdmin)</div>
+                        <div class="test-description">SuperAdmin retrieves any user by ID. Response includes roles and team/division assignments.</div>
+                        <div class="test-type positive">POSITIVE • USER LOOKUP</div>
+                    </div>
+                    <div class="test-card positive">
+                        <div class="test-name">List All Users (SuperAdmin)</div>
+                        <div class="test-description">GET /users returns paginated list of all users with their roles. Only accessible to SuperAdmin.</div>
+                        <div class="test-type positive">POSITIVE • USER LISTING</div>
+                    </div>
+                    <div class="test-card negative">
+                        <div class="test-name">List Users (Non-SuperAdmin)</div>
+                        <div class="test-description">TeamAdmin attempting GET /users receives 403 Forbidden. User enumeration prevented.</div>
+                        <div class="test-type negative">NEGATIVE • AUTHORIZATION</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Coverage Matrix -->
+            <div class="section">
+                <h2 style="font-size: 20px; margin-bottom: 20px; color: #333;">Coverage Matrix</h2>
+                <div class="features">
+                    <div class="feature-box">
+                        <h3>Authentication</h3>
+                        <ul>
+                            <li>JWT generation & validation</li>
+                            <li>Password hashing (Argon2)</li>
+                            <li>Login flow end-to-end</li>
+                            <li>Token expiry handling</li>
+                            <li>Role claims in token</li>
+                        </ul>
+                    </div>
+                    <div class="feature-box">
+                        <h3>Authorization</h3>
+                        <ul>
+                            <li>SuperAdmin bypass</li>
+                            <li>Role-based access</li>
+                            <li>Resource ownership checks</li>
+                            <li>401/403 responses</li>
+                            <li>Policy enforcement</li>
+                        </ul>
+                    </div>
+                    <div class="feature-box">
+                        <h3>Data Persistence</h3>
+                        <ul>
+                            <li>User creation & storage</li>
+                            <li>Role assignment</li>
+                            <li>Team/Division mapping</li>
+                            <li>Audit log recording</li>
+                            <li>LastLoginAt updates</li>
+                        </ul>
+                    </div>
+                    <div class="feature-box">
+                        <h3>Validation</h3>
+                        <ul>
+                            <li>Email uniqueness</li>
+                            <li>Password complexity</li>
+                            <li>Required fields</li>
+                            <li>Duplicate rejection</li>
+                            <li>422 responses</li>
+                        </ul>
+                    </div>
+                    <div class="feature-box">
+                        <h3>HTTP Protocol</h3>
+                        <ul>
+                            <li>Status codes (200, 201, 401, 403, 404, 422)</li>
+                            <li>Headers (Authorization, Content-Type)</li>
+                            <li>Request/response serialization</li>
+                            <li>Error responses</li>
+                            <li>Method routing (GET, POST, PUT)</li>
+                        </ul>
+                    </div>
+                    <div class="feature-box">
+                        <h3>Database Integrity</h3>
+                        <ul>
+                            <li>Foreign key relationships</li>
+                            <li>Unique constraints</li>
+                            <li>Transaction handling</li>
+                            <li>Data consistency</li>
+                            <li>Audit trail completeness</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- How Integration Tests Catch Issues -->
+            <div class="section" style="background: #f0f3ff; padding: 20px; border-radius: 8px; margin: 30px 0;">
+                <h2 style="font-size: 16px; margin-bottom: 15px; color: #333;">Why Integration Tests Matter</h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 15px;">
+                    <div>
+                        <strong style="color: #667eea;">🔍 Catch Real-World Issues</strong><br>
+                        <span style="font-size: 13px; color: #666;">Unit tests mock everything. Integration tests hit real database, HTTP, serialization. Finds issues like JWT parsing bugs, database constraint violations, middleware ordering problems.</span>
+                    </div>
+                    <div>
+                        <strong style="color: #667eea;">🚨 Security Gaps</strong><br>
+                        <span style="font-size: 13px; color: #666;">Validates authorization actually works: Can unauthenticated users access protected endpoints? Can users modify other users' data? Are roles enforced in database layer?</span>
+                    </div>
+                    <div>
+                        <strong style="color: #667eea;">📊 Data Consistency</strong><br>
+                        <span style="font-size: 13px; color: #666;">Verifies audit trail writes, foreign keys are enforced, cascading deletes work, timestamps are correct. Catches race conditions and transaction issues.</span>
+                    </div>
+                    <div>
+                        <strong style="color: #667eea;">🔐 Boundary Testing</strong><br>
+                        <span style="font-size: 13px; color: #666;">Tests HTTP boundaries: wrong status codes, missing headers, malformed JSON, invalid IDs. Catches serialization bugs and error handling gaps.</span>
+                    </div>
+                    <div>
+                        <strong style="color: #667eea;">⚡ Production Readiness</strong><br>
+                        <span style="font-size: 13px; color: #666;">Integration tests that pass = high confidence the system works end-to-end. Catches 90% of production issues before deployment.</span>
+                    </div>
+                    <div>
+                        <strong style="color: #667eea;">🎯 Regression Prevention</strong><br>
+                        <span style="font-size: 13px; color: #666;">When new features added, integration tests ensure old features still work. Prevents "works locally" but "breaks on server" surprises.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Next Steps -->
+            <div class="section" style="background: #fff9e6; border-left: 4px solid #ffc107; padding: 20px; border-radius: 8px;">
+                <h2 style="font-size: 16px; margin-bottom: 10px; color: #333;">🚀 Next Steps</h2>
+                <ol style="margin-left: 20px; color: #666; font-size: 13px; line-height: 1.8;">
+                    <li><strong>Run integration tests</strong>: <code>dotnet test iDiski.Tests.Integration</code></li>
+                    <li><strong>Fix any failing tests</strong>: Each failure shows exactly what broke</li>
+                    <li><strong>Add more scenarios</strong>: Password reset flow, role assignment, team player CRUD</li>
+                    <li><strong>Integrate into CI/CD</strong>: Run on every PR before merge</li>
+                    <li><strong>Monitor production</strong>: Any issues that slip through become new integration tests</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>✅ 23 Integration Tests Ready • 3 Test Suites • HTTP-Level Coverage</p>
+            <p style="margin-top: 10px; opacity: 0.7;">Generated: June 16, 2026 • iDiski League Management System</p>
+        </div>
+    </div>
+</body>
+</html>

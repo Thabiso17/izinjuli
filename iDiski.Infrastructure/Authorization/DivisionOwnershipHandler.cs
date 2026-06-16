@@ -36,7 +36,7 @@ public class DivisionOwnershipHandler : AuthorizationHandler<DivisionOwnershipRe
 
         // Super Admin has full access
         var isSuperAdmin = await _context.UserRoles
-            .AnyAsync(ur => ur.UserId == userId && ur.Role == (int)Role.SuperAdmin);
+            .AnyAsync(ur => ur.UserId == userId && ur.Role == Role.SuperAdmin);
 
         if (isSuperAdmin)
         {

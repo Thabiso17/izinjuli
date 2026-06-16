@@ -27,7 +27,7 @@ public sealed class GetUserByIdQueryHandler : IRequestHandler<GetUserByIdQuery, 
                 u.LastLoginAt,
                 u.CreatedAt,
                 u.UpdatedAt,
-                u.UserRoles.Select(ur => ur.Role).ToList(),
+                u.UserRoles.Select(ur => ur.Role).ToList() as IReadOnlyList<int>,
                 u.UserTeams.Select(ut => ut.TeamId).ToList(),
                 u.UserDivisions.Select(ud => ud.DivisionId).ToList()
             ))
