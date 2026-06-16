@@ -1,6 +1,7 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { RouterLink, RouterLinkActive, Router } from '@angular/router';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-header',
@@ -80,121 +81,157 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
               </a>
             </li>
 
-            <!-- Admin Dropdown -->
-            <li class="nav-item dropdown" [class.show]="isAdminOpen()">
-              <a
-                class="nav-link dropdown-toggle"
-                href="#"
-                role="button"
-                (click)="toggleAdmin($event)"
-                [class.active]="isAdminRoute()"
-              >
-                <i class="bi bi-gear-fill me-1"></i>
-                Admin
-              </a>
-              <ul class="dropdown-menu" [class.show]="isAdminOpen()">
-                <li>
-                  <a
-                    class="dropdown-item"
-                    routerLink="/admin/divisions"
-                    routerLinkActive="active"
-                    (click)="closeMenu()"
-                  >
-                    <i class="bi bi-trophy me-2"></i>Divisions
-                  </a>
-                </li>
-                <li>
-                  <a
-                    class="dropdown-item"
-                    routerLink="/admin/teams"
-                    routerLinkActive="active"
-                    (click)="closeMenu()"
-                  >
-                    <i class="bi bi-shield me-2"></i>Teams
-                  </a>
-                </li>
-                <li>
-                  <a
-                    class="dropdown-item"
-                    routerLink="/admin/players"
-                    routerLinkActive="active"
-                    (click)="closeMenu()"
-                  >
-                    <i class="bi bi-person me-2"></i>Players
-                  </a>
-                </li>
-                <li>
-                  <a
-                    class="dropdown-item"
-                    routerLink="/admin/matches"
-                    routerLinkActive="active"
-                    (click)="closeMenu()"
-                  >
-                    <i class="bi bi-calendar-event me-2"></i>Matches
-                  </a>
-                </li>
-                <li>
-                  <a
-                    class="dropdown-item"
-                    routerLink="/admin/suspensions"
-                    routerLinkActive="active"
-                    (click)="closeMenu()"
-                  >
-                    <i class="bi bi-exclamation-triangle me-2"></i>Suspensions
-                  </a>
-                </li>
-                <li><hr class="dropdown-divider" /></li>
-                <li>
-                  <a
-                    class="dropdown-item"
-                    routerLink="/admin/articles"
-                    routerLinkActive="active"
-                    (click)="closeMenu()"
-                  >
-                    <i class="bi bi-newspaper me-2"></i>Articles
-                  </a>
-                </li>
-                <li>
-                  <a
-                    class="dropdown-item"
-                    routerLink="/admin/videos"
-                    routerLinkActive="active"
-                    (click)="closeMenu()"
-                  >
-                    <i class="bi bi-camera-video me-2"></i>Videos
-                  </a>
-                </li>
-                <li>
-                  <a
-                    class="dropdown-item"
-                    routerLink="/admin/sponsors"
-                    routerLinkActive="active"
-                    (click)="closeMenu()"
-                  >
-                    <i class="bi bi-tag me-2"></i>Sponsors
-                  </a>
-                </li>
-                <li><hr class="dropdown-divider" /></li>
-                <li>
-                  <a
-                    class="dropdown-item"
-                    routerLink="/admin/layout"
-                    routerLinkActive="active"
-                    (click)="closeMenu()"
-                  >
-                    <i class="bi bi-layout-text-window me-2"></i>Layout Editor
-                  </a>
-                </li>
-              </ul>
-            </li>
+            <!-- Admin Dropdown (Only if logged in) -->
+            @if (authService.isAuthenticated()) {
+              <li class="nav-item dropdown" [class.show]="isAdminOpen()">
+                <a
+                  class="nav-link dropdown-toggle"
+                  href="#"
+                  role="button"
+                  (click)="toggleAdmin($event)"
+                  [class.active]="isAdminRoute()"
+                >
+                  <i class="bi bi-gear-fill me-1"></i>
+                  Admin
+                </a>
+                <ul class="dropdown-menu" [class.show]="isAdminOpen()">
+                  <li>
+                    <a
+                      class="dropdown-item"
+                      routerLink="/admin/divisions"
+                      routerLinkActive="active"
+                      (click)="closeMenu()"
+                    >
+                      <i class="bi bi-trophy me-2"></i>Divisions
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      class="dropdown-item"
+                      routerLink="/admin/teams"
+                      routerLinkActive="active"
+                      (click)="closeMenu()"
+                    >
+                      <i class="bi bi-shield me-2"></i>Teams
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      class="dropdown-item"
+                      routerLink="/admin/players"
+                      routerLinkActive="active"
+                      (click)="closeMenu()"
+                    >
+                      <i class="bi bi-person me-2"></i>Players
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      class="dropdown-item"
+                      routerLink="/admin/matches"
+                      routerLinkActive="active"
+                      (click)="closeMenu()"
+                    >
+                      <i class="bi bi-calendar-event me-2"></i>Matches
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      class="dropdown-item"
+                      routerLink="/admin/suspensions"
+                      routerLinkActive="active"
+                      (click)="closeMenu()"
+                    >
+                      <i class="bi bi-exclamation-triangle me-2"></i>Suspensions
+                    </a>
+                  </li>
+                  <li><hr class="dropdown-divider" /></li>
+                  <li>
+                    <a
+                      class="dropdown-item"
+                      routerLink="/admin/articles"
+                      routerLinkActive="active"
+                      (click)="closeMenu()"
+                    >
+                      <i class="bi bi-newspaper me-2"></i>Articles
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      class="dropdown-item"
+                      routerLink="/admin/videos"
+                      routerLinkActive="active"
+                      (click)="closeMenu()"
+                    >
+                      <i class="bi bi-camera-video me-2"></i>Videos
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      class="dropdown-item"
+                      routerLink="/admin/sponsors"
+                      routerLinkActive="active"
+                      (click)="closeMenu()"
+                    >
+                      <i class="bi bi-tag me-2"></i>Sponsors
+                    </a>
+                  </li>
+                  <li><hr class="dropdown-divider" /></li>
+                  <li>
+                    <a
+                      class="dropdown-item"
+                      routerLink="/admin/layout"
+                      routerLinkActive="active"
+                      (click)="closeMenu()"
+                    >
+                      <i class="bi bi-layout-text-window me-2"></i>Layout Editor
+                    </a>
+                  </li>
+                </ul>
+              </li>
+            }
           </ul>
 
-          <!-- Search (Future Enhancement) -->
-          <div class="d-flex">
+          <!-- Auth Buttons -->
+          <div class="d-flex gap-2 align-items-center">
             <button class="btn btn-outline-light" type="button" disabled>
               <i class="bi bi-search me-1"></i>
               <span class="d-none d-md-inline">Search</span>
             </button>
+
+            @if (authService.isAuthenticated()) {
+              <!-- User Info + Logout Dropdown -->
+              <div class="nav-item dropdown">
+                <button
+                  class="btn btn-outline-light dropdown-toggle"
+                  type="button"
+                  (click)="toggleUserMenu($event)"
+                  [class.show]="isUserMenuOpen()"
+                >
+                  <i class="bi bi-person-circle me-1"></i>
+                  <span class="d-none d-md-inline">{{ authService.currentUser()?.firstName }}</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" [class.show]="isUserMenuOpen()">
+                  <li>
+                    <span class="dropdown-item-text small text-muted">
+                      {{ authService.currentUser()?.email }}
+                    </span>
+                  </li>
+                  <li><hr class="dropdown-divider" /></li>
+                  <li>
+                    <a class="dropdown-item" href="#" (click)="logout($event)">
+                      <i class="bi bi-box-arrow-right me-2"></i>Logout
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            } @else {
+              <!-- Login Button -->
+              <a href="/login" class="btn btn-light">
+                <i class="bi bi-box-arrow-in-right me-1"></i>
+                Login
+              </a>
+            }
           </div>
         </div>
       </div>
@@ -248,6 +285,16 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
       font-weight: 600;
     }
 
+    .dropdown-menu-end {
+      right: 0;
+      left: auto;
+    }
+
+    .dropdown-item-text {
+      padding: 0.25rem 1rem;
+      white-space: normal;
+    }
+
     /* Mobile Adjustments */
     @media (max-width: 991px) {
       .navbar-collapse {
@@ -282,6 +329,12 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 export class HeaderComponent {
   isMenuOpen = signal(false);
   isAdminOpen = signal(false);
+  isUserMenuOpen = signal(false);
+
+  constructor(
+    public authService: AuthService,
+    private router: Router
+  ) {}
 
   toggleMenu() {
     this.isMenuOpen.update(v => !v);
@@ -290,11 +343,24 @@ export class HeaderComponent {
   closeMenu() {
     this.isMenuOpen.set(false);
     this.isAdminOpen.set(false);
+    this.isUserMenuOpen.set(false);
   }
 
   toggleAdmin(event: Event) {
     event.preventDefault();
     this.isAdminOpen.update(v => !v);
+  }
+
+  toggleUserMenu(event: Event) {
+    event.preventDefault();
+    this.isUserMenuOpen.update(v => !v);
+  }
+
+  logout(event: Event) {
+    event.preventDefault();
+    this.authService.logout();
+    this.closeMenu();
+    this.router.navigate(['/']);
   }
 
   isAdminRoute(): boolean {
