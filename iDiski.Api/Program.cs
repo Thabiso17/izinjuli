@@ -183,7 +183,8 @@ builder.Services.AddCors(options =>
         {
             "http://localhost:4200",
             "https://localhost:4200",
-            "https://izinjuli.vercel.app" // Production Vercel URL
+            "https://izinjuli.vercel.app", // Production Vercel URL
+            "https://idiski-api.up.railway.app" // Railway API URL (for testing)
         };
 
         // Production URLs (add your actual Vercel URL after deployment)
@@ -196,6 +197,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(origins.ToArray())
               .AllowAnyHeader()
               .AllowAnyMethod()
+              .AllowCredentials() // Required for cookies/auth
               .WithExposedHeaders("*");
     });
 });
