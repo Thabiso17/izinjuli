@@ -227,7 +227,7 @@ import { AuthService } from '../../core/services/auth.service';
               </div>
             } @else {
               <!-- Login Button -->
-              <a href="/login" class="btn btn-light">
+              <a routerLink="/login" class="btn btn-light">
                 <i class="bi bi-box-arrow-in-right me-1"></i>
                 Login
               </a>
