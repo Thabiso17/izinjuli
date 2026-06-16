@@ -59,7 +59,7 @@ public class DivisionsController : BaseApiController
     }
 
     /// <summary>
-    /// Update an existing division (Division Admin or SuperAdmin required)
+    /// Update an existing division. Requires Division Admin (assigned to division) or SuperAdmin.
     /// </summary>
     [HttpPut("{id:guid}")]
     [Authorize(Policy = "CanManageDivisions")]

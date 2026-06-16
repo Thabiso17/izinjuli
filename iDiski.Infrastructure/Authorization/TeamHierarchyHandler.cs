@@ -12,12 +12,12 @@ namespace iDiski.Infrastructure.Authorization;
 /// - Division Admin: Can access teams within their assigned division(s)
 /// - Team Admin: Can access only their explicitly assigned team(s)
 /// </summary>
-public class TeamOwnershipHandler : AuthorizationHandler<TeamOwnershipRequirement>
+public class TeamHierarchyHandler : AuthorizationHandler<TeamOwnershipRequirement>
 {
     private readonly ILeagueDbContext _context;
     private readonly ICurrentUserService _currentUserService;
 
-    public TeamOwnershipHandler(ILeagueDbContext context, ICurrentUserService currentUserService)
+    public TeamHierarchyHandler(ILeagueDbContext context, ICurrentUserService currentUserService)
     {
         _context = context;
         _currentUserService = currentUserService;
@@ -50,7 +50,7 @@ public class TeamOwnershipHandler : AuthorizationHandler<TeamOwnershipRequiremen
             return;
         }
 
-        // Get the team and its division
+        // Check if user is Division Admin assigned to the team's division
         var team = await _context.Teams.FindAsync([requirement.TeamId]);
         if (team == null)
         {
@@ -58,7 +58,6 @@ public class TeamOwnershipHandler : AuthorizationHandler<TeamOwnershipRequiremen
             return;
         }
 
-        // Check if user is Division Admin assigned to the team's division
         var isDivisionAdmin = await _context.UserDivisions
             .AnyAsync(ud => ud.UserId == userId && ud.DivisionId == team.DivisionId);
 

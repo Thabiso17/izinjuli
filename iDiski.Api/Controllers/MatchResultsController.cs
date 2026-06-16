@@ -42,10 +42,10 @@ public sealed class MatchResultsController : BaseApiController
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct) =>
         Ok(await Sender.Send(new GetMatchByIdQuery(id), ct));
 
-    /// <summary>Schedules a new match fixture (Division Admin required for the division).</summary>
+    /// <summary>Schedules a new match fixture. Requires Division Admin (assigned to match's division) or SuperAdmin.</summary>
     /// <response code="201">Match created.</response>
     /// <response code="401">Not authenticated.</response>
-    /// <response code="403">Not authorized (must be admin for the division).</response>
+    /// <response code="403">Not authorized (must be Division Admin assigned to the match's division).</response>
     /// <response code="422">Validation failure (e.g. same home and away team).</response>
     [HttpPost]
     [Authorize(Policy = "CanManageDivisions")]
@@ -62,12 +62,12 @@ public sealed class MatchResultsController : BaseApiController
     }
 
     /// <summary>
-    /// Submits or updates the score and status of a match (Division Admin required).
+    /// Submits or updates the score and status of a match. Requires Division Admin (assigned to match's division) or SuperAdmin.
     /// Use this endpoint to record final results, flag postponements, etc.
     /// </summary>
     /// <response code="204">Score updated.</response>
     /// <response code="401">Not authenticated.</response>
-    /// <response code="403">Not authorized (must be admin for the division).</response>
+    /// <response code="403">Not authorized (must be Division Admin assigned to the match's division).</response>
     /// <response code="404">Match not found.</response>
     /// <response code="422">Validation failure.</response>
     [HttpPut("{id:guid}/score")]

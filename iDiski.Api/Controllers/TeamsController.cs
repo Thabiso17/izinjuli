@@ -24,7 +24,7 @@ public sealed class TeamsController : BaseApiController
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct) =>
         Ok(await Sender.Send(new GetTeamByIdQuery(id), ct));
 
-    /// <summary>Creates a new team. Returns the new team's ID in the Location header.</summary>
+    /// <summary>Creates a new team. Returns the new team's ID in the Location header. SuperAdmin only.</summary>
     /// <response code="201">Team created.</response>
     /// <response code="401">Not authenticated.</response>
     /// <response code="403">Not authorized (SuperAdmin only).</response>
@@ -43,10 +43,10 @@ public sealed class TeamsController : BaseApiController
         return CreatedAtAction(nameof(GetById), new { id }, id);
     }
 
-    /// <summary>Updates an existing team. ShortCode is immutable after creation. Requires Team Admin or Super Admin access.</summary>
+    /// <summary>Updates an existing team. ShortCode is immutable after creation. Requires Division Admin (for team's division) or Team Admin (for team) or Super Admin.</summary>
     /// <response code="204">Team updated.</response>
     /// <response code="401">Not authenticated.</response>
-    /// <response code="403">Not authorized (must be assigned to this team).</response>
+    /// <response code="403">Not authorized (must be Division Admin for team's division, or Team Admin for team).</response>
     /// <response code="404">Team not found.</response>
     /// <response code="422">Validation failure.</response>
     [HttpPut("{id:guid}")]

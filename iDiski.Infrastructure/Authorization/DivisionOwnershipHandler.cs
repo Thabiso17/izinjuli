@@ -34,23 +34,21 @@ public class DivisionOwnershipHandler : AuthorizationHandler<DivisionOwnershipRe
             return;
         }
 
-        // Super Admin bypasses ownership checks
-        var userRoles = await _context.UserRoles
-            .Where(ur => ur.UserId == userId)
-            .Select(ur => ur.Role)
-            .ToListAsync();
+        // Super Admin has full access
+        var isSuperAdmin = await _context.UserRoles
+            .AnyAsync(ur => ur.UserId == userId && ur.Role == (int)Role.SuperAdmin);
 
-        if (userRoles.Contains((int)Role.SuperAdmin))
+        if (isSuperAdmin)
         {
             context.Succeed(requirement);
             return;
         }
 
-        // Check if Division Admin is assigned to this division
-        var isAssignedToDivision = await _context.UserDivisions
+        // Division Admin must be explicitly assigned to this division
+        var isDivisionAdmin = await _context.UserDivisions
             .AnyAsync(ud => ud.UserId == userId && ud.DivisionId == requirement.DivisionId);
 
-        if (isAssignedToDivision)
+        if (isDivisionAdmin)
         {
             context.Succeed(requirement);
         }

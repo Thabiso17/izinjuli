@@ -82,18 +82,30 @@ public sealed class UpdateTeamCommandHandler : IRequestHandler<UpdateTeamCommand
         if (userId == null)
             throw new UnauthorizedException();
 
-        // Check if Super Admin
+        // Super Admin has full access
         var isSuperAdmin = await _db.UserRoles
             .AnyAsync(ur => ur.UserId == userId && ur.Role == (int)Role.SuperAdmin, cancellationToken);
 
         if (isSuperAdmin)
             return;
 
-        // Check if Team Admin assigned to this team
-        var isAssignedToTeam = await _db.UserTeams
+        // Get team and its division
+        var team = await _db.Teams.FindAsync([teamId], cancellationToken);
+        if (team == null)
+            throw new NotFoundException(nameof(Domain.Entities.Team), teamId);
+
+        // Division Admin can manage teams in their division
+        var isDivisionAdmin = await _db.UserDivisions
+            .AnyAsync(ud => ud.UserId == userId && ud.DivisionId == team.DivisionId, cancellationToken);
+
+        if (isDivisionAdmin)
+            return;
+
+        // Team Admin can only manage their assigned team
+        var isTeamAdmin = await _db.UserTeams
             .AnyAsync(ut => ut.UserId == userId && ut.TeamId == teamId, cancellationToken);
 
-        if (!isAssignedToTeam)
+        if (!isTeamAdmin)
             throw new ForbiddenException($"User is not authorized to manage team {teamId}");
     }
 }

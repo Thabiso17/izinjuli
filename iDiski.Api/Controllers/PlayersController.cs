@@ -33,10 +33,10 @@ public sealed class PlayersController : BaseApiController
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct) =>
         Ok(await Sender.Send(new GetPlayerByIdQuery(id), ct));
 
-    /// <summary>Adds a player to a team (Team Admin or SuperAdmin with team assignment required).</summary>
+    /// <summary>Adds a player to a team. Requires: Division Admin (for team's division) OR Team Admin (for team) OR SuperAdmin.</summary>
     /// <response code="201">Player created.</response>
     /// <response code="401">Not authenticated.</response>
-    /// <response code="403">Not authorized (must be admin for the team).</response>
+    /// <response code="403">Not authorized (must be Division Admin for team's division or Team Admin for team).</response>
     /// <response code="404">TeamId not found.</response>
     /// <response code="422">Validation failure (e.g. duplicate jersey number).</response>
     [HttpPost]
@@ -55,10 +55,10 @@ public sealed class PlayersController : BaseApiController
         return CreatedAtAction(nameof(GetAll), new { teamId = command.TeamId }, id);
     }
 
-    /// <summary>Updates a player's details, team, or status (Team Admin with team assignment required).</summary>
+    /// <summary>Updates a player's details, team, or status. Requires: Division Admin (for player's team's division) OR Team Admin (for player's team) OR SuperAdmin.</summary>
     /// <response code="204">Player updated.</response>
     /// <response code="401">Not authenticated.</response>
-    /// <response code="403">Not authorized (must be admin for the team).</response>
+    /// <response code="403">Not authorized (must be Division Admin for player's team's division or Team Admin for player's team).</response>
     /// <response code="404">Player not found.</response>
     /// <response code="422">Validation failure.</response>
     [HttpPut("{id:guid}")]
@@ -81,11 +81,11 @@ public sealed class PlayersController : BaseApiController
     }
 
     /// <summary>
-    /// Transfers a player to a different team with a new jersey number (Team Admin required for both teams).
+    /// Transfers a player to a different team with a new jersey number. Requires admin access to both teams (same hierarchy rules apply).
     /// </summary>
     /// <response code="204">Player transferred successfully.</response>
     /// <response code="401">Not authenticated.</response>
-    /// <response code="403">Not authorized (must be admin for both teams).</response>
+    /// <response code="403">Not authorized (must be admin for both source and destination teams).</response>
     /// <response code="404">Player or team not found.</response>
     /// <response code="422">Validation failure (e.g. jersey number already taken).</response>
     [HttpPost("{id:guid}/transfer")]
@@ -109,11 +109,11 @@ public sealed class PlayersController : BaseApiController
 
     /// <summary>
     /// Soft-deletes a player (sets IsActive = false).
-    /// Historical stats are preserved. Team Admin required.
+    /// Historical stats are preserved. Requires: Division Admin (for player's team's division) OR Team Admin (for player's team) OR SuperAdmin.
     /// </summary>
     /// <response code="204">Player deactivated.</response>
     /// <response code="401">Not authenticated.</response>
-    /// <response code="403">Not authorized (must be admin for the team).</response>
+    /// <response code="403">Not authorized (must be Division Admin for player's team's division or Team Admin for player's team).</response>
     /// <response code="404">Player not found.</response>
     [HttpDelete("{id:guid}")]
     [Authorize(Policy = "CanManageTeams")]
