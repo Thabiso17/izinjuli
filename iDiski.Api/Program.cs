@@ -211,6 +211,10 @@ app.UseHttpsRedirection();
 app.UseAuthentication(); // Validates JWT tokens
 app.UseAuthorization();  // Checks [Authorize] attributes
 
+// Handle CORS preflight requests explicitly
+app.MapMethods("/{**route}", new[] { "OPTIONS" }, () => Results.Ok())
+   .ExcludeFromDescription();
+
 app.MapControllers(); // This maps your ArticlesController, TeamsController, etc.
 
 // Health check endpoint for Railway
