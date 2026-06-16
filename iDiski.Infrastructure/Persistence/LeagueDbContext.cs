@@ -25,6 +25,7 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<UserTeam> UserTeams => Set<UserTeam>();
     public DbSet<UserDivision> UserDivisions => Set<UserDivision>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     // ── Model Configuration ───────────────────────────────────────────────────
     protected override void OnModelCreating(ModelBuilder modelBuilder)

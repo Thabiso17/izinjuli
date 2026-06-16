@@ -4,6 +4,7 @@ using iDiski.Domain.Enums;
 using MediatR;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace iDiski.Application.Teams.Commands;
 
@@ -47,11 +48,16 @@ public sealed class UpdateTeamCommandHandler : IRequestHandler<UpdateTeamCommand
 {
     private readonly ILeagueDbContext _db;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IAuditService _auditService;
 
-    public UpdateTeamCommandHandler(ILeagueDbContext db, ICurrentUserService currentUserService)
+    public UpdateTeamCommandHandler(
+        ILeagueDbContext db,
+        ICurrentUserService currentUserService,
+        IAuditService auditService)
     {
         _db = db;
         _currentUserService = currentUserService;
+        _auditService = auditService;
     }
 
     public async Task Handle(
@@ -64,6 +70,19 @@ public sealed class UpdateTeamCommandHandler : IRequestHandler<UpdateTeamCommand
         // Authorization: Check if user is Super Admin or assigned to this team
         await AuthorizeTeamAccess(request.Id, cancellationToken);
 
+        // Capture old values for audit log
+        var oldValues = JsonSerializer.Serialize(new
+        {
+            team.Name,
+            team.LogoUrl,
+            team.Founded,
+            team.HomeGround,
+            team.City,
+            team.PrimaryColour,
+            team.SecondaryColour
+        });
+
+        // Update team
         team.Name            = request.Name;
         team.LogoUrl         = request.LogoUrl;
         team.Founded         = request.Founded;
@@ -74,6 +93,27 @@ public sealed class UpdateTeamCommandHandler : IRequestHandler<UpdateTeamCommand
         team.UpdatedByUserId = _currentUserService.UserId;
 
         await _db.SaveChangesAsync(cancellationToken);
+
+        // Log the change
+        var newValues = JsonSerializer.Serialize(new
+        {
+            team.Name,
+            team.LogoUrl,
+            team.Founded,
+            team.HomeGround,
+            team.City,
+            team.PrimaryColour,
+            team.SecondaryColour
+        });
+
+        await _auditService.LogAsync(
+            "Team",
+            team.Id,
+            "Updated",
+            $"Updated team: {team.Name}",
+            oldValues,
+            newValues,
+            cancellationToken);
     }
 
     private async Task AuthorizeTeamAccess(Guid teamId, CancellationToken cancellationToken)
