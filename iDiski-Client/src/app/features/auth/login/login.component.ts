@@ -1,14 +1,14 @@
 import { Component, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { Router, ActivatedRoute } from '@angular/router';
+import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { LoginRequest } from '../../../core/models/auth.model';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, RouterLink],
   template: `
     <div class="login-container">
       <div class="login-card">
@@ -57,7 +57,7 @@ import { LoginRequest } from '../../../core/models/auth.model';
         </div>
 
         <div class="links">
-          <a href="/forgot-password">Forgot Password?</a>
+          <a routerLink="/forgot-password">Forgot Password?</a>
         </div>
       </div>
     </div>

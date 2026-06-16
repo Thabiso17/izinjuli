@@ -85,9 +85,7 @@ export class AuthService {
    * Logout user and clear session
    */
   logout(): void {
-    sessionStorage.removeItem('auth_token');
-    sessionStorage.removeItem('token_expires');
-    this.currentUser.set(null);
+    this.clearSession();
     this.router.navigate(['/login']);
   }
 
@@ -159,13 +157,19 @@ export class AuthService {
       // Token exists and is valid, fetch current user
       this.getCurrentUser().subscribe({
         error: () => {
-          // Token is invalid, clear it
-          this.logout();
+          // Token is invalid, clear it silently (don't navigate)
+          this.clearSession();
         }
       });
     } else if (token) {
-      // Token expired, clear it
-      this.logout();
+      // Token expired, clear it silently (don't navigate)
+      this.clearSession();
     }
+  }
+
+  private clearSession(): void {
+    sessionStorage.removeItem('auth_token');
+    sessionStorage.removeItem('token_expires');
+    this.currentUser.set(null);
   }
 }
