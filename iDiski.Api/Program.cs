@@ -1,6 +1,7 @@
 using iDiski.Infrastructure.Persistence;
 using iDiski.Application.Common.Interfaces;
 using iDiski.Infrastructure.Services;
+using iDiski.Domain.Enums;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -125,7 +126,35 @@ builder.Services
         };
     });
 
-// 5.5. Register File Storage Service
+// 5.6. Register Authorization Handlers
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("SuperAdminOnly", policy =>
+        policy.RequireRole(Role.SuperAdmin.ToString()));
+
+    options.AddPolicy("AdminOnly", policy =>
+        policy.RequireRole(
+            Role.SuperAdmin.ToString(),
+            Role.DivisionAdmin.ToString(),
+            Role.TeamAdmin.ToString()));
+
+    options.AddPolicy("CanManageTeams", policy =>
+        policy.RequireRole(
+            Role.SuperAdmin.ToString(),
+            Role.TeamAdmin.ToString()));
+
+    options.AddPolicy("CanManageDivisions", policy =>
+        policy.RequireRole(
+            Role.SuperAdmin.ToString(),
+            Role.DivisionAdmin.ToString()));
+});
+
+builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler,
+    iDiski.Infrastructure.Authorization.TeamOwnershipHandler>();
+builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler,
+    iDiski.Infrastructure.Authorization.DivisionOwnershipHandler>();
+
+// 5.7. Register File Storage Service
 // Use Cloudinary in production (Railway), local storage in development
 var useCloudinary = Environment.GetEnvironmentVariable("USE_CLOUDINARY") == "true"
     || !builder.Environment.IsDevelopment();
