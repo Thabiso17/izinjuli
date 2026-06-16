@@ -16,7 +16,16 @@ import {
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = 'http://localhost:5000/api/auth';
+  private apiUrl = this.getApiUrl();
+
+  private getApiUrl(): string {
+    // In production (Vercel), call the Railway backend API
+    if (window.location.hostname === 'izinjuli.vercel.app') {
+      return 'https://idiski-api.up.railway.app/api/auth';
+    }
+    // In development, use localhost
+    return 'http://localhost:5000/api/auth';
+  }
 
   // Signals for reactive state
   currentUser = signal<CurrentUserDto | null>(null);
