@@ -197,8 +197,7 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(origins.ToArray())
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials() // Required for cookies/auth
-              .WithExposedHeaders("*");
+              .AllowCredentials();
     });
 });
 
@@ -246,13 +245,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<iDiski.Api.Middleware.ExceptionHandlingMiddleware>();
 app.UseStaticFiles(); // Serve static files from wwwroot (uploaded images)
-
-// Handle CORS preflight requests explicitly (must come before other middleware)
-app.MapMethods("/{**route}", new[] { "OPTIONS" }, () => Results.Ok())
-   .ExcludeFromDescription();
-
-app.UseCors(); // Enable CORS (must come before authentication)
 app.UseHttpsRedirection();
+
+// CORS must be applied BEFORE authentication
+app.UseCors();
 
 // Add JWT Authentication Middleware
 app.UseAuthentication(); // Validates JWT tokens
