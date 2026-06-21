@@ -21,10 +21,10 @@ export class AuthService {
   private logger = inject(LoggerService);
 
   private getApiUrl(): string {
-    const url = 'http://localhost:5207/api/auth';
-    console.log('DEBUG: getApiUrl() returning:', url);
-    console.log('DEBUG: window.location.hostname:', window.location.hostname);
-    return url;
+    if (window.location.hostname === 'izinjuli.vercel.app') {
+      return 'https://idiski-api.up.railway.app/api/auth';
+    }
+    return 'http://localhost:5207/api/auth';
   }
 
   constructor(private http: HttpClient, private router: Router) {
