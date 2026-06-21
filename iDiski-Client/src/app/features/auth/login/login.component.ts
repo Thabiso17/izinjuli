@@ -1,9 +1,10 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router, ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { LoginRequest } from '../../../core/models/auth.model';
+import { LoggerService } from '../../../core/services/logger.service';
 
 @Component({
   selector: 'app-login',
@@ -173,6 +174,7 @@ import { LoginRequest } from '../../../core/models/auth.model';
 })
 export class LoginComponent {
   loginForm: FormGroup;
+  private logger = inject(LoggerService);
 
   constructor(
     private formBuilder: FormBuilder,
@@ -184,24 +186,30 @@ export class LoginComponent {
       email: ['', [Validators.required, Validators.email]],
       password: ['', [Validators.required, Validators.minLength(8)]]
     });
+    this.logger.log('🔐 LoginComponent initialized');
   }
 
   onLogin(): void {
-    if (this.loginForm.invalid) return;
+    if (this.loginForm.invalid) {
+      this.logger.log('⚠️ Form is invalid, cannot submit');
+      return;
+    }
 
     const loginRequest: LoginRequest = {
       email: this.loginForm.get('email')?.value,
       password: this.loginForm.get('password')?.value
     };
 
+    this.logger.log('📝 Submitting login form for:', { email: loginRequest.email });
+
     this.authService.login(loginRequest).subscribe({
       next: (response) => {
-        console.log('✅ Login successful');
+        this.logger.log('✅ Login successful, redirecting...');
         const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/admin';
         this.router.navigateByUrl(returnUrl);
       },
       error: (error) => {
-        console.error('❌ Login failed:', error);
+        this.logger.error('❌ Login failed', error);
       }
     });
   }

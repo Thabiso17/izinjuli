@@ -11,25 +11,23 @@ namespace iDiski.Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AlterColumn<DateTime>(
-                name: "UpdatedAt",
-                table: "Videos",
-                type: "timestamp with time zone",
-                nullable: true,
-                oldClrType: typeof(DateTime),
-                oldType: "timestamp with time zone");
-
-            migrationBuilder.AddColumn<Guid>(
-                name: "CreatedByUserId",
-                table: "Videos",
-                type: "uuid",
-                nullable: true);
-
-            migrationBuilder.AddColumn<Guid>(
-                name: "UpdatedByUserId",
-                table: "Videos",
-                type: "uuid",
-                nullable: true);
+            // Only alter Videos table if it exists (may be missing in some deployments)
+            migrationBuilder.Sql(@"
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name='Videos') THEN
+                        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Videos' AND column_name='UpdatedAt' AND is_nullable='NO') THEN
+                            ALTER TABLE ""Videos"" ALTER COLUMN ""UpdatedAt"" DROP NOT NULL;
+                        END IF;
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Videos' AND column_name='CreatedByUserId') THEN
+                            ALTER TABLE ""Videos"" ADD COLUMN ""CreatedByUserId"" uuid;
+                        END IF;
+                        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='Videos' AND column_name='UpdatedByUserId') THEN
+                            ALTER TABLE ""Videos"" ADD COLUMN ""UpdatedByUserId"" uuid;
+                        END IF;
+                    END IF;
+                END $$;
+            ");
 
             migrationBuilder.AddColumn<Guid>(
                 name: "CreatedByUserId",
