@@ -1,7 +1,7 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, tap, throwError } from 'rxjs';
+import { Observable, tap, catchError } from 'rxjs';
 import {
   LoginRequest,
   LoginResponse,
@@ -69,11 +69,11 @@ export class AuthService {
 
         this.isLoading.set(false);
       }),
-      throwError(err => {
+      catchError(err => {
         this.isLoading.set(false);
         this.logger.error('Login request failed', err);
         this.error.set('Login failed. Please check your credentials.');
-        return err;
+        throw err;
       })
     );
   }
