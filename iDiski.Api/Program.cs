@@ -227,6 +227,16 @@ catch (Exception ex)
     throw;
 }
 
+// Auto-seed test authentication users on startup (development only)
+try
+{
+    await iDiski.Infrastructure.Seed.AuthTestDataSeeder.SeedAuthTestUsers(app.Services);
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"⚠️ Auth test data seeding failed: {ex.Message}");
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
