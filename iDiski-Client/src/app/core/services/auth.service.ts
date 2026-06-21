@@ -1,4 +1,4 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap, throwError } from 'rxjs';
@@ -11,20 +11,24 @@ import {
   CreateUserRequest,
   Role
 } from '../models/auth.model';
+import { LoggerService } from './logger.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
   private apiUrl = this.getApiUrl();
+  private logger = inject(LoggerService);
 
   private getApiUrl(): string {
-    // In production (Vercel), call the Railway backend API
-    if (window.location.hostname === 'izinjuli.vercel.app') {
-      return 'https://idiski-api.up.railway.app/api/auth';
-    }
-    // In development, use localhost
-    return 'http://localhost:5000/api/auth';
+    const url = 'http://localhost:5207/api/auth';
+    console.log('DEBUG: getApiUrl() returning:', url);
+    console.log('DEBUG: window.location.hostname:', window.location.hostname);
+    return url;
+  }
+
+  constructor(private http: HttpClient, private router: Router) {
+    this.logger.log('🔐 AuthService initialized with API URL: ' + this.apiUrl);
   }
 
   // Signals for reactive state
@@ -43,27 +47,21 @@ export class AuthService {
            false;
   });
 
-  constructor(
-    private http: HttpClient,
-    private router: Router
-  ) {
-    this.restoreSession();
-  }
 
-  /**
-   * Login with email and password
-   */
   login(request: LoginRequest): Observable<LoginResponse> {
     this.isLoading.set(true);
     this.error.set(null);
+    this.logger.log('📡 Attempting login for:', { email: request.email });
 
-    return this.http.post<LoginResponse>(`${this.apiUrl}/login`, request).pipe(
+    const loginUrl = `${this.apiUrl}/login`;
+    this.logger.log('🔗 POST to:', loginUrl);
+
+    return this.http.post<LoginResponse>(loginUrl, request).pipe(
       tap(response => {
-        // Store JWT token in sessionStorage
+        this.logger.log('✅ Login successful for:', { email: response.user.email, roles: response.user.roles });
         sessionStorage.setItem('auth_token', response.accessToken);
         sessionStorage.setItem('token_expires', response.expiresAt);
 
-        // Update current user signal
         this.currentUser.set({
           ...response.user,
           isSuperAdmin: response.user.roles.includes(Role.SuperAdmin)
@@ -71,11 +69,12 @@ export class AuthService {
 
         this.isLoading.set(false);
       }),
-      throwError => {
+      throwError(err => {
         this.isLoading.set(false);
+        this.logger.error('Login request failed', err);
         this.error.set('Login failed. Please check your credentials.');
-        return throwError;
-      }
+        return err;
+      })
     );
   }
 
