@@ -245,17 +245,18 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<iDiski.Api.Middleware.ExceptionHandlingMiddleware>();
-app.UseCors(); // Enable CORS
 app.UseStaticFiles(); // Serve static files from wwwroot (uploaded images)
+
+// Handle CORS preflight requests explicitly (must come before other middleware)
+app.MapMethods("/{**route}", new[] { "OPTIONS" }, () => Results.Ok())
+   .ExcludeFromDescription();
+
+app.UseCors(); // Enable CORS (must come before authentication)
 app.UseHttpsRedirection();
 
 // Add JWT Authentication Middleware
 app.UseAuthentication(); // Validates JWT tokens
 app.UseAuthorization();  // Checks [Authorize] attributes
-
-// Handle CORS preflight requests explicitly
-app.MapMethods("/{**route}", new[] { "OPTIONS" }, () => Results.Ok())
-   .ExcludeFromDescription();
 
 app.MapControllers(); // This maps your ArticlesController, TeamsController, etc.
 
