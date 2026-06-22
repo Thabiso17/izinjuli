@@ -10,6 +10,7 @@ using Swashbuckle.AspNetCore.SwaggerUI;
 using FluentValidation;
 using System.Text;
 
+// Railway rebuild trigger - June 22, 2026
 var builder = WebApplication.CreateBuilder(args);
 
 // 1. Get Connection String
