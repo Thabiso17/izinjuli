@@ -11,21 +11,15 @@ import {
   CreateUserRequest,
   Role
 } from '../models/auth.model';
+import { environment } from '../../../environments/environment';
 import { LoggerService } from './logger.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
-  private apiUrl = this.getApiUrl();
+  private apiUrl = `${environment.apiBaseUrl}/auth`;
   private logger = inject(LoggerService);
-
-  private getApiUrl(): string {
-    if (window.location.hostname === 'izinjuli.vercel.app') {
-      return 'https://idiski-api.up.railway.app/api/auth';
-    }
-    return 'http://localhost:5207/api/auth';
-  }
 
   constructor(private http: HttpClient, private router: Router) {
     this.logger.log('🔐 AuthService initialized with API URL: ' + this.apiUrl);
