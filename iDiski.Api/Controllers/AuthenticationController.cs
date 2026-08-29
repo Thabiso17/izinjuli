@@ -67,12 +67,14 @@ public class AuthenticationController : BaseApiController
     }
 
     /// <summary>
-    /// Create a new user account. Super Admin only.
+    /// Create a new user account. Super Admin can create any role and assign any
+    /// team(s)/division(s). Division Admin can only create Team Admins, scoped to
+    /// team(s) within division(s) they're assigned to.
     /// POST /api/auth/create-user
-    /// Auth: Requires authenticated user with SuperAdmin role
+    /// Auth: Requires authenticated user with SuperAdmin or DivisionAdmin role
     /// Body: { email, password, firstName, lastName, roles[], assignedTeamIds?, assignedDivisionIds? }
     /// Response: 201 Created with userId
-    ///           403 Forbidden if not Super Admin
+    ///           403 Forbidden if not Super Admin, or if a Division Admin oversteps their scope
     ///           409 Conflict if email already exists
     ///           422 Validation error
     /// </summary>
