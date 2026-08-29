@@ -57,7 +57,16 @@ builder.Services.AddScoped<ILeagueDbContext>(provider =>
 
 // 4. Register MediatR (CQRS pattern)
 builder.Services.AddMediatR(cfg =>
-    cfg.RegisterServicesFromAssembly(typeof(iDiski.Application.Teams.TeamDto).Assembly));
+{
+    cfg.RegisterServicesFromAssembly(typeof(iDiski.Application.Teams.TeamDto).Assembly);
+
+    // Pipeline order: Logging (outermost) -> Authorization -> Validation -> handler.
+    // RegisterServicesFromAssembly does NOT auto-register open-generic IPipelineBehavior<,>
+    // implementations, so these must be added explicitly or they silently never run.
+    cfg.AddOpenBehavior(typeof(iDiski.Application.Common.Behaviours.LoggingBehaviour<,>));
+    cfg.AddOpenBehavior(typeof(iDiski.Application.Common.Behaviours.AuthorizationBehaviour<,>));
+    cfg.AddOpenBehavior(typeof(iDiski.Application.Common.Behaviours.ValidationBehaviour<,>));
+});
 
 // 5. Register FluentValidation
 builder.Services.AddValidatorsFromAssembly(typeof(iDiski.Application.Teams.TeamDto).Assembly);
@@ -143,6 +152,7 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("CanManageTeams", policy =>
         policy.RequireRole(
             Role.SuperAdmin.ToString(),
+            Role.DivisionAdmin.ToString(),
             Role.TeamAdmin.ToString()));
 
     options.AddPolicy("CanManageDivisions", policy =>

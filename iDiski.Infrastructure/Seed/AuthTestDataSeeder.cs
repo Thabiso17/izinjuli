@@ -26,7 +26,8 @@ public static class AuthTestDataSeeder
             // Check if users already exist
             if (await db.Users.AnyAsync(u => u.Email == "superadmin@test.com"))
             {
-                Console.WriteLine("✅ Auth test users already seeded, skipping...");
+                Console.WriteLine("✅ Auth test users already seeded, skipping user creation...");
+                await AssignSampleOwnershipAsync(db);
                 return;
             }
 
@@ -130,6 +131,63 @@ public static class AuthTestDataSeeder
             Console.WriteLine("   TeamAdmin:     teamadmin@test.com / Password123!");
             Console.WriteLine("   DivisionAdmin: divadmin@test.com / Password123!");
             Console.WriteLine("   InactiveUser:  inactive@test.com / Password123! (should fail)\n");
+
+            await AssignSampleOwnershipAsync(db);
         }
+    }
+
+    /// <summary>
+    /// Scopes divadmin@test.com/teamadmin@test.com to a sample Division/Team so their
+    /// resource-ownership checks are actually exercisable in dev. Divisions/Teams are
+    /// usually populated later via /api/seed, so this re-checks on every startup rather
+    /// than only right after user creation, and no-ops once an assignment already exists.
+    /// </summary>
+    private static async Task AssignSampleOwnershipAsync(LeagueDbContext db)
+    {
+        var divisionAdmin = await db.Users.FirstOrDefaultAsync(u => u.Email == "divadmin@test.com");
+        if (divisionAdmin != null && !await db.UserDivisions.AnyAsync(ud => ud.UserId == divisionAdmin.Id))
+        {
+            var division = await db.Divisions.OrderBy(d => d.CreatedAt).FirstOrDefaultAsync();
+            if (division != null)
+            {
+                db.UserDivisions.Add(new UserDivision
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = divisionAdmin.Id,
+                    DivisionId = division.Id,
+                    AssignedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
+                });
+                Console.WriteLine($"✅ Assigned divadmin@test.com to division '{division.Name}'");
+            }
+            else
+            {
+                Console.WriteLine("⚠️ No divisions exist yet — divadmin@test.com has no division assignment. Seed divisions (e.g. /api/seed) and restart.");
+            }
+        }
+
+        var teamAdmin = await db.Users.FirstOrDefaultAsync(u => u.Email == "teamadmin@test.com");
+        if (teamAdmin != null && !await db.UserTeams.AnyAsync(ut => ut.UserId == teamAdmin.Id))
+        {
+            var team = await db.Teams.OrderBy(t => t.CreatedAt).FirstOrDefaultAsync();
+            if (team != null)
+            {
+                db.UserTeams.Add(new UserTeam
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = teamAdmin.Id,
+                    TeamId = team.Id,
+                    AssignedAt = DateTime.UtcNow,
+                    CreatedAt = DateTime.UtcNow
+                });
+                Console.WriteLine($"✅ Assigned teamadmin@test.com to team '{team.Name}'");
+            }
+            else
+            {
+                Console.WriteLine("⚠️ No teams exist yet — teamadmin@test.com has no team assignment. Seed teams (e.g. /api/seed) and restart.");
+            }
+        }
+
+        await db.SaveChangesAsync();
     }
 }

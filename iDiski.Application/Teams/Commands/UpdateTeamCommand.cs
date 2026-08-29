@@ -1,3 +1,4 @@
+using iDiski.Application.Common.Authorization;
 using iDiski.Application.Common.Interfaces;
 using iDiski.Application.Common.Exceptions;
 using iDiski.Domain.Enums;
@@ -19,7 +20,10 @@ public sealed record UpdateTeamCommand(
     string? City,
     string? PrimaryColour,
     string? SecondaryColour
-) : IRequest;
+) : IRequest, IRequireTeamAccess
+{
+    Guid IRequireTeamAccess.TeamId => Id;
+}
 
 // ── Validator ─────────────────────────────────────────────────────────────────
 

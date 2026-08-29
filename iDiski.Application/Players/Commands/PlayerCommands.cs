@@ -1,3 +1,4 @@
+using iDiski.Application.Common.Authorization;
 using iDiski.Application.Common.Exceptions;
 using iDiski.Application.Common.Interfaces;
 using iDiski.Domain.Entities;
@@ -22,7 +23,7 @@ public sealed record CreatePlayerCommand(
     PlayerPosition Position,
     PreferredFoot  PreferredFoot,
     Guid           TeamId
-) : IRequest<Guid>;
+) : IRequest<Guid>, IRequireTeamAccess;
 
 public sealed class CreatePlayerCommandValidator : AbstractValidator<CreatePlayerCommand>
 {
@@ -111,7 +112,7 @@ public sealed record UpdatePlayerCommand(
     PreferredFoot  PreferredFoot,
     Guid           TeamId,
     bool           IsActive
-) : IRequest;
+) : IRequest, IRequireTeamAccess;
 
 public sealed class UpdatePlayerCommandValidator : AbstractValidator<UpdatePlayerCommand>
 {
@@ -162,7 +163,13 @@ public sealed record TransferPlayerCommand(
     Guid PlayerId,
     Guid NewTeamId,
     int  NewJerseyNumber
-) : IRequest;
+) : IRequest, IRequirePlayerAccess, IRequireTeamAccess
+{
+    // Ownership is checked against both ends of the transfer: IRequirePlayerAccess resolves
+    // the player's current team, and this maps the destination team explicitly since the
+    // interface's TeamId doesn't match the NewTeamId property name.
+    Guid IRequireTeamAccess.TeamId => NewTeamId;
+}
 
 public sealed class TransferPlayerCommandValidator : AbstractValidator<TransferPlayerCommand>
 {
@@ -222,7 +229,10 @@ public sealed class TransferPlayerCommandHandler : IRequestHandler<TransferPlaye
 // DELETE (soft-delete via IsActive flag)
 // ═════════════════════════════════════════════════════════════════════════════
 
-public sealed record DeletePlayerCommand(Guid Id) : IRequest;
+public sealed record DeletePlayerCommand(Guid Id) : IRequest, IRequirePlayerAccess
+{
+    Guid IRequirePlayerAccess.PlayerId => Id;
+}
 
 public sealed class DeletePlayerCommandHandler : IRequestHandler<DeletePlayerCommand>
 {

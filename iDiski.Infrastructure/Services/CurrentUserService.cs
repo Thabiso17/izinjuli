@@ -32,4 +32,6 @@ public sealed class CurrentUserService : ICurrentUserService
         _httpContextAccessor.HttpContext?.User.IsInRole(role.ToString()) ?? false;
 
     public bool IsSuperAdmin => HasRole(Role.SuperAdmin);
+
+    public ClaimsPrincipal? User => _httpContextAccessor.HttpContext?.User;
 }
