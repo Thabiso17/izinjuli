@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { adminGuard, authGuard, noAuthGuard } from './core/guards/auth.guards';
+import { adminGuard, authGuard, noAuthGuard, superAdminGuard } from './core/guards/auth.guards';
 
 export const routes: Routes = [
   {
@@ -161,6 +161,14 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/admin/layout-editor/layout-editor.component').then(
             (m) => m.LayoutEditorComponent
+          ),
+      },
+      {
+        path: 'clear-data',
+        canActivate: [superAdminGuard],
+        loadComponent: () =>
+          import('./features/admin/clear-data/clear-data-admin.component').then(
+            (m) => m.ClearDataAdminComponent
           ),
       },
     ],

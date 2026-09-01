@@ -187,6 +187,19 @@ import { AuthService } from '../../core/services/auth.service';
                       <i class="bi bi-layout-text-window me-2"></i>Layout Editor
                     </a>
                   </li>
+                  @if (authService.isSuperAdmin()) {
+                    <li><hr class="dropdown-divider" /></li>
+                    <li>
+                      <a
+                        class="dropdown-item text-danger"
+                        routerLink="/admin/clear-data"
+                        routerLinkActive="active"
+                        (click)="closeMenu()"
+                      >
+                        <i class="bi bi-trash3 me-2"></i>Clear Data
+                      </a>
+                    </li>
+                  }
                 </ul>
               </li>
             }

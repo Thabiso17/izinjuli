@@ -16,7 +16,8 @@ public sealed record CreateTeamCommand(
     string? HomeGround,
     string? City,
     string? PrimaryColour,
-    string? SecondaryColour
+    string? SecondaryColour,
+    Guid?   DivisionId = null
 ) : IRequest<Guid>;
 
 // ── Validator ─────────────────────────────────────────────────────────────────
@@ -45,11 +46,19 @@ public sealed class CreateTeamCommandValidator : AbstractValidator<CreateTeamCom
         RuleFor(x => x.PrimaryColour)
             .Matches("^#[0-9A-Fa-f]{6}$").WithMessage("Must be a valid hex colour, e.g. #FF0000.")
             .When(x => x.PrimaryColour is not null);
+
+        RuleFor(x => x.DivisionId)
+            .MustAsync(DivisionExists).WithMessage("Division not found.")
+            .When(x => x.DivisionId is not null);
     }
 
     private async Task<bool> BeUniqueShortCode(
         string shortCode, CancellationToken cancellationToken)
         => !await _db.Teams.AnyAsync(t => t.ShortCode == shortCode, cancellationToken);
+
+    private async Task<bool> DivisionExists(
+        Guid? divisionId, CancellationToken cancellationToken)
+        => await _db.Divisions.AnyAsync(d => d.Id == divisionId, cancellationToken);
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -74,7 +83,8 @@ public sealed class CreateTeamCommandHandler
             HomeGround      = request.HomeGround,
             City            = request.City,
             PrimaryColour   = request.PrimaryColour,
-            SecondaryColour = request.SecondaryColour
+            SecondaryColour = request.SecondaryColour,
+            DivisionId      = request.DivisionId
         };
 
         _db.Teams.Add(team);

@@ -10,3 +10,4 @@ export * from './team.service';
 export * from './player.service';
 export * from './match.service';
 export * from './standings.service';
+export * from './clear-data.service';

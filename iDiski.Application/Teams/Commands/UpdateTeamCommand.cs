@@ -19,7 +19,8 @@ public sealed record UpdateTeamCommand(
     string? HomeGround,
     string? City,
     string? PrimaryColour,
-    string? SecondaryColour
+    string? SecondaryColour,
+    Guid?   DivisionId = null
 ) : IRequest, IRequireTeamAccess
 {
     Guid IRequireTeamAccess.TeamId => Id;
@@ -29,8 +30,12 @@ public sealed record UpdateTeamCommand(
 
 public sealed class UpdateTeamCommandValidator : AbstractValidator<UpdateTeamCommand>
 {
-    public UpdateTeamCommandValidator()
+    private readonly ILeagueDbContext _db;
+
+    public UpdateTeamCommandValidator(ILeagueDbContext db)
     {
+        _db = db;
+
         RuleFor(x => x.Id).NotEmpty();
 
         RuleFor(x => x.Name)
@@ -43,7 +48,15 @@ public sealed class UpdateTeamCommandValidator : AbstractValidator<UpdateTeamCom
         RuleFor(x => x.PrimaryColour)
             .Matches("^#[0-9A-Fa-f]{6}$").WithMessage("Must be a valid hex colour.")
             .When(x => x.PrimaryColour is not null);
+
+        RuleFor(x => x.DivisionId)
+            .MustAsync(DivisionExists).WithMessage("Division not found.")
+            .When(x => x.DivisionId is not null);
     }
+
+    private async Task<bool> DivisionExists(
+        Guid? divisionId, CancellationToken cancellationToken)
+        => await _db.Divisions.AnyAsync(d => d.Id == divisionId, cancellationToken);
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -83,7 +96,8 @@ public sealed class UpdateTeamCommandHandler : IRequestHandler<UpdateTeamCommand
             team.HomeGround,
             team.City,
             team.PrimaryColour,
-            team.SecondaryColour
+            team.SecondaryColour,
+            team.DivisionId
         });
 
         // Update team
@@ -94,6 +108,7 @@ public sealed class UpdateTeamCommandHandler : IRequestHandler<UpdateTeamCommand
         team.City            = request.City;
         team.PrimaryColour   = request.PrimaryColour;
         team.SecondaryColour = request.SecondaryColour;
+        team.DivisionId      = request.DivisionId;
         team.UpdatedByUserId = _currentUserService.UserId;
 
         await _db.SaveChangesAsync(cancellationToken);
@@ -107,7 +122,8 @@ public sealed class UpdateTeamCommandHandler : IRequestHandler<UpdateTeamCommand
             team.HomeGround,
             team.City,
             team.PrimaryColour,
-            team.SecondaryColour
+            team.SecondaryColour,
+            team.DivisionId
         });
 
         await _auditService.LogAsync(

@@ -43,7 +43,7 @@ import { getImageUrl } from '../../../core/utils/image.utils';
               <select
                 class="form-select"
                 [(ngModel)]="filterDivisionId"
-                (ngModelChange)="loadTeams(); loadPlayers()"
+                (ngModelChange)="onFilterDivisionChange()"
               >
                 <option [ngValue]="undefined">All Divisions</option>
                 @for (division of divisions(); track division.id) {
@@ -59,7 +59,7 @@ import { getImageUrl } from '../../../core/utils/image.utils';
                 (ngModelChange)="loadPlayers()"
               >
                 <option [ngValue]="undefined">All Teams</option>
-                @for (team of teams(); track team.id) {
+                @for (team of getTeamsByDivision(filterDivisionId); track team.id) {
                   <option [ngValue]="team.id">{{ team.name }}</option>
                 }
               </select>
@@ -292,7 +292,7 @@ import { getImageUrl } from '../../../core/utils/image.utils';
                       class="form-select"
                       [(ngModel)]="formDivisionFilter"
                       name="formDivisionFilter"
-                      (ngModelChange)="filterTeamsByDivision()"
+                      (ngModelChange)="onFormDivisionFilterChange()"
                     >
                       <option [ngValue]="undefined">All Divisions</option>
                       @for (division of divisions(); track division.id) {
@@ -310,7 +310,7 @@ import { getImageUrl } from '../../../core/utils/image.utils';
                       required
                     >
                       <option [ngValue]="null">Select Team</option>
-                      @for (team of getFilteredTeams(); track team.id) {
+                      @for (team of getTeamsByDivision(formDivisionFilter); track team.id) {
                         <option [ngValue]="team.id">{{ team.name }} ({{ team.divisionName }})</option>
                       }
                     </select>
@@ -745,15 +745,32 @@ export class PlayersAdminComponent implements OnInit {
     this.loadPlayers();
   }
 
-  filterTeamsByDivision() {
-    // Just a trigger for the template to re-render getFilteredTeams()
+  onFilterDivisionChange() {
+    // Team filter may no longer be valid for the newly selected division
+    if (this.filterTeamId) {
+      const team = this.teams().find(t => t.id === this.filterTeamId);
+      if (!team || team.divisionId !== this.filterDivisionId) {
+        this.filterTeamId = undefined;
+      }
+    }
+    this.loadPlayers();
   }
 
-  getFilteredTeams(): TeamDto[] {
-    if (!this.formDivisionFilter) {
+  onFormDivisionFilterChange() {
+    // Team selection may no longer be valid for the newly selected division
+    if (this.formData.teamId) {
+      const team = this.teams().find(t => t.id === this.formData.teamId);
+      if (!team || team.divisionId !== this.formDivisionFilter) {
+        this.formData.teamId = null;
+      }
+    }
+  }
+
+  getTeamsByDivision(divisionId: string | undefined): TeamDto[] {
+    if (!divisionId) {
       return this.teams();
     }
-    return this.teams().filter(team => team.divisionId === this.formDivisionFilter);
+    return this.teams().filter(team => team.divisionId === divisionId);
   }
 
   selectPlayer(playerId: string) {
