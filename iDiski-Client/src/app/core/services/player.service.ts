@@ -9,9 +9,16 @@ export class PlayerService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/players`;
 
-  getAll(teamId?: string, activeOnly: boolean = true): Observable<PlayerDto[]> {
+  getAll(
+    teamId?: string,
+    activeOnly: boolean = true,
+    divisionId?: string,
+  ): Observable<PlayerDto[]> {
     let params = new HttpParams().set('activeOnly', activeOnly.toString());
     if (teamId) params = params.set('teamId', teamId);
+    // Sent alongside teamId rather than instead of it: with a division chosen and the team
+    // filter left on "All", this is what keeps the list to that division.
+    if (divisionId) params = params.set('divisionId', divisionId);
     return this.http.get<PlayerDto[]>(this.base, { params });
   }
 

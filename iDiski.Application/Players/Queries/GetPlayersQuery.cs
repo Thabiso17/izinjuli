@@ -8,11 +8,18 @@ namespace iDiski.Application.Players.Queries;
 
 // ── Query ─────────────────────────────────────────────────────────────────────
 
-/// <param name="TeamId">Filter by team. If null, returns all players in the league.</param>
+/// <param name="TeamId">Filter by team. If null, returns players from every team.</param>
 /// <param name="ActiveOnly">When true, excludes released/inactive players.</param>
+/// <param name="DivisionId">
+/// Filter by the division the player's team plays in. Narrower filters still apply on top, so
+/// naming both a division and a team gives you that team. The admin players page needs this to
+/// answer "everyone in this division" — without it, clearing the team filter widened the list
+/// to the entire league rather than back to the chosen division.
+/// </param>
 public sealed record GetPlayersQuery(
     Guid? TeamId     = null,
-    bool  ActiveOnly = true
+    bool  ActiveOnly = true,
+    Guid? DivisionId = null
 ) : IRequest<IReadOnlyList<PlayerDto>>;
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -45,6 +52,9 @@ public sealed class GetPlayersQueryHandler
 
         if (request.TeamId.HasValue)
             query = query.Where(p => p.TeamId == request.TeamId.Value);
+
+        if (request.DivisionId.HasValue)
+            query = query.Where(p => p.Team.DivisionId == request.DivisionId.Value);
 
         if (request.ActiveOnly)
             query = query.Where(p => p.IsActive);

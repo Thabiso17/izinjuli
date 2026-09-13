@@ -13,9 +13,11 @@ public class SuspensionsController : BaseApiController
     /// Get all active suspensions with optional division filter
     /// </summary>
     [HttpGet("active")]
-    public async Task<IActionResult> GetActive([FromQuery] Guid? divisionId)
+    public async Task<IActionResult> GetActive(
+        [FromQuery] Guid? divisionId,
+        [FromQuery] Guid? teamId = null)
     {
-        var query = new GetActiveSuspensionsQuery(divisionId);
+        var query = new GetActiveSuspensionsQuery(divisionId, teamId);
         var result = await Sender.Send(query);
         return Ok(result);
     }

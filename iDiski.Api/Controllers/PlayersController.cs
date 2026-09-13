@@ -20,9 +20,10 @@ public sealed class PlayersController : BaseApiController
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAll(
         [FromQuery] Guid? teamId,
-        [FromQuery] bool activeOnly = true,
-        CancellationToken ct = default) =>
-        Ok(await Sender.Send(new GetPlayersQuery(teamId, activeOnly), ct));
+        [FromQuery] bool activeOnly   = true,
+        [FromQuery] Guid? divisionId  = null,
+        CancellationToken ct          = default) =>
+        Ok(await Sender.Send(new GetPlayersQuery(teamId, activeOnly, divisionId), ct));
 
     /// <summary>Gets a single player by ID.</summary>
     /// <response code="200">Player details.</response>

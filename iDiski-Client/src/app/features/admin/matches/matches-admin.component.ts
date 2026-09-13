@@ -44,7 +44,7 @@ import {
                 type="number"
                 class="form-control"
                 [(ngModel)]="filterSeason"
-                (ngModelChange)="loadMatches()"
+                (ngModelChange)="onFiltersChanged()"
                 placeholder="2025"
               />
             </div>
@@ -54,7 +54,7 @@ import {
                 type="number"
                 class="form-control"
                 [(ngModel)]="filterMatchweek"
-                (ngModelChange)="loadMatches()"
+                (ngModelChange)="onFiltersChanged()"
                 placeholder="All"
               />
             </div>
@@ -63,7 +63,7 @@ import {
               <select
                 class="form-select"
                 [(ngModel)]="filterDivisionId"
-                (ngModelChange)="loadMatches()"
+                (ngModelChange)="onFilterDivisionChange()"
               >
                 <option [ngValue]="undefined">All Divisions</option>
                 @for (division of divisions(); track division.id) {
@@ -74,11 +74,25 @@ import {
               </select>
             </div>
             <div class="col-md-3">
+              <label class="form-label">Team</label>
+              <select
+                class="form-select"
+                [(ngModel)]="filterTeamId"
+                (ngModelChange)="onFiltersChanged()"
+              >
+                <option [ngValue]="undefined">All Teams</option>
+                @for (team of getTeamsByDivision(filterDivisionId); track team.id) {
+                  <option [ngValue]="team.id">{{ team.name }}</option>
+                }
+              </select>
+              <small class="text-muted">Home and away fixtures</small>
+            </div>
+            <div class="col-md-2">
               <label class="form-label">Status</label>
               <select
                 class="form-select"
                 [(ngModel)]="filterStatus"
-                (ngModelChange)="loadMatches()"
+                (ngModelChange)="onFiltersChanged()"
               >
                 <option [ngValue]="undefined">All Statuses</option>
                 <option value="Scheduled">Scheduled</option>
@@ -88,7 +102,7 @@ import {
                 <option value="Cancelled">Cancelled</option>
               </select>
             </div>
-            <div class="col-md-2 d-flex align-items-end">
+            <div class="col-12 d-flex justify-content-end">
               <button class="btn btn-outline-secondary" (click)="clearFilters()">
                 Clear
               </button>
@@ -330,6 +344,7 @@ import {
                       class="form-select"
                       [(ngModel)]="createFormData.divisionId"
                       name="divisionId"
+                      (ngModelChange)="onCreateDivisionChange()"
                     >
                       <option [ngValue]="null">Select</option>
                       @for (division of divisions(); track division.id) {
@@ -349,7 +364,7 @@ import {
                       required
                     >
                       <option [ngValue]="null">Select Team</option>
-                      @for (team of teams(); track team.id) {
+                      @for (team of getTeamsByDivision(createFormData.divisionId); track team.id) {
                         <option
                           [ngValue]="team.id"
                           [disabled]="team.id === createFormData.awayTeamId"
@@ -368,7 +383,7 @@ import {
                       required
                     >
                       <option [ngValue]="null">Select Team</option>
-                      @for (team of teams(); track team.id) {
+                      @for (team of getTeamsByDivision(createFormData.divisionId); track team.id) {
                         <option
                           [ngValue]="team.id"
                           [disabled]="team.id === createFormData.homeTeamId"
@@ -762,6 +777,7 @@ export class MatchesAdminComponent implements OnInit {
   filterSeason = new Date().getFullYear();
   filterMatchweek: number | undefined;
   filterDivisionId: string | undefined;
+  filterTeamId: string | undefined;
   filterStatus: string | undefined;
   currentPage = 1;
   pageSize = 20;
@@ -790,7 +806,9 @@ export class MatchesAdminComponent implements OnInit {
       .getAll(
         this.filterSeason,
         this.filterMatchweek,
-        undefined,
+        // A team plays home and away, so this matches a fixture from either side rather
+        // than only the ones where they are listed first.
+        this.filterTeamId,
         this.filterStatus,
         this.filterDivisionId,
         this.currentPage,
@@ -830,12 +848,56 @@ export class MatchesAdminComponent implements OnInit {
     });
   }
 
+  /** Teams of the given division, or every team when none is chosen. */
+  getTeamsByDivision(divisionId: string | null | undefined) {
+    const all = this.teams();
+    return divisionId ? all.filter((t) => t.divisionId === divisionId) : all;
+  }
+
+  /**
+   * Changing the division invalidates team choices from the old one. Two clubs from different
+   * divisions should never end up scheduled against each other, and before this the pickers
+   * offered every team in the league regardless of the division selected above them.
+   */
+  onCreateDivisionChange() {
+    const eligible = this.getTeamsByDivision(this.createFormData.divisionId);
+
+    if (!eligible.some((t) => t.id === this.createFormData.homeTeamId)) {
+      this.createFormData.homeTeamId = null;
+    }
+
+    if (!eligible.some((t) => t.id === this.createFormData.awayTeamId)) {
+      this.createFormData.awayTeamId = null;
+    }
+  }
+
+  /**
+   * Any filter change starts again at the first page. Staying on page three of the previous
+   * result set lands on an empty table and reads as "no matches", which is how a working
+   * filter gets reported as broken.
+   */
+  onFiltersChanged() {
+    this.currentPage = 1;
+    this.loadMatches();
+  }
+
+  onFilterDivisionChange() {
+    // The chosen team may not play in the newly chosen division.
+    if (this.filterTeamId) {
+      const team = this.teams().find((t) => t.id === this.filterTeamId);
+      if (!team || team.divisionId !== this.filterDivisionId) {
+        this.filterTeamId = undefined;
+      }
+    }
+    this.onFiltersChanged();
+  }
+
   clearFilters() {
     this.filterMatchweek = undefined;
     this.filterDivisionId = undefined;
+    this.filterTeamId = undefined;
     this.filterStatus = undefined;
-    this.currentPage = 1;
-    this.loadMatches();
+    this.onFiltersChanged();
   }
 
   goToPage(page: number) {
