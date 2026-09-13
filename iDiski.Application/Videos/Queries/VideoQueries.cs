@@ -30,7 +30,7 @@ public sealed class GetPublishedVideosQueryHandler
     {
         var query = _db.Videos
             .AsNoTracking()
-            .Where(v => v.IsPublished);
+            .Where(v => v.IsPublished && !v.IsArchived);
 
         if (request.DivisionId.HasValue)
             query = query.Where(v => v.DivisionId == request.DivisionId.Value);
@@ -94,9 +94,7 @@ public sealed class GetAllVideosAdminQueryHandler
                 v.Author,
                 v.PublishedAt,
                 v.IsPinned,
-                v.PlayerId != null
-                    && v.TeamId != null
-                    && _db.Players.Any(p => p.Id == v.PlayerId && p.TeamId != v.TeamId)))
+                v.IsArchived))
             .ToListAsync(cancellationToken);
     }
 }

@@ -48,10 +48,10 @@ public sealed record ArticleSummaryDto(
     bool      IsPinned = false,
 
     /// <summary>
-    /// Admin lists only: the tagged player has left the team this was written about, so it
-    /// is now that team's record of their time there and the editor should not offer it.
+    /// Retired from public view but kept on record. Only ever true in admin listings —
+    /// public queries filter archived content out entirely.
     /// </summary>
-    bool      IsLocked = false
+    bool      IsArchived = false
 );
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -73,7 +73,7 @@ public sealed class GetArticleBySlugQueryHandler
     {
         var article = await _db.Articles
             .AsNoTracking()
-            .Where(a => a.Slug == request.Slug && a.IsPublished)
+            .Where(a => a.Slug == request.Slug && a.IsPublished && !a.IsArchived)
             .Select(a => new ArticleDto(
                 a.Id, a.Title, a.Slug, a.Content, a.Excerpt,
                 a.CoverImageUrl, a.VideoUrl, a.FeaturedImageUrl,
@@ -119,7 +119,7 @@ public sealed class GetPublishedArticlesQueryHandler
     {
         var query = _db.Articles
             .AsNoTracking()
-            .Where(a => a.IsPublished);
+            .Where(a => a.IsPublished && !a.IsArchived);
 
         // Tag filter — leverages the native PostgreSQL text[] Contains translation
         if (!string.IsNullOrWhiteSpace(request.Tag))
@@ -217,10 +217,7 @@ public sealed class GetAllArticlesAdminQueryHandler
             .Select(a => new ArticleSummaryDto(
                 a.Id, a.Title, a.Slug, a.Excerpt,
                 a.CoverImageUrl, a.VideoUrl, a.FeaturedImageUrl,
-                a.Author, a.PublishedAt, a.Tags, a.IsPinned,
-                a.PlayerId != null
-                    && a.TeamId != null
-                    && _db.Players.Any(p => p.Id == a.PlayerId && p.TeamId != a.TeamId)));
+                a.Author, a.PublishedAt, a.Tags, a.IsPinned, a.IsArchived));
 
         return await PaginatedList<ArticleSummaryDto>.CreateAsync(
             projected, request.PageNumber, request.PageSize, cancellationToken);

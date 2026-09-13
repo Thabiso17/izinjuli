@@ -116,7 +116,32 @@ public sealed class VideosController : BaseApiController
     }
 
     /// <summary>
-    /// Deletes a video.
+    /// Archives a video: retired from public view, kept on record. This is how a published
+    /// video is taken down, since it can no longer be deleted.
+    /// </summary>
+    [HttpPatch("{id:guid}/archive")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Archive(Guid id, CancellationToken ct)
+    {
+        await Sender.Send(new ArchiveVideoCommand(id), ct);
+        return NoContent();
+    }
+
+    /// <summary>Restores an archived video to public view.</summary>
+    [HttpPatch("{id:guid}/unarchive")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Unarchive(Guid id, CancellationToken ct)
+    {
+        await Sender.Send(new UnarchiveVideoCommand(id), ct);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Deletes a video. Only one that has never been published may be deleted.
     /// </summary>
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

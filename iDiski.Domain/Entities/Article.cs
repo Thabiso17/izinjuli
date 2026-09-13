@@ -46,6 +46,12 @@ public class Article : BaseEntity
     public Guid? TeamId { get; set; }
     public Guid? PlayerId { get; set; }
 
+    /// <summary>
+    /// Retired from public view but kept on record. Anything that has been published is
+    /// archived rather than deleted, so the league's history cannot be erased.
+    /// </summary>
+    public bool IsArchived { get; set; } = false;
+
     // Navigation properties
     public ICollection<ArticleAttachment> Attachments { get; set; } = new List<ArticleAttachment>();
 }

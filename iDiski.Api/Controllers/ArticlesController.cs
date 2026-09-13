@@ -104,7 +104,7 @@ public sealed class ArticlesController : BaseApiController
         return NoContent();
     }
 
-    /// <summary>Retracts a published article back to draft. Required before deletion.</summary>
+    /// <summary>Retracts a published article back to draft, hiding it from the public site.</summary>
     [HttpPatch("{id:guid}/unpublish")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -114,7 +114,32 @@ public sealed class ArticlesController : BaseApiController
         return NoContent();
     }
 
-    /// <summary>Deletes an article. Only drafts may be deleted — unpublish first.</summary>
+    /// <summary>
+    /// Archives an article: retired from public view, kept on record. This is how a
+    /// published article is taken down, since it can no longer be deleted.
+    /// </summary>
+    [HttpPatch("{id:guid}/archive")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Archive(Guid id, CancellationToken ct)
+    {
+        await Sender.Send(new ArchiveArticleCommand(id), ct);
+        return NoContent();
+    }
+
+    /// <summary>Restores an archived article to public view.</summary>
+    [HttpPatch("{id:guid}/unarchive")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Unarchive(Guid id, CancellationToken ct)
+    {
+        await Sender.Send(new UnarchiveArticleCommand(id), ct);
+        return NoContent();
+    }
+
+    /// <summary>Deletes an article. Only one that has never been published may be deleted.</summary>
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

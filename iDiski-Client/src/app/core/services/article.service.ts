@@ -63,9 +63,6 @@ export class ArticleService {
   // ── ADMIN ──────────────────────────────────────────────────────────────────
 
   /**
-   * [Admin] Returns all articles including drafts.
-   */
-  /**
    * Loads one article for the editor, drafts included. The public getBySlug only returns
    * published articles, so it cannot be used to open a draft.
    */
@@ -73,6 +70,19 @@ export class ArticleService {
     return this.http.get<ArticleDto>(`${this.base}/admin/${id}`);
   }
 
+  /** Retires an article from public view without destroying it. */
+  archive(id: string): Observable<void> {
+    return this.http.patch<void>(`${this.base}/${id}/archive`, {});
+  }
+
+  /** Restores an archived article to public view. */
+  unarchive(id: string): Observable<void> {
+    return this.http.patch<void>(`${this.base}/${id}/unarchive`, {});
+  }
+
+  /**
+   * [Admin] Returns all articles including drafts.
+   */
   getAllAdmin(options: {
     publishedOnly?: boolean;
     pageNumber?: number;
@@ -129,8 +139,8 @@ export class ArticleService {
   }
 
   /**
-   * Permanently deletes a draft article.
-   * Will return 409 if the article is still published — call unpublish() first.
+   * Permanently deletes an article that has never been published.
+   * Anything that has been live returns 409 — archive it instead.
    */
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`);

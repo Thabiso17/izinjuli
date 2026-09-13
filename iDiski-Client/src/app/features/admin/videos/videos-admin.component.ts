@@ -81,6 +81,9 @@ interface VideoFormData {
                     <p class="card-text text-muted small">{{ video.description }}</p>
                   }
                   <div class="d-flex gap-2 mb-2">
+                    @if (video.isArchived) {
+                      <span class="badge bg-dark">Archived</span>
+                    }
                     @if (video.publishedAt) {
                       <span class="badge bg-success">Published</span>
                     } @else {
@@ -104,15 +107,9 @@ interface VideoFormData {
                     <button
                       class="btn btn-outline-primary"
                       (click)="showEditModal(video)"
-                      [disabled]="video.isLocked"
-                      [title]="
-                        video.isLocked
-                          ? 'Locked — the player this is about has left this team, so it stands as a record of their time there'
-                          : 'Edit'
-                      "
+                      title="Edit"
                     >
-                      <i [class.bi-pencil]="!video.isLocked" [class.bi-lock]="video.isLocked" class="bi"></i>
-                      {{ video.isLocked ? 'Locked' : 'Edit' }}
+                      <i class="bi bi-pencil"></i> Edit
                     </button>
                     @if (video.publishedAt) {
                       <button
@@ -140,11 +137,32 @@ interface VideoFormData {
                         <i class="bi bi-check-circle"></i>
                       </button>
                     }
+                    @if (video.isArchived) {
+                      <button
+                        class="btn btn-outline-secondary"
+                        (click)="unarchiveVideo(video.id)"
+                        title="Restore to public view"
+                      >
+                        <i class="bi bi-box-arrow-up"></i>
+                      </button>
+                    } @else {
+                      <button
+                        class="btn btn-outline-secondary"
+                        (click)="confirmArchive(video)"
+                        title="Archive — retires it from public view but keeps the record"
+                      >
+                        <i class="bi bi-archive"></i>
+                      </button>
+                    }
                     <button
                       class="btn btn-outline-danger"
                       (click)="confirmDelete(video)"
-                      [disabled]="!!video.publishedAt"
-                      [title]="video.publishedAt ? 'Unpublish first' : 'Delete'"
+                      [disabled]="!!video.publishedAt || !!video.isArchived"
+                      [title]="
+                        video.publishedAt || video.isArchived
+                          ? 'Published and archived videos are part of the record — archive rather than delete'
+                          : 'Delete'
+                      "
                     >
                       <i class="bi bi-trash"></i>
                     </button>
@@ -615,6 +633,36 @@ export class VideosAdminComponent implements OnInit {
       },
       error: (err) => {
         this.error.set(`Failed to toggle pin: ${err.error?.detail || err.error?.title || err.message}`);
+      },
+    });
+  }
+
+  confirmArchive(video: VideoSummaryDto) {
+    if (!confirm(`Archive "${video.title}"? It will be removed from public pages but kept on record.`)) {
+      return;
+    }
+
+    this.videoService.archive(video.id).subscribe({
+      next: () => {
+        this.success.set('Video archived');
+        this.loadVideos();
+        setTimeout(() => this.success.set(null), 3000);
+      },
+      error: (err) => {
+        this.error.set(`Failed to archive video: ${err.error?.detail || err.error?.title || err.message}`);
+      },
+    });
+  }
+
+  unarchiveVideo(id: string) {
+    this.videoService.unarchive(id).subscribe({
+      next: () => {
+        this.success.set('Video restored');
+        this.loadVideos();
+        setTimeout(() => this.success.set(null), 3000);
+      },
+      error: (err) => {
+        this.error.set(`Failed to restore video: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }

@@ -36,4 +36,7 @@ public class Video : BaseEntity
     public Guid? DivisionId { get; set; }
     public Guid? TeamId { get; set; }
     public Guid? PlayerId { get; set; }
+
+    /// <summary>See <see cref="Article.IsArchived"/> — retired from view, kept on record.</summary>
+    public bool IsArchived { get; set; } = false;
 }

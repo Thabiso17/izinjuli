@@ -40,6 +40,16 @@ export class VideoService {
   /**
    * Returns a single published video by ID.
    */
+  /** Retires a video from public view without destroying it. */
+  archive(id: string): Observable<void> {
+    return this.http.patch<void>(`${this.base}/${id}/archive`, {});
+  }
+
+  /** Restores an archived video to public view. */
+  unarchive(id: string): Observable<void> {
+    return this.http.patch<void>(`${this.base}/${id}/unarchive`, {});
+  }
+
   getById(id: string): Observable<VideoDto> {
     return this.http.get<VideoDto>(`${this.base}/${id}`);
   }

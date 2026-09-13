@@ -19,8 +19,8 @@ export interface ArticleSummaryDto {
   publishedAt: string | null; // ISO 8601 — pipe through DatePipe in templates
   tags: string[];
   isPinned: boolean;
-  /** Admin lists only: the tagged player has left the team this was written about. */
-  isLocked?: boolean;
+  /** Retired from public view but kept on record. Only set on admin listings. */
+  isArchived?: boolean;
 }
 
 /**

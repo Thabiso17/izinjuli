@@ -113,6 +113,9 @@ interface ArticleFormData {
                       }
                     </td>
                     <td>
+                      @if (article.isArchived) {
+                        <span class="badge bg-dark me-1">Archived</span>
+                      }
                       @if (article.isPinned) {
                         <i class="bi bi-pin-angle-fill text-primary" title="Pinned"></i>
                       } @else {
@@ -124,14 +127,9 @@ interface ArticleFormData {
                         <button
                           class="btn btn-outline-primary"
                           (click)="showEditModal(article)"
-                          [disabled]="article.isLocked"
-                          [title]="
-                            article.isLocked
-                              ? 'Locked — the player this is about has left this team, so it stands as a record of their time there'
-                              : 'Edit'
-                          "
+                          title="Edit"
                         >
-                          <i [class.bi-pencil]="!article.isLocked" [class.bi-lock]="article.isLocked" class="bi"></i>
+                          <i class="bi bi-pencil"></i>
                         </button>
                         @if (article.publishedAt) {
                           <button
@@ -161,11 +159,32 @@ interface ArticleFormData {
                             <i class="bi bi-x-circle"></i>
                           </button>
                         }
+                        @if (article.isArchived) {
+                          <button
+                            class="btn btn-outline-secondary"
+                            (click)="unarchiveArticle(article.id)"
+                            title="Restore to public view"
+                          >
+                            <i class="bi bi-box-arrow-up"></i>
+                          </button>
+                        } @else {
+                          <button
+                            class="btn btn-outline-secondary"
+                            (click)="confirmArchive(article)"
+                            title="Archive — retires it from public view but keeps the record"
+                          >
+                            <i class="bi bi-archive"></i>
+                          </button>
+                        }
                         <button
                           class="btn btn-outline-danger"
                           (click)="confirmDelete(article)"
-                          [disabled]="!!article.publishedAt"
-                          [title]="article.publishedAt ? 'Unpublish first' : 'Delete'"
+                          [disabled]="!!article.publishedAt || !!article.isArchived"
+                          [title]="
+                            article.publishedAt || article.isArchived
+                              ? 'Published and archived articles are part of the record — archive rather than delete'
+                              : 'Delete'
+                          "
                         >
                           <i class="bi bi-trash"></i>
                         </button>
@@ -671,6 +690,36 @@ export class ArticlesAdminComponent implements OnInit {
       },
       error: (err) => {
         this.error.set(`Failed to fetch article details: ${err.error?.detail || err.error?.title || err.message}`);
+      },
+    });
+  }
+
+  confirmArchive(article: ArticleSummaryDto) {
+    if (!confirm(`Archive "${article.title}"? It will be removed from public pages but kept on record.`)) {
+      return;
+    }
+
+    this.articleService.archive(article.id).subscribe({
+      next: () => {
+        this.success.set('Article archived');
+        this.loadArticles();
+        setTimeout(() => this.success.set(null), 3000);
+      },
+      error: (err) => {
+        this.error.set(`Failed to archive article: ${err.error?.detail || err.error?.title || err.message}`);
+      },
+    });
+  }
+
+  unarchiveArticle(id: string) {
+    this.articleService.unarchive(id).subscribe({
+      next: () => {
+        this.success.set('Article restored');
+        this.loadArticles();
+        setTimeout(() => this.success.set(null), 3000);
+      },
+      error: (err) => {
+        this.error.set(`Failed to restore article: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }

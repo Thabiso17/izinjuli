@@ -27,8 +27,7 @@ public sealed record VideoSummaryDto(
     bool      IsPinned,
 
     /// <summary>
-    /// Admin lists only: the tagged player has left the team this was made about, so it is
-    /// now that team's record of their time there and the editor should not offer it.
+    /// Retired from public view but kept on record. Only ever true in admin listings.
     /// </summary>
-    bool      IsLocked = false
+    bool      IsArchived = false
 );

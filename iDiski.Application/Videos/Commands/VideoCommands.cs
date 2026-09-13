@@ -117,9 +117,6 @@ public sealed class UpdateVideoCommandHandler : IRequestHandler<UpdateVideoComma
         var video = await _db.Videos.FindAsync([request.Id], cancellationToken)
             ?? throw new NotFoundException(nameof(Video), request.Id);
 
-        await ContentScopeRules.EnsureOpenForEditingAsync(
-            _db, video.PlayerId, video.TeamId, cancellationToken);
-
         video.Title = request.Title.Trim();
         video.VideoUrl = request.VideoUrl.Trim();
         video.Description = request.Description?.Trim();
@@ -225,7 +222,62 @@ public sealed class DeleteVideoCommandHandler : IRequestHandler<DeleteVideoComma
         var video = await _db.Videos.FindAsync([request.Id], cancellationToken)
             ?? throw new NotFoundException(nameof(Video), request.Id);
 
+        // PublishedAt survives unpublishing, so it records that this was live at some point.
+        if (video.PublishedAt is not null)
+            throw new InvalidOperationException(
+                "This video has been published, so it can no longer be deleted. "
+                + "Archive it instead to retire it from public view.");
+
+        if (video.IsArchived)
+            throw new InvalidOperationException("Archived videos cannot be deleted.");
+
         _db.Videos.Remove(video);
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ARCHIVE / UNARCHIVE  (retire from public view without destroying the record)
+// ═════════════════════════════════════════════════════════════════════════════
+
+public sealed record ArchiveVideoCommand(Guid Id) : IRequest;
+
+public sealed class ArchiveVideoCommandHandler : IRequestHandler<ArchiveVideoCommand>
+{
+    private readonly ILeagueDbContext _db;
+
+    public ArchiveVideoCommandHandler(ILeagueDbContext db) => _db = db;
+
+    public async Task Handle(ArchiveVideoCommand request, CancellationToken cancellationToken)
+    {
+        var video = await _db.Videos.FindAsync([request.Id], cancellationToken)
+            ?? throw new NotFoundException(nameof(Video), request.Id);
+
+        if (video.IsArchived)
+            throw new InvalidOperationException("Video is already archived.");
+
+        video.IsArchived = true;
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+}
+
+public sealed record UnarchiveVideoCommand(Guid Id) : IRequest;
+
+public sealed class UnarchiveVideoCommandHandler : IRequestHandler<UnarchiveVideoCommand>
+{
+    private readonly ILeagueDbContext _db;
+
+    public UnarchiveVideoCommandHandler(ILeagueDbContext db) => _db = db;
+
+    public async Task Handle(UnarchiveVideoCommand request, CancellationToken cancellationToken)
+    {
+        var video = await _db.Videos.FindAsync([request.Id], cancellationToken)
+            ?? throw new NotFoundException(nameof(Video), request.Id);
+
+        if (!video.IsArchived)
+            throw new InvalidOperationException("Video is not archived.");
+
+        video.IsArchived = false;
         await _db.SaveChangesAsync(cancellationToken);
     }
 }
