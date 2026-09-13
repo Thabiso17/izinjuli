@@ -10,7 +10,7 @@ namespace iDiski.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "SuperAdminOnly")]
+[Authorize(Policy = "AdminOnly")]
 public sealed class UploadsController : ControllerBase
 {
     private readonly IFileStorageService _fileStorage;

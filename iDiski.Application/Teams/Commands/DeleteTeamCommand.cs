@@ -1,3 +1,4 @@
+using iDiski.Application.Common.Authorization;
 using iDiski.Application.Common.Exceptions;
 using iDiski.Application.Common.Interfaces;
 using MediatR;
@@ -7,7 +8,12 @@ namespace iDiski.Application.Teams.Commands;
 
 // ── Command ───────────────────────────────────────────────────────────────────
 
-public sealed record DeleteTeamCommand(Guid Id) : IRequest;
+// The CanManageDivisions policy on the endpoint keeps TeamAdmins out entirely; this scopes
+// a DivisionAdmin to teams that sit inside a division they are assigned to.
+public sealed record DeleteTeamCommand(Guid Id) : IRequest, IRequireTeamAccess
+{
+    Guid IRequireTeamAccess.TeamId => Id;
+}
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
