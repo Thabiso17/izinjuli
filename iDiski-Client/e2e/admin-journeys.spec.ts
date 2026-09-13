@@ -1,8 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { accounts, signIn, signInAndWaitForAdmin, someJerseyNumber } from './helpers';
 
-test.describe.configure({ mode: 'serial' });
-
 test.describe('signing in', () => {
   test('a super admin reaches the admin area', async ({ page }) => {
     await signInAndWaitForAdmin(page, accounts.superAdmin);
@@ -24,6 +22,9 @@ test.describe('signing in', () => {
 });
 
 test.describe('the admin players page', () => {
+  // The duplicate-jersey test creates a player and then clashes with it, so these run in order.
+  test.describe.configure({ mode: 'serial' });
+
   test.beforeEach(async ({ page }) => {
     await signInAndWaitForAdmin(page, accounts.superAdmin);
     await page.goto('/admin/players');
@@ -109,6 +110,32 @@ async function addPlayer(
 
   return save;
 }
+
+test.describe('staying signed in', () => {
+  test('refreshing an admin page does not throw the admin back to the login screen', async ({
+    page,
+  }) => {
+    await signInAndWaitForAdmin(page, accounts.superAdmin);
+    await page.goto('/admin/players');
+    await expect(page).toHaveURL(/\/admin\/players/);
+
+    // A reload is the case that used to break: the token is still in sessionStorage, but the
+    // signed-in user was never restored from it before the route guard asked.
+    await page.reload();
+
+    await expect(page).toHaveURL(/\/admin\/players/);
+    await expect(page.locator('button:has-text("Add Player")').first()).toBeVisible();
+  });
+
+  test('opening an admin page directly in a fresh tab keeps the session', async ({ page }) => {
+    await signInAndWaitForAdmin(page, accounts.superAdmin);
+
+    // goto is a full document load, so the app boots from scratch with only the stored token.
+    await page.goto('/admin/teams');
+
+    await expect(page).toHaveURL(/\/admin\/teams/);
+  });
+});
 
 test.describe('what each role is shown', () => {
   test('a team admin is not offered the division admin pages', async ({ page }) => {
