@@ -416,6 +416,32 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
                 entry.Entity.UpdatedAt = DateTime.UtcNow;
         }
 
+        NormalizeDateTimesToUtc();
+
         return base.SaveChangesAsync(cancellationToken);
+    }
+
+    // Npgsql only accepts DateTimeKind.Utc for "timestamp with time zone" columns. Values bound
+    // from request bodies come in as Unspecified; DateTime.Now-based values come in as Local.
+    private void NormalizeDateTimesToUtc()
+    {
+        foreach (var entry in ChangeTracker.Entries())
+        {
+            if (entry.State is not (EntityState.Added or EntityState.Modified))
+                continue;
+
+            foreach (var property in entry.Properties)
+            {
+                switch (property.CurrentValue)
+                {
+                    case DateTime { Kind: DateTimeKind.Unspecified } dateTime:
+                        property.CurrentValue = DateTime.SpecifyKind(dateTime, DateTimeKind.Utc);
+                        break;
+                    case DateTime { Kind: DateTimeKind.Local } dateTime:
+                        property.CurrentValue = dateTime.ToUniversalTime();
+                        break;
+                }
+            }
+        }
     }
 }
