@@ -92,18 +92,6 @@ public sealed class VideosController : BaseApiController
     }
 
     /// <summary>
-    /// Unpublishes a video.
-    /// </summary>
-    [HttpPatch("{id:guid}/unpublish")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Unpublish(Guid id, CancellationToken ct)
-    {
-        await Sender.Send(new UnpublishVideoCommand(id), ct);
-        return NoContent();
-    }
-
-    /// <summary>
     /// Toggles the pinned status of a video.
     /// </summary>
     [HttpPatch("{id:guid}/toggle-pin")]

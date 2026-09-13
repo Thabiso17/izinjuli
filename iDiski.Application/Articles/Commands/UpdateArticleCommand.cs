@@ -13,7 +13,7 @@ namespace iDiski.Application.Articles.Commands;
 /// <summary>
 /// Updates the editable fields of an existing article.
 /// The <b>Slug is intentionally immutable</b> — changing it after publish breaks
-/// inbound links and SEO. If you need a new slug, unpublish and create a new article.
+/// inbound links and SEO. If you need a new slug, archive this one and write a new article.
 /// </summary>
 public sealed record UpdateArticleCommand(
     Guid     Id,

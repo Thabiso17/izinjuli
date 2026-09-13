@@ -150,14 +150,6 @@ interface ArticleFormData {
                           >
                             <i class="bi bi-check-circle"></i>
                           </button>
-                        } @else {
-                          <button
-                            class="btn btn-outline-warning"
-                            (click)="unpublishArticle(article.id)"
-                            title="Unpublish"
-                          >
-                            <i class="bi bi-x-circle"></i>
-                          </button>
                         }
                         @if (article.isArchived) {
                           <button
@@ -642,21 +634,6 @@ export class ArticlesAdminComponent implements OnInit {
     });
   }
 
-  unpublishArticle(id: string) {
-    if (!confirm('Are you sure you want to unpublish this article?')) return;
-
-    this.articleService.unpublish(id).subscribe({
-      next: () => {
-        this.success.set('Article unpublished successfully');
-        this.loadArticles();
-        setTimeout(() => this.success.set(null), 3000);
-      },
-      error: (err) => {
-        this.error.set(`Failed to unpublish article: ${err.error?.detail || err.error?.title || err.message}`);
-      },
-    });
-  }
-
   togglePin(article: ArticleSummaryDto) {
     const action = article.isPinned ? 'unpin' : 'pin';
     const newPinnedState = !article.isPinned;
@@ -674,7 +651,10 @@ export class ArticlesAdminComponent implements OnInit {
           featuredImageUrl: fullArticle.featuredImageUrl || '',
           author: fullArticle.author,
           tags: fullArticle.tags,
-          isPinned: newPinnedState
+          isPinned: newPinnedState,
+          divisionId: fullArticle.divisionId ?? null,
+          teamId: fullArticle.teamId ?? null,
+          playerId: fullArticle.playerId ?? null
         };
 
         this.articleService.update(article.id, updateRequest).subscribe({

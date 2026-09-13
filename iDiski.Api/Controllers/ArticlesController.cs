@@ -104,16 +104,6 @@ public sealed class ArticlesController : BaseApiController
         return NoContent();
     }
 
-    /// <summary>Retracts a published article back to draft, hiding it from the public site.</summary>
-    [HttpPatch("{id:guid}/unpublish")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Unpublish(Guid id, CancellationToken ct)
-    {
-        await Sender.Send(new UnpublishArticleCommand(id), ct);
-        return NoContent();
-    }
-
     /// <summary>
     /// Archives an article: retired from public view, kept on record. This is how a
     /// published article is taken down, since it can no longer be deleted.

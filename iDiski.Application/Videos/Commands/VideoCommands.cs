@@ -148,32 +148,15 @@ public sealed class PublishVideoCommandHandler : IRequestHandler<PublishVideoCom
         var video = await _db.Videos.FindAsync([request.Id], cancellationToken)
             ?? throw new NotFoundException(nameof(Video), request.Id);
 
+        if (video.IsPublished)
+            throw new InvalidOperationException("Video is already published.");
+
+        if (video.IsArchived)
+            throw new InvalidOperationException(
+                "This video is archived. Restore it from the archive to publish it again.");
+
         video.IsPublished = true;
         video.PublishedAt = DateTime.UtcNow;
-
-        await _db.SaveChangesAsync(cancellationToken);
-    }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// UNPUBLISH VIDEO
-// ═════════════════════════════════════════════════════════════════════════════
-
-public sealed record UnpublishVideoCommand(Guid Id) : IRequest;
-
-public sealed class UnpublishVideoCommandHandler : IRequestHandler<UnpublishVideoCommand>
-{
-    private readonly ILeagueDbContext _db;
-
-    public UnpublishVideoCommandHandler(ILeagueDbContext db) => _db = db;
-
-    public async Task Handle(UnpublishVideoCommand request, CancellationToken cancellationToken)
-    {
-        var video = await _db.Videos.FindAsync([request.Id], cancellationToken)
-            ?? throw new NotFoundException(nameof(Video), request.Id);
-
-        video.IsPublished = false;
-        video.IsPinned = false; // Unpublishing also unpins
 
         await _db.SaveChangesAsync(cancellationToken);
     }
@@ -222,7 +205,8 @@ public sealed class DeleteVideoCommandHandler : IRequestHandler<DeleteVideoComma
         var video = await _db.Videos.FindAsync([request.Id], cancellationToken)
             ?? throw new NotFoundException(nameof(Video), request.Id);
 
-        // PublishedAt survives unpublishing, so it records that this was live at some point.
+        // PublishedAt is stamped on publish and never cleared, so it records that this
+        // was live at some point even if it has since been archived.
         if (video.PublishedAt is not null)
             throw new InvalidOperationException(
                 "This video has been published, so it can no longer be deleted. "

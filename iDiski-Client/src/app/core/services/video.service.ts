@@ -91,13 +91,6 @@ export class VideoService {
   }
 
   /**
-   * Unpublishes a video.
-   */
-  unpublish(id: string): Observable<void> {
-    return this.http.patch<void>(`${this.base}/${id}/unpublish`, {});
-  }
-
-  /**
    * Toggles pinned status.
    */
   togglePin(id: string): Observable<void> {
@@ -105,7 +98,7 @@ export class VideoService {
   }
 
   /**
-   * Permanently deletes an unpublished video.
+   * Permanently deletes a video that has never been published.
    */
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`);

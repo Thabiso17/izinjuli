@@ -9,8 +9,8 @@ namespace iDiski.Application.Articles.Commands;
 // ═════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
-/// Hard-deletes an article. Only unpublished articles may be deleted.
-/// To retract a published article, call <see cref="UnpublishArticleCommand"/> first.
+/// Hard-deletes an article. Only an article that has never been published may be
+/// deleted; once live it belongs to the record and is archived instead.
 /// </summary>
 public sealed record DeleteArticleCommand(Guid Id) : IRequest;
 
@@ -25,8 +25,8 @@ public sealed class DeleteArticleCommandHandler : IRequestHandler<DeleteArticleC
         var article = await _db.Articles.FindAsync([request.Id], cancellationToken)
             ?? throw new NotFoundException(nameof(iDiski.Domain.Entities.Article), request.Id);
 
-        // PublishedAt survives unpublishing, so it records that this was live at some point.
-        // Once that has happened the article is part of the league's record: archive it.
+        // PublishedAt is stamped on publish and never cleared, so it records that this was
+        // live at some point. Once that has happened it is part of the record: archive it.
         if (article.PublishedAt is not null)
             throw new InvalidOperationException(
                 "This article has been published, so it can no longer be deleted. "
@@ -36,33 +36,6 @@ public sealed class DeleteArticleCommandHandler : IRequestHandler<DeleteArticleC
             throw new InvalidOperationException("Archived articles cannot be deleted.");
 
         _db.Articles.Remove(article);
-        await _db.SaveChangesAsync(cancellationToken);
-    }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// UNPUBLISH  (retract a live article back to draft)
-// ═════════════════════════════════════════════════════════════════════════════
-
-public sealed record UnpublishArticleCommand(Guid Id) : IRequest;
-
-public sealed class UnpublishArticleCommandHandler : IRequestHandler<UnpublishArticleCommand>
-{
-    private readonly ILeagueDbContext _db;
-
-    public UnpublishArticleCommandHandler(ILeagueDbContext db) => _db = db;
-
-    public async Task Handle(UnpublishArticleCommand request, CancellationToken cancellationToken)
-    {
-        var article = await _db.Articles.FindAsync([request.Id], cancellationToken)
-            ?? throw new NotFoundException(nameof(iDiski.Domain.Entities.Article), request.Id);
-
-        if (!article.IsPublished)
-            throw new InvalidOperationException("Article is already a draft.");
-
-        article.IsPublished = false;
-        // Keep PublishedAt so there is an audit trail of when it was live
-
         await _db.SaveChangesAsync(cancellationToken);
     }
 }

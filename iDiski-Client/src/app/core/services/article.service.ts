@@ -131,14 +131,6 @@ export class ArticleService {
   }
 
   /**
-   * Retracts a published article back to draft status.
-   * Must be called before delete.
-   */
-  unpublish(id: string): Observable<void> {
-    return this.http.patch<void>(`${this.base}/${id}/unpublish`, {});
-  }
-
-  /**
    * Permanently deletes an article that has never been published.
    * Anything that has been live returns 409 — archive it instead.
    */

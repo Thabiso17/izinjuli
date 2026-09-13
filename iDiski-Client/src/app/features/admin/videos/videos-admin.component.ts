@@ -48,7 +48,7 @@ interface VideoFormData {
               >
                 <option [ngValue]="undefined">All Videos</option>
                 <option [ngValue]="true">Published Only</option>
-                <option [ngValue]="false">Unpublished Only</option>
+                <option [ngValue]="false">Drafts Only</option>
               </select>
             </div>
           </div>
@@ -87,7 +87,7 @@ interface VideoFormData {
                     @if (video.publishedAt) {
                       <span class="badge bg-success">Published</span>
                     } @else {
-                      <span class="badge bg-warning">Unpublished</span>
+                      <span class="badge bg-warning">Draft</span>
                     }
                     @if (video.isPinned) {
                       <span class="badge bg-primary">
@@ -120,13 +120,6 @@ interface VideoFormData {
                         [title]="video.isPinned ? 'Unpin' : 'Pin to homepage'"
                       >
                         <i [class.bi-pin-angle-fill]="video.isPinned" [class.bi-pin-angle]="!video.isPinned" class="bi"></i>
-                      </button>
-                      <button
-                        class="btn btn-outline-warning"
-                        (click)="unpublishVideo(video.id)"
-                        title="Unpublish"
-                      >
-                        <i class="bi bi-x-circle"></i>
                       </button>
                     } @else {
                       <button
@@ -356,7 +349,7 @@ interface VideoFormData {
                           Publish immediately
                         </label>
                         <small class="text-muted d-block">
-                          Uncheck to save as unpublished
+                          Uncheck to save as a draft
                         </small>
                       </div>
                     </div>
@@ -604,21 +597,6 @@ export class VideosAdminComponent implements OnInit {
       },
       error: (err) => {
         this.error.set(`Failed to publish video: ${err.error?.detail || err.error?.title || err.message}`);
-      },
-    });
-  }
-
-  unpublishVideo(id: string) {
-    if (!confirm('Are you sure you want to unpublish this video?')) return;
-
-    this.videoService.unpublish(id).subscribe({
-      next: () => {
-        this.success.set('Video unpublished successfully');
-        this.loadVideos();
-        setTimeout(() => this.success.set(null), 3000);
-      },
-      error: (err) => {
-        this.error.set(`Failed to unpublish video: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }
