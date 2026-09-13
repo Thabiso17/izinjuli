@@ -44,6 +44,12 @@ public sealed class LeagueScenario
         var s = new LeagueScenario();
         var now = DateTime.UtcNow;
 
+        // Tests in a class share this context. If one of them failed partway through a save its
+        // entities are still tracked as Added, and every save after it would resubmit them —
+        // one genuine failure would then cascade into every test that ran afterwards, all
+        // reporting a duplicate key that has nothing to do with them.
+        db.ChangeTracker.Clear();
+
         db.Divisions.AddRange(
             new Division
             {
@@ -104,7 +110,7 @@ public sealed class LeagueScenario
     }
 
     /// <summary>Short codes carry a unique index, so they cannot repeat across scenarios.</summary>
-    private static string Suffix() => Guid.NewGuid().ToString("N")[..4].ToUpperInvariant();
+    private static string Suffix() => TestIds.Code(string.Empty);
 
     public Guid UserFor(Role role) => role switch
     {

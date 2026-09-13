@@ -120,7 +120,7 @@ public class UtcDateTimeTests : IClassFixture<IntegrationTestFixture>
         Id = Guid.NewGuid(),
         Name = "Date Division",
         // Season and ShortCode carry a unique index together, and this class shares a database.
-        ShortCode = $"DT{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}",
+        ShortCode = TestIds.Code("DT"),
         Season = 2026,
         Gender = Gender.Male,
         IsActive = true,

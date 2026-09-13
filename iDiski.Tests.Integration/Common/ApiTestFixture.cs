@@ -165,6 +165,5 @@ public class ApiTestFixture : IAsyncLifetime
     }
 
     /// <summary>Short codes carry unique indexes, so every test needs its own.</summary>
-    public static string Code(string prefix) =>
-        $"{prefix}{Guid.NewGuid().ToString("N")[..4].ToUpperInvariant()}";
+    public static string Code(string prefix) => TestIds.Code(prefix);
 }

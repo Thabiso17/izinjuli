@@ -320,6 +320,5 @@ public class TeamCrudIntegrationTests : IClassFixture<IntegrationTestFixture>
     }
 
     /// <summary>A short code unique to this test, inside the column's length limit.</summary>
-    private static string Code(string prefix) =>
-        $"{prefix}{Guid.NewGuid().ToString("N")[..4].ToUpperInvariant()}";
+    private static string Code(string prefix) => TestIds.Code(prefix);
 }
