@@ -113,6 +113,51 @@ public class AdminFilterTests : IClassFixture<IntegrationTestFixture>
         result.Items.Should().Contain(m => m.Id == two.Id);
     }
 
+    [Fact]
+    public async Task Matches_NarrowToATeam_FromEitherSideOfTheFixture()
+    {
+        var scenario = await LeagueScenario.CreateAsync(_fixture.DbContext);
+
+        // The same club, listed first in one fixture and second in the other. A filter that
+        // only looked at the home side would drop half of a team's season.
+        var atHome = await AddMatchAsync(
+            scenario.DivisionOneId, scenario.TeamAId, scenario.TeamBId);
+        var away = await AddMatchAsync(
+            scenario.DivisionOneId, scenario.TeamBId, scenario.TeamAId);
+        var notInvolved = await AddMatchAsync(
+            scenario.DivisionTwoId, scenario.TeamCId, scenario.TeamBId);
+
+        var result = await new GetFixturesQueryHandler(_fixture.DbContext).Handle(
+            new GetFixturesQuery(Season: 2026, TeamId: scenario.TeamAId, PageSize: 100),
+            CancellationToken.None);
+
+        result.Items.Should().Contain(m => m.Id == atHome.Id);
+        result.Items.Should().Contain(m => m.Id == away.Id,
+            "a team plays half its fixtures away, and those are still its matches");
+        result.Items.Should().NotContain(m => m.Id == notInvolved.Id);
+    }
+
+    [Fact]
+    public async Task Matches_TeamAndDivisionTogether_NarrowToThatTeam()
+    {
+        var scenario = await LeagueScenario.CreateAsync(_fixture.DbContext);
+
+        var teamAMatch = await AddMatchAsync(
+            scenario.DivisionOneId, scenario.TeamAId, scenario.TeamBId);
+        var withoutTeamA = await AddMatchAsync(
+            scenario.DivisionOneId, scenario.TeamBId, scenario.TeamCId);
+
+        var result = await new GetFixturesQueryHandler(_fixture.DbContext).Handle(
+            new GetFixturesQuery(
+                Season: 2026, TeamId: scenario.TeamAId,
+                PageSize: 100, DivisionId: scenario.DivisionOneId),
+            CancellationToken.None);
+
+        result.Items.Should().Contain(m => m.Id == teamAMatch.Id);
+        result.Items.Should().NotContain(m => m.Id == withoutTeamA.Id,
+            "both fixtures are in the division, so the team filter has to narrow further");
+    }
+
     // ── Suspensions ───────────────────────────────────────────────────────────
 
     [Fact]
