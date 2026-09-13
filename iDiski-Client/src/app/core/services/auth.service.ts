@@ -1,7 +1,7 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, tap, catchError } from 'rxjs';
+import { Observable, tap, catchError, firstValueFrom } from 'rxjs';
 import {
   LoginRequest,
   LoginResponse,
@@ -150,23 +150,36 @@ export class AuthService {
   }
 
   /**
-   * Restore session from sessionStorage on page refresh
+   * Restores the signed-in user from the token held in sessionStorage.
+   *
+   * This runs as an app initializer, which matters twice over. It has to run at all — it used
+   * to be private and was never called, so a refresh left a valid token in storage with no user
+   * behind it, and adminGuard reads isAuthenticated() synchronously and sent the admin
+   * straight back to the login page. And it has to finish before routing starts, or the guard
+   * would run while the profile request was still in flight and bounce them just the same.
+   *
+   * It never rejects: a token the API refuses is cleared and the app carries on as signed out,
+   * rather than failing to start.
    */
-  private restoreSession(): void {
+  restoreSession(): Promise<void> {
     const token = this.getToken();
 
-    if (token && !this.isTokenExpired(token)) {
-      // Token exists and is valid, fetch current user
-      this.getCurrentUser().subscribe({
-        error: () => {
-          // Token is invalid, clear it silently (don't navigate)
-          this.clearSession();
-        }
-      });
-    } else if (token) {
-      // Token expired, clear it silently (don't navigate)
-      this.clearSession();
+    if (!token) {
+      return Promise.resolve();
     }
+
+    if (this.isTokenExpired(token)) {
+      this.clearSession();
+      return Promise.resolve();
+    }
+
+    return firstValueFrom(this.getCurrentUser())
+      .then(() => undefined)
+      .catch(() => {
+        // The token did not survive the server's scrutiny. Drop it quietly; navigating from
+        // here would interrupt whatever the visitor was opening.
+        this.clearSession();
+      });
   }
 
   private clearSession(): void {

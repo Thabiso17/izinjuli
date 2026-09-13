@@ -53,7 +53,8 @@ public sealed class GetPublishedVideosQueryHandler
                 v.ThumbnailUrl,
                 v.Author,
                 v.PublishedAt,
-                v.IsPinned))
+                v.IsPinned,
+                v.IsArchived))
             .ToListAsync(cancellationToken);
     }
 }

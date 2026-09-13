@@ -1,0 +1,137 @@
+name: CI
+
+# Runs on every pull request so a branch is known to compile and pass its tests before
+# it reaches main — merging to main deploys to Railway, so a break here is a broken deploy.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend build and tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore iDiski.sln
+
+      - name: Build
+        run: dotnet build iDiski.sln --configuration Release --no-restore
+
+      # These run against real PostgreSQL in Testcontainers, which needs the Docker daemon
+      # the ubuntu-latest runner already provides.
+      - name: Integration tests
+        run: dotnet test iDiski.Tests.Integration/iDiski.Tests.Integration.csproj --configuration Release --logger "trx;LogFileName=integration.trx" --results-directory TestResults
+
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/
+          if-no-files-found: ignore
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: iDiski-Client
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: iDiski-Client/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npx ng build --configuration production
+
+  e2e:
+    name: Browser tests
+    runs-on: ubuntu-latest
+
+    # The API and the Angular app both have to be up before a browser can drive them, so this
+    # job assembles the whole stack: database, API, client, then Playwright.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: idiski_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: iDiski-Client/package-lock.json
+
+      - name: Install client dependencies
+        working-directory: iDiski-Client
+        run: npm ci
+
+      - name: Install Chromium
+        working-directory: iDiski-Client
+        run: npx playwright install --with-deps chromium
+
+      - name: Build the API
+        run: dotnet build iDiski.Api --configuration Release
+
+      - name: Start the API and seed a league
+        env:
+          DATABASE_URL: Host=localhost;Port=5432;Database=idiski_e2e;Username=postgres;Password=postgres
+          # Development is what seeds the known admin accounts the browser tests sign in with,
+          # and what keeps file storage local instead of reaching for Cloudinary credentials.
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: http://localhost:5207
+        run: ./scripts/start-api-for-e2e.sh
+
+      - name: Browser tests
+        working-directory: iDiski-Client
+        run: npx playwright test
+
+      - name: Publish Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: iDiski-Client/playwright-report/
+          if-no-files-found: ignore
+
+      - name: Publish API log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-log
+          path: api.log
+          if-no-files-found: ignore

@@ -143,7 +143,7 @@ public sealed class GetPublishedArticlesQueryHandler
             .Select(a => new ArticleSummaryDto(
                 a.Id, a.Title, a.Slug, a.Excerpt,
                 a.CoverImageUrl, a.VideoUrl, a.FeaturedImageUrl,
-                a.Author, a.PublishedAt, a.Tags, a.IsPinned));
+                a.Author, a.PublishedAt, a.Tags, a.IsPinned, a.IsArchived));
 
         return await PaginatedList<ArticleSummaryDto>.CreateAsync(
             projected, request.PageNumber, request.PageSize, cancellationToken);

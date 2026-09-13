@@ -18,7 +18,7 @@ $ErrorActionPreference = "Stop"
 
 # Define paths
 $solutionRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$testProjectPath = Join-Path $solutionRoot "iDiski.Tests.Unit"
+$testProjectPath = Join-Path $solutionRoot "iDiski.Tests.Integration"
 $reportDir = Join-Path $solutionRoot "test-reports"
 $logsDir = Join-Path $reportDir "logs"
 $timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"

@@ -39,8 +39,8 @@ iDiski.Api/
   └─ Middleware/ExceptionHandlingMiddleware.cs - global exception → HTTP status mapping
   └─ Program.cs - DI registration, JWT auth, CORS, auto-migrate on startup
 
-iDiski.Tests.Unit/        - xUnit + Moq + FluentAssertions, mocks ILeagueDbContext
-iDiski.Tests.Integration/ - hits a real LeagueDbContext via IntegrationTestFixture
+iDiski.Tests.Integration/ - xUnit + FluentAssertions against a real LeagueDbContext
+                            via IntegrationTestFixture
 ```
 
 **Key principle**: Application layer never references Infrastructure. It depends only on `ILeagueDbContext` interface. Infrastructure implements the interface and is injected at runtime in `Program.cs`.
@@ -83,8 +83,8 @@ dotnet run --project iDiski.Api
 # Run all tests (unit + integration)
 dotnet test
 
-# Run only the unit test project
-dotnet test iDiski.Tests.Unit
+# Run only the integration test project
+dotnet test iDiski.Tests.Integration
 
 # Run a single test by fully-qualified name
 dotnet test --filter "FullyQualifiedName~LoginCommandTests"
@@ -218,6 +218,9 @@ Swagger UI available in Development mode at `/openapi/v1.json` via SwaggerUI end
 4. Create controller endpoint that dispatches via `Sender.Send(command)`
 
 ### Testing business logic
-- Domain services are pure functions - test directly (`iDiski.Tests.Unit`)
-- Application handlers: mock `ILeagueDbContext` (see `iDiski.Tests.Unit/Common/BaseTest.cs` and `TestFixture.cs` for the mocking harness); tests are grouped by feature folder mirroring `iDiski.Application/` (e.g. `Authentication/`, `Teams/`, `Authorization/`)
-- End-to-end flows against a real `LeagueDbContext` belong in `iDiski.Tests.Integration` (`IntegrationTestFixture` + `TestDataSeeder`)
+- Everything runs against a real PostgreSQL database: `IntegrationTestFixture` starts a container per test class and applies the project's migrations, so tests exercise the same schema a deploy produces
+- Use `LeagueScenario` to seed a league whose role assignments line up. Note `TestDataSeeder` is older, unused, and assigns teams to hardcoded ids matching no user it creates
+- Tests in a class share one database, so anything with a unique index — an email, a team short code, a division's season and short code — has to differ per test
+- There is deliberately no mock-based unit project. One existed and was removed: EF Core's async operators (`FirstOrDefaultAsync`, `AnyAsync`, `AsNoTracking`) are static extension methods that Moq cannot intercept, so every test built that way failed the moment it was run
+- FluentValidation runs in the MediatR pipeline, not inside handlers, so a test that calls a handler directly will never raise `ValidationException` — exercise validators on their own
+- End-to-end flows belong in `iDiski.Tests.Integration`, which runs against real PostgreSQL via Testcontainers — Docker must be available to run them

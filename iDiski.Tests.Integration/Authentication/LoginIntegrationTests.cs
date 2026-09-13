@@ -30,7 +30,7 @@ public class LoginIntegrationTests : IClassFixture<IntegrationTestFixture>
         var user = new User
         {
             Id = userId,
-            Email = "test@example.com",
+            Email = "valid-creds@example.com",
             PasswordHash = passwordHash,
             FirstName = "Test",
             LastName = "User",
@@ -47,7 +47,7 @@ public class LoginIntegrationTests : IClassFixture<IntegrationTestFixture>
 
         // Assert
         isValid.Should().BeTrue();
-        user.Email.Should().Be("test@example.com");
+        user.Email.Should().Be("valid-creds@example.com");
         user.IsActive.Should().BeTrue();
     }
 
@@ -62,7 +62,7 @@ public class LoginIntegrationTests : IClassFixture<IntegrationTestFixture>
         var user = new User
         {
             Id = userId,
-            Email = "test@example.com",
+            Email = "invalid-password@example.com",
             PasswordHash = passwordHash,
             FirstName = "Test",
             LastName = "User",
@@ -118,7 +118,7 @@ public class LoginIntegrationTests : IClassFixture<IntegrationTestFixture>
         var user = new User
         {
             Id = userId,
-            Email = "test@example.com",
+            Email = "last-login@example.com",
             PasswordHash = new Argon2PasswordHasher().HashPassword("Password123!"),
             FirstName = "Test",
             LastName = "User",
@@ -153,7 +153,7 @@ public class LoginIntegrationTests : IClassFixture<IntegrationTestFixture>
         var user = new User
         {
             Id = Guid.NewGuid(),
-            Email = "user@example.com",
+            Email = "argon2@example.com",
             PasswordHash = hash1,
             FirstName = "Test",
             LastName = "User",
@@ -171,7 +171,7 @@ public class LoginIntegrationTests : IClassFixture<IntegrationTestFixture>
 
         // Assert
         retrieved.Should().NotBeNull();
-        retrieved?.Email.Should().Be("user@example.com");
+        retrieved?.Email.Should().Be("argon2@example.com");
         passwordValid.Should().BeTrue();
         // Note: Both hashes work for the same password (Argon2 includes salt and iteration in hash)
     }

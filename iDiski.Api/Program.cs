@@ -448,3 +448,8 @@ app.MapDelete("/api/seed/reset", async (LeagueDbContext db) =>
 }).WithTags("Seed");
 
 app.Run();
+
+// Exposed so the integration tests can boot this exact application through
+// WebApplicationFactory. Top-level statements generate an internal Program class, which a
+// test project cannot name.
+public partial class Program { }
