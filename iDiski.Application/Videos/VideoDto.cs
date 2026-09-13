@@ -24,5 +24,11 @@ public sealed record VideoSummaryDto(
     string?   ThumbnailUrl,
     string    Author,
     DateTime? PublishedAt,
-    bool      IsPinned
+    bool      IsPinned,
+
+    /// <summary>
+    /// Admin lists only: the tagged player has left the team this was made about, so it is
+    /// now that team's record of their time there and the editor should not offer it.
+    /// </summary>
+    bool      IsLocked = false
 );

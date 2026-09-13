@@ -104,9 +104,15 @@ interface VideoFormData {
                     <button
                       class="btn btn-outline-primary"
                       (click)="showEditModal(video)"
-                      title="Edit"
+                      [disabled]="video.isLocked"
+                      [title]="
+                        video.isLocked
+                          ? 'Locked — the player this is about has left this team, so it stands as a record of their time there'
+                          : 'Edit'
+                      "
                     >
-                      <i class="bi bi-pencil"></i> Edit
+                      <i [class.bi-pencil]="!video.isLocked" [class.bi-lock]="video.isLocked" class="bi"></i>
+                      {{ video.isLocked ? 'Locked' : 'Edit' }}
                     </button>
                     @if (video.publishedAt) {
                       <button

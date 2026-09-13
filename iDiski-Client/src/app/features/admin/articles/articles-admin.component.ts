@@ -124,9 +124,14 @@ interface ArticleFormData {
                         <button
                           class="btn btn-outline-primary"
                           (click)="showEditModal(article)"
-                          title="Edit"
+                          [disabled]="article.isLocked"
+                          [title]="
+                            article.isLocked
+                              ? 'Locked — the player this is about has left this team, so it stands as a record of their time there'
+                              : 'Edit'
+                          "
                         >
-                          <i class="bi bi-pencil"></i>
+                          <i [class.bi-pencil]="!article.isLocked" [class.bi-lock]="article.isLocked" class="bi"></i>
                         </button>
                         @if (article.publishedAt) {
                           <button

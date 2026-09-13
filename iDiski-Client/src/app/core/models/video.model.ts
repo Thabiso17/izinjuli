@@ -23,6 +23,8 @@ export interface VideoSummaryDto {
   author: string;
   publishedAt?: string;
   isPinned: boolean;
+  /** Admin lists only: the tagged player has left the team this was made about. */
+  isLocked?: boolean;
 }
 
 export interface CreateVideoRequest {

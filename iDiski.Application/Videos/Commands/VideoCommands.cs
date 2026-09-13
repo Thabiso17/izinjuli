@@ -117,6 +117,9 @@ public sealed class UpdateVideoCommandHandler : IRequestHandler<UpdateVideoComma
         var video = await _db.Videos.FindAsync([request.Id], cancellationToken)
             ?? throw new NotFoundException(nameof(Video), request.Id);
 
+        await ContentScopeRules.EnsureOpenForEditingAsync(
+            _db, video.PlayerId, video.TeamId, cancellationToken);
+
         video.Title = request.Title.Trim();
         video.VideoUrl = request.VideoUrl.Trim();
         video.Description = request.Description?.Trim();

@@ -45,7 +45,13 @@ public sealed record ArticleSummaryDto(
     string    Author,
     DateTime? PublishedAt,
     string[]  Tags,
-    bool      IsPinned = false
+    bool      IsPinned = false,
+
+    /// <summary>
+    /// Admin lists only: the tagged player has left the team this was written about, so it
+    /// is now that team's record of their time there and the editor should not offer it.
+    /// </summary>
+    bool      IsLocked = false
 );
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -211,7 +217,10 @@ public sealed class GetAllArticlesAdminQueryHandler
             .Select(a => new ArticleSummaryDto(
                 a.Id, a.Title, a.Slug, a.Excerpt,
                 a.CoverImageUrl, a.VideoUrl, a.FeaturedImageUrl,
-                a.Author, a.PublishedAt, a.Tags, a.IsPinned));
+                a.Author, a.PublishedAt, a.Tags, a.IsPinned,
+                a.PlayerId != null
+                    && a.TeamId != null
+                    && _db.Players.Any(p => p.Id == a.PlayerId && p.TeamId != a.TeamId)));
 
         return await PaginatedList<ArticleSummaryDto>.CreateAsync(
             projected, request.PageNumber, request.PageSize, cancellationToken);

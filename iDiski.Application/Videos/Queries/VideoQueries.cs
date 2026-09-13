@@ -93,7 +93,10 @@ public sealed class GetAllVideosAdminQueryHandler
                 v.ThumbnailUrl,
                 v.Author,
                 v.PublishedAt,
-                v.IsPinned))
+                v.IsPinned,
+                v.PlayerId != null
+                    && v.TeamId != null
+                    && _db.Players.Any(p => p.Id == v.PlayerId && p.TeamId != v.TeamId)))
             .ToListAsync(cancellationToken);
     }
 }

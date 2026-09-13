@@ -18,6 +18,33 @@ public interface IContentScope
 public static class ContentScopeRules
 {
     /// <summary>
+    /// A piece tagged to a player at a club becomes that club's record of their time there
+    /// the moment the player leaves, and is closed to further editing. Reads the stored
+    /// scope rather than the incoming one, so the lock cannot be sidestepped by retagging
+    /// on the way past.
+    /// </summary>
+    public static async Task EnsureOpenForEditingAsync(
+        ILeagueDbContext db,
+        Guid? storedPlayerId,
+        Guid? storedTeamId,
+        CancellationToken cancellationToken)
+    {
+        if (storedPlayerId is null || storedTeamId is null) return;
+
+        var currentTeamId = await db.Players
+            .Where(p => p.Id == storedPlayerId.Value)
+            .Select(p => (Guid?)p.TeamId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // No player row left to compare against — nothing to protect.
+        if (currentTeamId is null || currentTeamId == storedTeamId) return;
+
+        throw new InvalidOperationException(
+            "This is locked. The player it was written about has since left that team, so it "
+            + "stands as a record of their time there and can no longer be edited.");
+    }
+
+    /// <summary>
     /// Enforces that the scope narrows consistently — a team belongs to the named division,
     /// a player to the named team — so content can never claim a subject it doesn't have.
     /// </summary>

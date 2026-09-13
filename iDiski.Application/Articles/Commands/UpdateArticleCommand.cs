@@ -113,6 +113,9 @@ public sealed class UpdateArticleCommandHandler : IRequestHandler<UpdateArticleC
         var article = await _db.Articles.FindAsync([request.Id], cancellationToken)
             ?? throw new NotFoundException(nameof(Domain.Entities.Article), request.Id);
 
+        await ContentScopeRules.EnsureOpenForEditingAsync(
+            _db, article.PlayerId, article.TeamId, cancellationToken);
+
         // ── Slug stays untouched — only content fields update ─────────────────
         article.Title            = request.Title.Trim();
         article.Content          = request.Content;
