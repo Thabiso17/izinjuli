@@ -24,9 +24,16 @@ export class VideoService {
    */
   getPublished(options: {
     maxResults?: number;
+    divisionId?: string;
+    teamId?: string;
+    playerId?: string;
   } = {}): Observable<VideoSummaryDto[]> {
     let params = new HttpParams();
-    if (options.maxResults) params = params.set('maxResults', options.maxResults);
+    // The API parameter is `limit`; sending maxResults meant the cap was silently ignored.
+    if (options.maxResults) params = params.set('limit', options.maxResults);
+    if (options.divisionId) params = params.set('divisionId', options.divisionId);
+    if (options.teamId)     params = params.set('teamId', options.teamId);
+    if (options.playerId)   params = params.set('playerId', options.playerId);
     return this.http.get<VideoSummaryDto[]>(this.base, { params });
   }
 

@@ -9,6 +9,9 @@ export interface VideoDto {
   publishedAt?: string;
   isPinned: boolean;
   viewCount: number;
+  divisionId?: string | null;
+  teamId?: string | null;
+  playerId?: string | null;
 }
 
 export interface VideoSummaryDto {
@@ -29,6 +32,9 @@ export interface CreateVideoRequest {
   thumbnailUrl?: string;
   author: string;
   publishImmediately: boolean;
+  divisionId?: string | null;
+  teamId?: string | null;
+  playerId?: string | null;
 }
 
 export interface UpdateVideoRequest {
@@ -39,4 +45,7 @@ export interface UpdateVideoRequest {
   thumbnailUrl?: string;
   author: string;
   isPinned?: boolean;
+  divisionId?: string | null;
+  teamId?: string | null;
+  playerId?: string | null;
 }

@@ -56,6 +56,13 @@ public sealed class ArticlesController : BaseApiController
         Ok(await Sender.Send(
             new GetAllArticlesAdminQuery(publishedOnly, pageNumber, pageSize), ct));
 
+    /// <summary>[Admin] Returns one article by id, drafts included, for the editor.</summary>
+    [HttpGet("admin/{id:guid}")]
+    [ProducesResponseType(typeof(ArticleDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetByIdAdmin(Guid id, CancellationToken ct) =>
+        Ok(await Sender.Send(new GetArticleByIdAdminQuery(id), ct));
+
     /// <summary>
     /// Creates a new article. The SEO slug is auto-generated from Title.
     /// Returns both the new ID and the generated slug.

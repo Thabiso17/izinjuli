@@ -2,7 +2,9 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { VideoService } from '../../../core/services/video.service';
+import { DivisionService, TeamService, PlayerService } from '../../../core/services';
 import { VideoSummaryDto, CreateVideoRequest, UpdateVideoRequest } from '../../../core/models/video.model';
+import { DivisionDto, TeamDto, PlayerDto } from '../../../core/models';
 
 interface VideoFormData {
   title: string;
@@ -11,6 +13,9 @@ interface VideoFormData {
   thumbnailUrl: string;
   author: string;
   publishImmediately: boolean;
+  divisionId: string | null;
+  teamId: string | null;
+  playerId: string | null;
 }
 
 @Component({
@@ -262,6 +267,57 @@ interface VideoFormData {
                     </small>
                   </div>
 
+                  <!-- What the video covers: division → team → player -->
+                  <div class="col-12">
+                    <label class="form-label">What does this video cover?</label>
+                    <div class="row g-2">
+                      <div class="col-md-4">
+                        <select
+                          class="form-select"
+                          [(ngModel)]="formData.divisionId"
+                          name="divisionId"
+                          (ngModelChange)="onDivisionChange()"
+                        >
+                          <option [ngValue]="null">Whole league</option>
+                          @for (division of divisions(); track division.id) {
+                            <option [ngValue]="division.id">{{ division.name }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div class="col-md-4">
+                        <select
+                          class="form-select"
+                          [(ngModel)]="formData.teamId"
+                          name="teamId"
+                          (ngModelChange)="onTeamChange()"
+                          [disabled]="!formData.divisionId"
+                        >
+                          <option [ngValue]="null">Whole division</option>
+                          @for (team of teamsInDivision(); track team.id) {
+                            <option [ngValue]="team.id">{{ team.name }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div class="col-md-4">
+                        <select
+                          class="form-select"
+                          [(ngModel)]="formData.playerId"
+                          name="playerId"
+                          [disabled]="!formData.teamId"
+                        >
+                          <option [ngValue]="null">Whole team</option>
+                          @for (player of playersInTeam(); track player.id) {
+                            <option [ngValue]="player.id">{{ player.fullName }}</option>
+                          }
+                        </select>
+                      </div>
+                    </div>
+                    <small class="text-muted">
+                      Division highlights, team highlights, or one player's — leave as
+                      "Whole league" for general footage.
+                    </small>
+                  </div>
+
                   @if (!editingVideo()) {
                     <div class="col-12">
                       <div class="form-check">
@@ -311,6 +367,9 @@ interface VideoFormData {
 })
 export class VideosAdminComponent implements OnInit {
   private videoService = inject(VideoService);
+  private divisionService = inject(DivisionService);
+  private teamService = inject(TeamService);
+  private playerService = inject(PlayerService);
 
   videos = signal<VideoSummaryDto[]>([]);
   loading = signal(false);
@@ -324,8 +383,55 @@ export class VideosAdminComponent implements OnInit {
 
   formData: VideoFormData = this.getEmptyForm();
 
+  divisions = signal<DivisionDto[]>([]);
+  teams = signal<TeamDto[]>([]);
+  teamsInDivision = signal<TeamDto[]>([]);
+  playersInTeam = signal<PlayerDto[]>([]);
+
   ngOnInit() {
     this.loadVideos();
+
+    this.divisionService.getAll().subscribe({
+      next: (divisions) => this.divisions.set(divisions),
+      error: (err) => console.error('Failed to load divisions:', err),
+    });
+
+    this.teamService.getAll().subscribe({
+      next: (teams) => this.teams.set(teams),
+      error: (err) => console.error('Failed to load teams:', err),
+    });
+  }
+
+  onDivisionChange() {
+    this.formData.teamId = null;
+    this.formData.playerId = null;
+    this.playersInTeam.set([]);
+    this.refreshTeamsInDivision();
+  }
+
+  onTeamChange() {
+    this.formData.playerId = null;
+    this.refreshPlayersInTeam();
+  }
+
+  private refreshTeamsInDivision() {
+    const divisionId = this.formData.divisionId;
+    this.teamsInDivision.set(
+      divisionId ? this.teams().filter((team) => team.divisionId === divisionId) : []
+    );
+  }
+
+  private refreshPlayersInTeam() {
+    const teamId = this.formData.teamId;
+    if (!teamId) {
+      this.playersInTeam.set([]);
+      return;
+    }
+
+    this.playerService.getAll(teamId, true).subscribe({
+      next: (players) => this.playersInTeam.set(players),
+      error: (err) => console.error('Failed to load players:', err),
+    });
   }
 
   loadVideos() {
@@ -359,14 +465,32 @@ export class VideosAdminComponent implements OnInit {
       thumbnailUrl: video.thumbnailUrl || '',
       author: video.author,
       publishImmediately: false,
+      divisionId: null,
+      teamId: null,
+      playerId: null,
     };
     this.showModal.set(true);
+
+    // The summary carries no scope, so load the full video to prefill the pickers —
+    // otherwise saving an edit would silently clear what the video is about.
+    this.videoService.getById(video.id).subscribe({
+      next: (full) => {
+        this.formData.divisionId = full.divisionId ?? null;
+        this.formData.teamId = full.teamId ?? null;
+        this.formData.playerId = full.playerId ?? null;
+        this.refreshTeamsInDivision();
+        this.refreshPlayersInTeam();
+      },
+      error: (err) => console.error('Failed to load video details:', err),
+    });
   }
 
   closeModal() {
     this.showModal.set(false);
     this.editingVideo.set(null);
     this.formData = this.getEmptyForm();
+    this.teamsInDivision.set([]);
+    this.playersInTeam.set([]);
   }
 
   saveVideo() {
@@ -382,6 +506,9 @@ export class VideosAdminComponent implements OnInit {
         description: this.formData.description || undefined,
         thumbnailUrl: this.formData.thumbnailUrl || undefined,
         author: this.formData.author,
+        divisionId: this.formData.divisionId,
+        teamId: this.formData.teamId,
+        playerId: this.formData.playerId,
       };
 
       this.videoService.update(this.editingVideo()!.id, request).subscribe({
@@ -406,6 +533,9 @@ export class VideosAdminComponent implements OnInit {
         thumbnailUrl: this.formData.thumbnailUrl || undefined,
         author: this.formData.author,
         publishImmediately: this.formData.publishImmediately,
+        divisionId: this.formData.divisionId,
+        teamId: this.formData.teamId,
+        playerId: this.formData.playerId,
       };
 
       this.videoService.create(request).subscribe({
@@ -491,6 +621,9 @@ export class VideosAdminComponent implements OnInit {
       thumbnailUrl: '',
       author: 'iDiski Media Team',
       publishImmediately: true,
+      divisionId: null,
+      teamId: null,
+      playerId: null,
     };
   }
 }

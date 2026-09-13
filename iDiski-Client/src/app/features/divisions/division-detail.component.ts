@@ -4,10 +4,12 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DivisionService, StandingsService } from '../../core/services';
 import { DivisionDto, StandingDto, TopScorerDto } from '../../core/models';
 import { getImageUrl } from '../../core/utils/image.utils';
+import { ScopedArticlesComponent } from '../../shared/components/scoped-articles.component';
+import { ScopedVideosComponent } from '../../shared/components/scoped-videos.component';
 
 @Component({
   selector: 'app-division-detail',
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, ScopedArticlesComponent, ScopedVideosComponent],
   template: `
     <div class="container py-5">
       @if (loading()) {
@@ -67,7 +69,7 @@ import { getImageUrl } from '../../core/utils/image.utils';
         <div class="row g-4">
           <!-- League table -->
           <div class="col-lg-8">
-            <section class="card shadow-sm">
+            <section class="card shadow-sm mb-4">
               <div class="card-body">
                 <h2 class="h4 mb-4">
                   <i class="bi bi-table text-primary me-2"></i>League Table
@@ -133,6 +135,17 @@ import { getImageUrl } from '../../core/utils/image.utils';
                 }
               </div>
             </section>
+
+            <!-- Both hide themselves when this division has no content -->
+            <app-scoped-articles
+              [divisionId]="div.id"
+              heading="Division News"
+            />
+
+            <app-scoped-videos
+              [divisionId]="div.id"
+              heading="Division Highlights"
+            />
           </div>
 
           <!-- Top scorers -->

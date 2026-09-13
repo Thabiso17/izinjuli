@@ -145,6 +145,41 @@ public sealed class GetPublishedArticlesQueryHandler
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// GET BY ID (admin)  —  drafts included, so the editor can load what it is about to save
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// The public by-slug query only returns published articles, so the admin editor cannot
+/// use it to load a draft. This returns the full article whatever its publish state.
+/// </summary>
+public sealed record GetArticleByIdAdminQuery(Guid Id) : IRequest<ArticleDto>;
+
+public sealed class GetArticleByIdAdminQueryHandler
+    : IRequestHandler<GetArticleByIdAdminQuery, ArticleDto>
+{
+    private readonly ILeagueDbContext _db;
+
+    public GetArticleByIdAdminQueryHandler(ILeagueDbContext db) => _db = db;
+
+    public async Task<ArticleDto> Handle(
+        GetArticleByIdAdminQuery request,
+        CancellationToken cancellationToken)
+    {
+        return await _db.Articles
+            .AsNoTracking()
+            .Where(a => a.Id == request.Id)
+            .Select(a => new ArticleDto(
+                a.Id, a.Title, a.Slug, a.Content, a.Excerpt,
+                a.CoverImageUrl, a.VideoUrl, a.FeaturedImageUrl,
+                a.Author, a.IsPublished, a.PublishedAt, a.Tags,
+                a.ViewCount, a.CreatedAt, a.UpdatedAt,
+                a.DivisionId, a.TeamId, a.PlayerId))
+            .FirstOrDefaultAsync(cancellationToken)
+            ?? throw new NotFoundException(nameof(iDiski.Domain.Entities.Article), request.Id);
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 // GET ALL (admin)  —  includes drafts, for the CMS admin panel
 // ═════════════════════════════════════════════════════════════════════════════
 

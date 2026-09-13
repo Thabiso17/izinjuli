@@ -37,12 +37,18 @@ export class ArticleService {
     authorName?: string;
     pageNumber?: number;
     pageSize?: number;
+    divisionId?: string;
+    teamId?: string;
+    playerId?: string;
   } = {}): Observable<PaginatedList<ArticleSummaryDto>> {
     let params = new HttpParams();
     if (options.tag)        params = params.set('tag', options.tag);
     if (options.authorName) params = params.set('authorName', options.authorName);
     if (options.pageNumber) params = params.set('pageNumber', options.pageNumber);
     if (options.pageSize)   params = params.set('pageSize', options.pageSize);
+    if (options.divisionId) params = params.set('divisionId', options.divisionId);
+    if (options.teamId)     params = params.set('teamId', options.teamId);
+    if (options.playerId)   params = params.set('playerId', options.playerId);
     return this.http.get<PaginatedList<ArticleSummaryDto>>(this.base, { params });
   }
 
@@ -59,6 +65,14 @@ export class ArticleService {
   /**
    * [Admin] Returns all articles including drafts.
    */
+  /**
+   * Loads one article for the editor, drafts included. The public getBySlug only returns
+   * published articles, so it cannot be used to open a draft.
+   */
+  getByIdAdmin(id: string): Observable<ArticleDto> {
+    return this.http.get<ArticleDto>(`${this.base}/admin/${id}`);
+  }
+
   getAllAdmin(options: {
     publishedOnly?: boolean;
     pageNumber?: number;
