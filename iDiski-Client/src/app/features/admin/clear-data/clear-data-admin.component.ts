@@ -294,7 +294,7 @@ export class ClearDataAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 5000);
       },
       error: (err) => {
-        this.error.set(`Failed to clear data: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to clear data: ${err.error?.detail || err.error?.title || err.message}`);
         this.clearing.set(false);
       },
     });

@@ -10,7 +10,10 @@ public sealed record VideoDto(
     bool      IsPublished,
     DateTime? PublishedAt,
     bool      IsPinned,
-    int       ViewCount
+    int       ViewCount,
+    Guid?     DivisionId = null,
+    Guid?     TeamId = null,
+    Guid?     PlayerId = null
 );
 
 public sealed record VideoSummaryDto(
@@ -21,5 +24,10 @@ public sealed record VideoSummaryDto(
     string?   ThumbnailUrl,
     string    Author,
     DateTime? PublishedAt,
-    bool      IsPinned
+    bool      IsPinned,
+
+    /// <summary>
+    /// Retired from public view but kept on record. Only ever true in admin listings.
+    /// </summary>
+    bool      IsArchived = false
 );

@@ -1,3 +1,4 @@
+using iDiski.Application.Common.Authorization;
 using iDiski.Application.Common.Interfaces;
 using iDiski.Domain.Entities;
 using FluentValidation;
@@ -18,7 +19,12 @@ public sealed record CreateTeamCommand(
     string? PrimaryColour,
     string? SecondaryColour,
     Guid?   DivisionId = null
-) : IRequest<Guid>;
+) : IRequest<Guid>, IRequireDivisionAccess
+{
+    // Guid.Empty matches no division assignment, so a team with no division can only be
+    // created by a SuperAdmin; a DivisionAdmin must name a division they are assigned to.
+    Guid IRequireDivisionAccess.DivisionId => DivisionId ?? Guid.Empty;
+}
 
 // ── Validator ─────────────────────────────────────────────────────────────────
 

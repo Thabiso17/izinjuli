@@ -106,6 +106,7 @@ public sealed record UpdatePlayerCommand(
     string         LastName,
     string?        ProfileImageUrl,
     string?        Bio,
+    DateTime       DateOfBirth,
     string?        Nationality,
     int            JerseyNumber,
     PlayerPosition Position,
@@ -122,6 +123,10 @@ public sealed class UpdatePlayerCommandValidator : AbstractValidator<UpdatePlaye
         RuleFor(x => x.FirstName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.LastName).NotEmpty().MaximumLength(100);
         RuleFor(x => x.JerseyNumber).InclusiveBetween(1, 99);
+
+        RuleFor(x => x.DateOfBirth)
+            .LessThan(DateTime.UtcNow.AddYears(-14))
+            .WithMessage("Player must be at least 14 years old.");
 
         RuleFor(x => x.Bio)
             .MaximumLength(2000)
@@ -144,6 +149,7 @@ public sealed class UpdatePlayerCommandHandler : IRequestHandler<UpdatePlayerCom
         player.LastName        = request.LastName;
         player.ProfileImageUrl = request.ProfileImageUrl;
         player.Bio             = request.Bio;
+        player.DateOfBirth     = request.DateOfBirth;
         player.Nationality     = request.Nationality;
         player.JerseyNumber    = request.JerseyNumber;
         player.Position        = request.Position;

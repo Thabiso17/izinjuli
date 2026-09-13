@@ -350,7 +350,7 @@ export class SuspensionsAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 3000);
       },
       error: (err) => {
-        this.error.set(`Failed to add suspension: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to add suspension: ${err.error?.detail || err.error?.title || err.message}`);
         this.saving.set(false);
       },
     });

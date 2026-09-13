@@ -24,15 +24,32 @@ export class VideoService {
    */
   getPublished(options: {
     maxResults?: number;
+    divisionId?: string;
+    teamId?: string;
+    playerId?: string;
   } = {}): Observable<VideoSummaryDto[]> {
     let params = new HttpParams();
-    if (options.maxResults) params = params.set('maxResults', options.maxResults);
+    // The API parameter is `limit`; sending maxResults meant the cap was silently ignored.
+    if (options.maxResults) params = params.set('limit', options.maxResults);
+    if (options.divisionId) params = params.set('divisionId', options.divisionId);
+    if (options.teamId)     params = params.set('teamId', options.teamId);
+    if (options.playerId)   params = params.set('playerId', options.playerId);
     return this.http.get<VideoSummaryDto[]>(this.base, { params });
   }
 
   /**
    * Returns a single published video by ID.
    */
+  /** Retires a video from public view without destroying it. */
+  archive(id: string): Observable<void> {
+    return this.http.patch<void>(`${this.base}/${id}/archive`, {});
+  }
+
+  /** Restores an archived video to public view. */
+  unarchive(id: string): Observable<void> {
+    return this.http.patch<void>(`${this.base}/${id}/unarchive`, {});
+  }
+
   getById(id: string): Observable<VideoDto> {
     return this.http.get<VideoDto>(`${this.base}/${id}`);
   }
@@ -74,13 +91,6 @@ export class VideoService {
   }
 
   /**
-   * Unpublishes a video.
-   */
-  unpublish(id: string): Observable<void> {
-    return this.http.patch<void>(`${this.base}/${id}/unpublish`, {});
-  }
-
-  /**
    * Toggles pinned status.
    */
   togglePin(id: string): Observable<void> {
@@ -88,7 +98,7 @@ export class VideoService {
   }
 
   /**
-   * Permanently deletes an unpublished video.
+   * Permanently deletes a video that has never been published.
    */
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/${id}`);

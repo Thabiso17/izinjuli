@@ -1,8 +1,15 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ArticleService } from '../../../core/services';
-import { ArticleSummaryDto, CreateArticleRequest, UpdateArticleRequest } from '../../../core/models';
+import { ArticleService, DivisionService, TeamService, PlayerService } from '../../../core/services';
+import {
+  ArticleSummaryDto,
+  CreateArticleRequest,
+  UpdateArticleRequest,
+  DivisionDto,
+  TeamDto,
+  PlayerDto,
+} from '../../../core/models';
 
 interface ArticleFormData {
   title: string;
@@ -11,6 +18,9 @@ interface ArticleFormData {
   tags: string;
   featuredImageUrl: string;
   publishImmediately: boolean;
+  divisionId: string | null;
+  teamId: string | null;
+  playerId: string | null;
 }
 
 @Component({
@@ -103,6 +113,9 @@ interface ArticleFormData {
                       }
                     </td>
                     <td>
+                      @if (article.isArchived) {
+                        <span class="badge bg-dark me-1">Archived</span>
+                      }
                       @if (article.isPinned) {
                         <i class="bi bi-pin-angle-fill text-primary" title="Pinned"></i>
                       } @else {
@@ -137,20 +150,33 @@ interface ArticleFormData {
                           >
                             <i class="bi bi-check-circle"></i>
                           </button>
+                        }
+                        @if (article.isArchived) {
+                          <button
+                            class="btn btn-outline-secondary"
+                            (click)="unarchiveArticle(article.id)"
+                            title="Restore to public view"
+                          >
+                            <i class="bi bi-box-arrow-up"></i>
+                          </button>
                         } @else {
                           <button
-                            class="btn btn-outline-warning"
-                            (click)="unpublishArticle(article.id)"
-                            title="Unpublish"
+                            class="btn btn-outline-secondary"
+                            (click)="confirmArchive(article)"
+                            title="Archive — retires it from public view but keeps the record"
                           >
-                            <i class="bi bi-x-circle"></i>
+                            <i class="bi bi-archive"></i>
                           </button>
                         }
                         <button
                           class="btn btn-outline-danger"
                           (click)="confirmDelete(article)"
-                          [disabled]="!!article.publishedAt"
-                          [title]="article.publishedAt ? 'Unpublish first' : 'Delete'"
+                          [disabled]="!!article.publishedAt || !!article.isArchived"
+                          [title]="
+                            article.publishedAt || article.isArchived
+                              ? 'Published and archived articles are part of the record — archive rather than delete'
+                              : 'Delete'
+                          "
                         >
                           <i class="bi bi-trash"></i>
                         </button>
@@ -283,6 +309,57 @@ Lebo Molefe has been named Player of the Month for March 2026...
                     </small>
                   </div>
 
+                  <!-- What the article is about: division → team → player -->
+                  <div class="col-12">
+                    <label class="form-label">What is this article about?</label>
+                    <div class="row g-2">
+                      <div class="col-md-4">
+                        <select
+                          class="form-select"
+                          [(ngModel)]="formData.divisionId"
+                          name="divisionId"
+                          (ngModelChange)="onDivisionChange()"
+                        >
+                          <option [ngValue]="null">Whole league</option>
+                          @for (division of divisions(); track division.id) {
+                            <option [ngValue]="division.id">{{ division.name }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div class="col-md-4">
+                        <select
+                          class="form-select"
+                          [(ngModel)]="formData.teamId"
+                          name="teamId"
+                          (ngModelChange)="onTeamChange()"
+                          [disabled]="!formData.divisionId"
+                        >
+                          <option [ngValue]="null">Whole division</option>
+                          @for (team of teamsInDivision(); track team.id) {
+                            <option [ngValue]="team.id">{{ team.name }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div class="col-md-4">
+                        <select
+                          class="form-select"
+                          [(ngModel)]="formData.playerId"
+                          name="playerId"
+                          [disabled]="!formData.teamId"
+                        >
+                          <option [ngValue]="null">Whole team</option>
+                          @for (player of playersInTeam(); track player.id) {
+                            <option [ngValue]="player.id">{{ player.fullName }}</option>
+                          }
+                        </select>
+                      </div>
+                    </div>
+                    <small class="text-muted">
+                      Leave as "Whole league" for general news. Narrow it down to show the
+                      article on a division or team page.
+                    </small>
+                  </div>
+
                   @if (!editingArticle()) {
                     <div class="col-12">
                       <div class="form-check">
@@ -332,6 +409,14 @@ Lebo Molefe has been named Player of the Month for March 2026...
 })
 export class ArticlesAdminComponent implements OnInit {
   private articleService = inject(ArticleService);
+  private divisionService = inject(DivisionService);
+  private teamService = inject(TeamService);
+  private playerService = inject(PlayerService);
+
+  divisions = signal<DivisionDto[]>([]);
+  teams = signal<TeamDto[]>([]);
+  teamsInDivision = signal<TeamDto[]>([]);
+  playersInTeam = signal<PlayerDto[]>([]);
 
   articles = signal<ArticleSummaryDto[]>([]);
   loading = signal(false);
@@ -347,6 +432,66 @@ export class ArticlesAdminComponent implements OnInit {
 
   ngOnInit() {
     this.loadArticles();
+
+    this.divisionService.getAll().subscribe({
+      next: (divisions) => this.divisions.set(divisions),
+      error: (err) => console.error('Failed to load divisions:', err),
+    });
+
+    this.teamService.getAll().subscribe({
+      next: (teams) => this.teams.set(teams),
+      error: (err) => console.error('Failed to load teams:', err),
+    });
+  }
+
+  onDivisionChange() {
+    // A team only makes sense inside the chosen division, and a player inside that team.
+    this.formData.teamId = null;
+    this.formData.playerId = null;
+    this.playersInTeam.set([]);
+    this.refreshTeamsInDivision();
+  }
+
+  onTeamChange() {
+    this.formData.playerId = null;
+    this.refreshPlayersInTeam();
+  }
+
+  private refreshTeamsInDivision() {
+    const divisionId = this.formData.divisionId;
+    this.teamsInDivision.set(
+      divisionId ? this.teams().filter((team) => team.divisionId === divisionId) : []
+    );
+  }
+
+  private refreshPlayersInTeam() {
+    const teamId = this.formData.teamId;
+    if (!teamId) {
+      this.playersInTeam.set([]);
+      return;
+    }
+
+    this.playerService.getAll(teamId, true).subscribe({
+      next: (players) => {
+        this.playersInTeam.set(players);
+        this.keepTaggedPlayerSelectable(players);
+      },
+      error: (err) => console.error('Failed to load players:', err),
+    });
+  }
+
+  /**
+   * A tagged player may have since transferred away, which would leave the dropdown with
+   * no matching option and quietly drop the tag on save. Keep them in the list instead.
+   */
+  private keepTaggedPlayerSelectable(squad: PlayerDto[]) {
+    const taggedId = this.formData.playerId;
+    if (!taggedId || squad.some((player) => player.id === taggedId)) return;
+
+    this.playerService.getById(taggedId).subscribe({
+      next: (player) => this.playersInTeam.set([...squad, player]),
+      error: (err) => console.error('Failed to load tagged player:', err),
+    });
   }
 
   loadArticles() {
@@ -373,23 +518,41 @@ export class ArticlesAdminComponent implements OnInit {
 
   showEditModal(article: ArticleSummaryDto) {
     this.editingArticle.set(article);
-    // Note: We'd need to fetch full article content via getBySlug
-    // For now, just show title/author (content editing requires full DTO)
-    this.formData = {
-      title: article.title,
-      content: '',
-      author: article.author,
-      tags: article.tags.join(', '),
-      featuredImageUrl: article.featuredImageUrl || '',
-      publishImmediately: false,
-    };
     this.showModal.set(true);
+
+    // The body is not on the summary, and loading it from the public by-slug endpoint would
+    // miss drafts — so fetch the full article, otherwise saving would blank its content.
+    this.articleService.getByIdAdmin(article.id).subscribe({
+      next: (full) => {
+        this.formData = {
+          title: full.title,
+          content: full.content,
+          author: full.author,
+          tags: full.tags.join(', '),
+          featuredImageUrl: full.featuredImageUrl || '',
+          publishImmediately: false,
+          divisionId: full.divisionId ?? null,
+          teamId: full.teamId ?? null,
+          playerId: full.playerId ?? null,
+        };
+        this.refreshTeamsInDivision();
+        this.refreshPlayersInTeam();
+      },
+      error: (err) => {
+        this.error.set(
+          `Failed to load article: ${err.error?.detail || err.error?.title || err.message}`
+        );
+        this.closeModal();
+      },
+    });
   }
 
   closeModal() {
     this.showModal.set(false);
     this.editingArticle.set(null);
     this.formData = this.getEmptyForm();
+    this.teamsInDivision.set([]);
+    this.playersInTeam.set([]);
   }
 
   saveArticle() {
@@ -410,6 +573,9 @@ export class ArticlesAdminComponent implements OnInit {
         author: this.formData.author,
         tags,
         featuredImageUrl: this.formData.featuredImageUrl || undefined,
+        divisionId: this.formData.divisionId,
+        teamId: this.formData.teamId,
+        playerId: this.formData.playerId,
       };
 
       this.articleService.update(this.editingArticle()!.id, request).subscribe({
@@ -421,7 +587,7 @@ export class ArticlesAdminComponent implements OnInit {
           setTimeout(() => this.success.set(null), 3000);
         },
         error: (err) => {
-          this.error.set(`Failed to update article: ${err.error?.message || err.message}`);
+          this.error.set(`Failed to update article: ${err.error?.detail || err.error?.title || err.message}`);
           this.saving.set(false);
         },
       });
@@ -434,6 +600,9 @@ export class ArticlesAdminComponent implements OnInit {
         tags,
         featuredImageUrl: this.formData.featuredImageUrl || undefined,
         publishImmediately: this.formData.publishImmediately,
+        divisionId: this.formData.divisionId,
+        teamId: this.formData.teamId,
+        playerId: this.formData.playerId,
       };
 
       this.articleService.create(request).subscribe({
@@ -445,7 +614,7 @@ export class ArticlesAdminComponent implements OnInit {
           setTimeout(() => this.success.set(null), 3000);
         },
         error: (err) => {
-          this.error.set(`Failed to create article: ${err.error?.message || err.message}`);
+          this.error.set(`Failed to create article: ${err.error?.detail || err.error?.title || err.message}`);
           this.saving.set(false);
         },
       });
@@ -460,22 +629,7 @@ export class ArticlesAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 3000);
       },
       error: (err) => {
-        this.error.set(`Failed to publish article: ${err.error?.message || err.message}`);
-      },
-    });
-  }
-
-  unpublishArticle(id: string) {
-    if (!confirm('Are you sure you want to unpublish this article?')) return;
-
-    this.articleService.unpublish(id).subscribe({
-      next: () => {
-        this.success.set('Article unpublished successfully');
-        this.loadArticles();
-        setTimeout(() => this.success.set(null), 3000);
-      },
-      error: (err) => {
-        this.error.set(`Failed to unpublish article: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to publish article: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }
@@ -497,7 +651,10 @@ export class ArticlesAdminComponent implements OnInit {
           featuredImageUrl: fullArticle.featuredImageUrl || '',
           author: fullArticle.author,
           tags: fullArticle.tags,
-          isPinned: newPinnedState
+          isPinned: newPinnedState,
+          divisionId: fullArticle.divisionId ?? null,
+          teamId: fullArticle.teamId ?? null,
+          playerId: fullArticle.playerId ?? null
         };
 
         this.articleService.update(article.id, updateRequest).subscribe({
@@ -507,12 +664,42 @@ export class ArticlesAdminComponent implements OnInit {
             setTimeout(() => this.success.set(null), 3000);
           },
           error: (err) => {
-            this.error.set(`Failed to ${action} article: ${err.error?.message || err.message}`);
+            this.error.set(`Failed to ${action} article: ${err.error?.detail || err.error?.title || err.message}`);
           },
         });
       },
       error: (err) => {
-        this.error.set(`Failed to fetch article details: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to fetch article details: ${err.error?.detail || err.error?.title || err.message}`);
+      },
+    });
+  }
+
+  confirmArchive(article: ArticleSummaryDto) {
+    if (!confirm(`Archive "${article.title}"? It will be removed from public pages but kept on record.`)) {
+      return;
+    }
+
+    this.articleService.archive(article.id).subscribe({
+      next: () => {
+        this.success.set('Article archived');
+        this.loadArticles();
+        setTimeout(() => this.success.set(null), 3000);
+      },
+      error: (err) => {
+        this.error.set(`Failed to archive article: ${err.error?.detail || err.error?.title || err.message}`);
+      },
+    });
+  }
+
+  unarchiveArticle(id: string) {
+    this.articleService.unarchive(id).subscribe({
+      next: () => {
+        this.success.set('Article restored');
+        this.loadArticles();
+        setTimeout(() => this.success.set(null), 3000);
+      },
+      error: (err) => {
+        this.error.set(`Failed to restore article: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }
@@ -529,7 +716,7 @@ export class ArticlesAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 3000);
       },
       error: (err) => {
-        this.error.set(`Failed to delete article: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to delete article: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }
@@ -542,6 +729,9 @@ export class ArticlesAdminComponent implements OnInit {
       tags: '',
       featuredImageUrl: '',
       publishImmediately: true,
+      divisionId: null,
+      teamId: null,
+      playerId: null,
     };
   }
 }

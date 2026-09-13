@@ -5,10 +5,18 @@ import { TeamService, PlayerService, MatchService } from '../../core/services';
 import { TeamDto, PlayerDto, MatchResultDto } from '../../core/models';
 import { getImageUrl } from '../../core/utils/image.utils';
 import { ErrorStateComponent } from '../../shared/components/error-state/error-state.component';
+import { ScopedArticlesComponent } from '../../shared/components/scoped-articles.component';
+import { ScopedVideosComponent } from '../../shared/components/scoped-videos.component';
 
 @Component({
   selector: 'app-team-detail',
-  imports: [CommonModule, RouterLink, ErrorStateComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    ErrorStateComponent,
+    ScopedArticlesComponent,
+    ScopedVideosComponent,
+  ],
   template: `
     <div class="container py-5">
       @if (loading()) {
@@ -316,6 +324,12 @@ import { ErrorStateComponent } from '../../shared/components/error-state/error-s
               }
             </div>
           }
+        </div>
+
+        <!-- Both hide themselves when this team has no content -->
+        <div class="mt-4">
+          <app-scoped-articles [teamId]="team()!.id" heading="Team News" />
+          <app-scoped-videos [teamId]="team()!.id" heading="Team Highlights" />
         </div>
       }
     </div>

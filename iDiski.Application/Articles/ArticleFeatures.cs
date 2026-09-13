@@ -201,6 +201,10 @@ public sealed class PublishArticleCommandHandler : IRequestHandler<PublishArticl
         if (article.IsPublished)
             throw new InvalidOperationException("Article is already published.");
 
+        if (article.IsArchived)
+            throw new InvalidOperationException(
+                "This article is archived. Restore it from the archive to publish it again.");
+
         article.IsPublished = true;
         article.PublishedAt = DateTime.UtcNow;
 

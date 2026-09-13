@@ -36,6 +36,22 @@ public class Article : BaseEntity
 
     public int ViewCount { get; set; }
 
+    /// <summary>
+    /// What this article is about, narrowing from division to team to player. Each level
+    /// requires the one above it, so a player-scoped article also names the team and division.
+    /// All null means league-wide. Plain ids rather than relationships: deleting a team should
+    /// retire its articles from team pages, not delete them.
+    /// </summary>
+    public Guid? DivisionId { get; set; }
+    public Guid? TeamId { get; set; }
+    public Guid? PlayerId { get; set; }
+
+    /// <summary>
+    /// Retired from public view but kept on record. Anything that has been published is
+    /// archived rather than deleted, so the league's history cannot be erased.
+    /// </summary>
+    public bool IsArchived { get; set; } = false;
+
     // Navigation properties
     public ICollection<ArticleAttachment> Attachments { get; set; } = new List<ArticleAttachment>();
 }

@@ -1,9 +1,11 @@
 using iDiski.Application.Sponsors;
 using iDiski.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace iDiski.Api.Controllers;
 
+[Authorize(Policy = "SuperAdminOnly")]
 public sealed class SponsorsController : BaseApiController
 {
     /// <summary>
@@ -24,6 +26,7 @@ public sealed class SponsorsController : BaseApiController
     /// </param>
     /// <response code="200">List of active sponsors for the placement.</response>
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(IReadOnlyList<SponsorDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetByPlacement(
         [FromQuery] AdPlacement placement,

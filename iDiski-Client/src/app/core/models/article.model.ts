@@ -19,6 +19,8 @@ export interface ArticleSummaryDto {
   publishedAt: string | null; // ISO 8601 — pipe through DatePipe in templates
   tags: string[];
   isPinned: boolean;
+  /** Retired from public view but kept on record. Only set on admin listings. */
+  isArchived?: boolean;
 }
 
 /**
@@ -45,6 +47,9 @@ export interface ArticleDto {
   viewCount: number;
   createdAt: string;
   updatedAt: string | null;
+  divisionId?: string | null;
+  teamId?: string | null;
+  playerId?: string | null;
   attachments: ArticleAttachmentDto[];
 }
 
@@ -65,6 +70,9 @@ export interface CreateArticleRequest {
   author: string;
   tags: string[];
   publishImmediately: boolean;
+  divisionId?: string | null;
+  teamId?: string | null;
+  playerId?: string | null;
 }
 
 /** Request body for PUT /api/articles/:id */
@@ -79,4 +87,7 @@ export interface UpdateArticleRequest {
   author: string;
   tags: string[];
   isPinned?: boolean;
+  divisionId?: string | null;
+  teamId?: string | null;
+  playerId?: string | null;
 }

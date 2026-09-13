@@ -42,6 +42,19 @@ import { AuthService } from '../../core/services/auth.service';
               </a>
             </li>
 
+            <!-- Divisions -->
+            <li class="nav-item">
+              <a
+                class="nav-link"
+                routerLink="/divisions"
+                routerLinkActive="active"
+                (click)="closeMenu()"
+              >
+                <i class="bi bi-trophy-fill me-1"></i>
+                Divisions
+              </a>
+            </li>
+
             <!-- Teams -->
             <li class="nav-item">
               <a

@@ -1,10 +1,12 @@
 using iDiski.Application.Videos;
 using iDiski.Application.Videos.Commands;
 using iDiski.Application.Videos.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace iDiski.Api.Controllers;
 
+[Authorize(Policy = "SuperAdminOnly")]
 public sealed class VideosController : BaseApiController
 {
     /// <summary>
@@ -12,11 +14,16 @@ public sealed class VideosController : BaseApiController
     /// </summary>
     /// <param name="limit">Maximum number of videos to return (default 10).</param>
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(List<VideoSummaryDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPublished(
-        [FromQuery] int limit = 10,
+        [FromQuery] int   limit      = 10,
+        [FromQuery] Guid? divisionId = null,
+        [FromQuery] Guid? teamId     = null,
+        [FromQuery] Guid? playerId   = null,
         CancellationToken ct = default)
-        => Ok(await Sender.Send(new GetPublishedVideosQuery(limit), ct));
+        => Ok(await Sender.Send(
+            new GetPublishedVideosQuery(limit, divisionId, teamId, playerId), ct));
 
     /// <summary>
     /// Returns all videos for admin panel.
@@ -33,6 +40,7 @@ public sealed class VideosController : BaseApiController
     /// Gets a single video by ID.
     /// </summary>
     [HttpGet("{id:guid}")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(VideoDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
@@ -84,18 +92,6 @@ public sealed class VideosController : BaseApiController
     }
 
     /// <summary>
-    /// Unpublishes a video.
-    /// </summary>
-    [HttpPatch("{id:guid}/unpublish")]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> Unpublish(Guid id, CancellationToken ct)
-    {
-        await Sender.Send(new UnpublishVideoCommand(id), ct);
-        return NoContent();
-    }
-
-    /// <summary>
     /// Toggles the pinned status of a video.
     /// </summary>
     [HttpPatch("{id:guid}/toggle-pin")]
@@ -108,7 +104,32 @@ public sealed class VideosController : BaseApiController
     }
 
     /// <summary>
-    /// Deletes a video.
+    /// Archives a video: retired from public view, kept on record. This is how a published
+    /// video is taken down, since it can no longer be deleted.
+    /// </summary>
+    [HttpPatch("{id:guid}/archive")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Archive(Guid id, CancellationToken ct)
+    {
+        await Sender.Send(new ArchiveVideoCommand(id), ct);
+        return NoContent();
+    }
+
+    /// <summary>Restores an archived video to public view.</summary>
+    [HttpPatch("{id:guid}/unarchive")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> Unarchive(Guid id, CancellationToken ct)
+    {
+        await Sender.Send(new UnarchiveVideoCommand(id), ct);
+        return NoContent();
+    }
+
+    /// <summary>
+    /// Deletes a video. Only one that has never been published may be deleted.
     /// </summary>
     [HttpDelete("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]

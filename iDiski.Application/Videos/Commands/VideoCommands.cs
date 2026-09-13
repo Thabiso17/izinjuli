@@ -1,4 +1,5 @@
 using FluentValidation;
+using iDiski.Application.Common.Content;
 using iDiski.Application.Common.Exceptions;
 using iDiski.Application.Common.Interfaces;
 using iDiski.Domain.Entities;
@@ -16,13 +17,23 @@ public sealed record CreateVideoCommand(
     string? Description,
     string? ThumbnailUrl,
     string  Author,
-    bool    PublishImmediately = false
-) : IRequest<Guid>;
+    bool    PublishImmediately = false,
+
+    /// <summary>
+    /// What the video covers, narrowing division → team → player. Each level needs the one
+    /// above it. All null is a league-wide video.
+    /// </summary>
+    Guid?   DivisionId = null,
+    Guid?   TeamId = null,
+    Guid?   PlayerId = null
+) : IRequest<Guid>, IContentScope;
 
 public sealed class CreateVideoCommandValidator : AbstractValidator<CreateVideoCommand>
 {
-    public CreateVideoCommandValidator()
+    public CreateVideoCommandValidator(ILeagueDbContext db)
     {
+        this.AddContentScopeRules(db);
+
         RuleFor(x => x.Title).NotEmpty().MaximumLength(300);
         RuleFor(x => x.VideoUrl).NotEmpty().MaximumLength(500);
         RuleFor(x => x.Author).NotEmpty().MaximumLength(100);
@@ -46,7 +57,10 @@ public sealed class CreateVideoCommandHandler : IRequestHandler<CreateVideoComma
             ThumbnailUrl = request.ThumbnailUrl?.Trim(),
             Author = request.Author.Trim(),
             IsPublished = request.PublishImmediately,
-            PublishedAt = request.PublishImmediately ? DateTime.UtcNow : null
+            PublishedAt = request.PublishImmediately ? DateTime.UtcNow : null,
+            DivisionId = request.DivisionId,
+            TeamId = request.TeamId,
+            PlayerId = request.PlayerId
         };
 
         _db.Videos.Add(video);
@@ -67,13 +81,23 @@ public sealed record UpdateVideoCommand(
     string? Description,
     string? ThumbnailUrl,
     string  Author,
-    bool    IsPinned = false
-) : IRequest;
+    bool    IsPinned = false,
+
+    /// <summary>
+    /// What the video covers, narrowing division → team → player. Each level needs the one
+    /// above it. All null is a league-wide video.
+    /// </summary>
+    Guid?   DivisionId = null,
+    Guid?   TeamId = null,
+    Guid?   PlayerId = null
+) : IRequest, IContentScope;
 
 public sealed class UpdateVideoCommandValidator : AbstractValidator<UpdateVideoCommand>
 {
-    public UpdateVideoCommandValidator()
+    public UpdateVideoCommandValidator(ILeagueDbContext db)
     {
+        this.AddContentScopeRules(db);
+
         RuleFor(x => x.Id).NotEmpty();
         RuleFor(x => x.Title).NotEmpty().MaximumLength(300);
         RuleFor(x => x.VideoUrl).NotEmpty().MaximumLength(500);
@@ -99,6 +123,9 @@ public sealed class UpdateVideoCommandHandler : IRequestHandler<UpdateVideoComma
         video.ThumbnailUrl = request.ThumbnailUrl?.Trim();
         video.Author = request.Author.Trim();
         video.IsPinned = request.IsPinned;
+        video.DivisionId = request.DivisionId;
+        video.TeamId = request.TeamId;
+        video.PlayerId = request.PlayerId;
 
         await _db.SaveChangesAsync(cancellationToken);
     }
@@ -121,32 +148,15 @@ public sealed class PublishVideoCommandHandler : IRequestHandler<PublishVideoCom
         var video = await _db.Videos.FindAsync([request.Id], cancellationToken)
             ?? throw new NotFoundException(nameof(Video), request.Id);
 
+        if (video.IsPublished)
+            throw new InvalidOperationException("Video is already published.");
+
+        if (video.IsArchived)
+            throw new InvalidOperationException(
+                "This video is archived. Restore it from the archive to publish it again.");
+
         video.IsPublished = true;
         video.PublishedAt = DateTime.UtcNow;
-
-        await _db.SaveChangesAsync(cancellationToken);
-    }
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// UNPUBLISH VIDEO
-// ═════════════════════════════════════════════════════════════════════════════
-
-public sealed record UnpublishVideoCommand(Guid Id) : IRequest;
-
-public sealed class UnpublishVideoCommandHandler : IRequestHandler<UnpublishVideoCommand>
-{
-    private readonly ILeagueDbContext _db;
-
-    public UnpublishVideoCommandHandler(ILeagueDbContext db) => _db = db;
-
-    public async Task Handle(UnpublishVideoCommand request, CancellationToken cancellationToken)
-    {
-        var video = await _db.Videos.FindAsync([request.Id], cancellationToken)
-            ?? throw new NotFoundException(nameof(Video), request.Id);
-
-        video.IsPublished = false;
-        video.IsPinned = false; // Unpublishing also unpins
 
         await _db.SaveChangesAsync(cancellationToken);
     }
@@ -195,7 +205,63 @@ public sealed class DeleteVideoCommandHandler : IRequestHandler<DeleteVideoComma
         var video = await _db.Videos.FindAsync([request.Id], cancellationToken)
             ?? throw new NotFoundException(nameof(Video), request.Id);
 
+        // PublishedAt is stamped on publish and never cleared, so it records that this
+        // was live at some point even if it has since been archived.
+        if (video.PublishedAt is not null)
+            throw new InvalidOperationException(
+                "This video has been published, so it can no longer be deleted. "
+                + "Archive it instead to retire it from public view.");
+
+        if (video.IsArchived)
+            throw new InvalidOperationException("Archived videos cannot be deleted.");
+
         _db.Videos.Remove(video);
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ARCHIVE / UNARCHIVE  (retire from public view without destroying the record)
+// ═════════════════════════════════════════════════════════════════════════════
+
+public sealed record ArchiveVideoCommand(Guid Id) : IRequest;
+
+public sealed class ArchiveVideoCommandHandler : IRequestHandler<ArchiveVideoCommand>
+{
+    private readonly ILeagueDbContext _db;
+
+    public ArchiveVideoCommandHandler(ILeagueDbContext db) => _db = db;
+
+    public async Task Handle(ArchiveVideoCommand request, CancellationToken cancellationToken)
+    {
+        var video = await _db.Videos.FindAsync([request.Id], cancellationToken)
+            ?? throw new NotFoundException(nameof(Video), request.Id);
+
+        if (video.IsArchived)
+            throw new InvalidOperationException("Video is already archived.");
+
+        video.IsArchived = true;
+        await _db.SaveChangesAsync(cancellationToken);
+    }
+}
+
+public sealed record UnarchiveVideoCommand(Guid Id) : IRequest;
+
+public sealed class UnarchiveVideoCommandHandler : IRequestHandler<UnarchiveVideoCommand>
+{
+    private readonly ILeagueDbContext _db;
+
+    public UnarchiveVideoCommandHandler(ILeagueDbContext db) => _db = db;
+
+    public async Task Handle(UnarchiveVideoCommand request, CancellationToken cancellationToken)
+    {
+        var video = await _db.Videos.FindAsync([request.Id], cancellationToken)
+            ?? throw new NotFoundException(nameof(Video), request.Id);
+
+        if (!video.IsArchived)
+            throw new InvalidOperationException("Video is not archived.");
+
+        video.IsArchived = false;
         await _db.SaveChangesAsync(cancellationToken);
     }
 }

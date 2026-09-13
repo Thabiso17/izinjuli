@@ -27,9 +27,11 @@ public sealed record TopScorerDto(
 /// so Season is used here as a label only — extend if you add per-season stat tracking.
 /// </param>
 /// <param name="TopN">How many rows to return. Default 10.</param>
+/// <param name="DivisionId">Optional division filter, matched through the player's team.</param>
 public sealed record GetTopScorersQuery(
-    int Season,
-    int TopN = 10
+    int   Season,
+    int   TopN = 10,
+    Guid? DivisionId = null
 ) : IRequest<IReadOnlyList<TopScorerDto>>;
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -45,10 +47,15 @@ public sealed class GetTopScorersQueryHandler
         GetTopScorersQuery request,
         CancellationToken cancellationToken)
     {
-        var scorers = await _db.Players
+        var query = _db.Players
             .AsNoTracking()
             .Include(p => p.Team)
-            .Where(p => p.Goals > 0 || p.Assists > 0)
+            .Where(p => p.Goals > 0 || p.Assists > 0);
+
+        if (request.DivisionId.HasValue)
+            query = query.Where(p => p.Team.DivisionId == request.DivisionId.Value);
+
+        var scorers = await query
             .OrderByDescending(p => p.Goals)
             .ThenByDescending(p => p.Assists)
             .ThenBy(p => p.LastName)

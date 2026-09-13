@@ -1,4 +1,5 @@
 using FluentValidation;
+using iDiski.Application.Common.Content;
 using iDiski.Application.Common.Exceptions;
 using iDiski.Application.Common.Interfaces;
 using MediatR;
@@ -12,7 +13,7 @@ namespace iDiski.Application.Articles.Commands;
 /// <summary>
 /// Updates the editable fields of an existing article.
 /// The <b>Slug is intentionally immutable</b> — changing it after publish breaks
-/// inbound links and SEO. If you need a new slug, unpublish and create a new article.
+/// inbound links and SEO. If you need a new slug, archive this one and write a new article.
 /// </summary>
 public sealed record UpdateArticleCommand(
     Guid     Id,
@@ -24,15 +25,22 @@ public sealed record UpdateArticleCommand(
     string?  FeaturedImageUrl,
     string   Author,
     string[] Tags,
-    bool     IsPinned = false
-) : IRequest;
+    bool     IsPinned = false,
+
+    /// <summary>See CreateArticleCommand — division → team → player, each needing the one above.</summary>
+    Guid?    DivisionId = null,
+    Guid?    TeamId = null,
+    Guid?    PlayerId = null
+) : IRequest, IContentScope;
 
 // ── Validator ─────────────────────────────────────────────────────────────────
 
 public sealed class UpdateArticleCommandValidator : AbstractValidator<UpdateArticleCommand>
 {
-    public UpdateArticleCommandValidator()
+    public UpdateArticleCommandValidator(ILeagueDbContext db)
     {
+        this.AddContentScopeRules(db);
+
         RuleFor(x => x.Id).NotEmpty();
 
         RuleFor(x => x.Title)
@@ -113,6 +121,9 @@ public sealed class UpdateArticleCommandHandler : IRequestHandler<UpdateArticleC
         article.FeaturedImageUrl = request.FeaturedImageUrl;
         article.Author           = request.Author.Trim();
         article.IsPinned         = request.IsPinned;
+        article.DivisionId       = request.DivisionId;
+        article.TeamId           = request.TeamId;
+        article.PlayerId         = request.PlayerId;
         article.Tags = request.Tags
             .Select(t => t.Trim())
             .Where(t => !string.IsNullOrWhiteSpace(t))

@@ -27,4 +27,16 @@ public class Video : BaseEntity
     public bool IsPinned { get; set; } = false;
 
     public int ViewCount { get; set; }
+
+    /// <summary>
+    /// What this video covers, narrowing from division to team to player — division
+    /// highlights, team highlights, or a single player's. Each level requires the one above
+    /// it; all null means league-wide. See <see cref="Article"/> for why these are plain ids.
+    /// </summary>
+    public Guid? DivisionId { get; set; }
+    public Guid? TeamId { get; set; }
+    public Guid? PlayerId { get; set; }
+
+    /// <summary>See <see cref="Article.IsArchived"/> — retired from view, kept on record.</summary>
+    public bool IsArchived { get; set; } = false;
 }

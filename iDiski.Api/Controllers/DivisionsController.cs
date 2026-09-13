@@ -59,10 +59,11 @@ public class DivisionsController : BaseApiController
     }
 
     /// <summary>
-    /// Update an existing division. Requires Division Admin (assigned to division) or SuperAdmin.
+    /// Update an existing division. SuperAdmin only — a DivisionAdmin works inside the
+    /// division they are assigned to, but does not administer the division record itself.
     /// </summary>
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = "CanManageDivisions")]
+    [Authorize(Policy = "SuperAdminOnly")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateDivisionCommand command)
     {
         if (id != command.Id)

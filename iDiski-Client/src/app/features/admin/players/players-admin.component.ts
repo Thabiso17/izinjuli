@@ -800,7 +800,8 @@ export class PlayersAdminComponent implements OnInit {
       lastName: player.lastName,
       profileImageUrl: player.profileImageUrl || '',
       bio: player.bio || '',
-      dateOfBirth: player.dateOfBirth,
+      // <input type="date"> only accepts yyyy-MM-dd; the API returns a full ISO timestamp.
+      dateOfBirth: player.dateOfBirth?.substring(0, 10) ?? '',
       nationality: player.nationality || '',
       jerseyNumber: player.jerseyNumber,
       position: player.position,
@@ -848,7 +849,7 @@ export class PlayersAdminComponent implements OnInit {
           setTimeout(() => this.success.set(null), 3000);
         },
         error: (err: any) => {
-          this.error.set(`Failed to save player: ${err.error?.message || err.message}`);
+          this.error.set(`Failed to save player: ${err.error?.detail || err.error?.title || err.message}`);
           this.saving.set(false);
         },
       });
@@ -862,7 +863,7 @@ export class PlayersAdminComponent implements OnInit {
           setTimeout(() => this.success.set(null), 3000);
         },
         error: (err: any) => {
-          this.error.set(`Failed to save player: ${err.error?.message || err.message}`);
+          this.error.set(`Failed to save player: ${err.error?.detail || err.error?.title || err.message}`);
           this.saving.set(false);
         },
       });
@@ -916,7 +917,7 @@ export class PlayersAdminComponent implements OnInit {
         },
         error: (err: any) => {
           this.error.set(
-            `Failed to transfer player: ${err.error?.message || err.message}`
+            `Failed to transfer player: ${err.error?.detail || err.error?.title || err.message}`
           );
           this.saving.set(false);
         },
@@ -939,7 +940,7 @@ export class PlayersAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 3000);
       },
       error: (err) => {
-        this.error.set(`Failed to deactivate player: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to deactivate player: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }
@@ -962,7 +963,7 @@ export class PlayersAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 2000);
       },
       error: (err) => {
-        this.error.set(`Failed to upload image: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to upload image: ${err.error?.detail || err.error?.title || err.message}`);
         this.uploadingImage.set(false);
       },
     });

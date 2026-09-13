@@ -9,6 +9,9 @@ export interface VideoDto {
   publishedAt?: string;
   isPinned: boolean;
   viewCount: number;
+  divisionId?: string | null;
+  teamId?: string | null;
+  playerId?: string | null;
 }
 
 export interface VideoSummaryDto {
@@ -20,6 +23,8 @@ export interface VideoSummaryDto {
   author: string;
   publishedAt?: string;
   isPinned: boolean;
+  /** Retired from public view but kept on record. Only set on admin listings. */
+  isArchived?: boolean;
 }
 
 export interface CreateVideoRequest {
@@ -29,6 +34,9 @@ export interface CreateVideoRequest {
   thumbnailUrl?: string;
   author: string;
   publishImmediately: boolean;
+  divisionId?: string | null;
+  teamId?: string | null;
+  playerId?: string | null;
 }
 
 export interface UpdateVideoRequest {
@@ -39,4 +47,7 @@ export interface UpdateVideoRequest {
   thumbnailUrl?: string;
   author: string;
   isPinned?: boolean;
+  divisionId?: string | null;
+  teamId?: string | null;
+  playerId?: string | null;
 }

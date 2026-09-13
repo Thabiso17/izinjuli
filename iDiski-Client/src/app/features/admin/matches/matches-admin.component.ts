@@ -900,7 +900,7 @@ export class MatchesAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 8000);
       },
       error: (err: any) => {
-        this.error.set(`Failed to generate fixtures: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to generate fixtures: ${err.error?.detail || err.error?.title || err.message}`);
         this.saving.set(false);
       }
     });
@@ -930,7 +930,7 @@ export class MatchesAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 3000);
       },
       error: (err) => {
-        this.error.set(`Failed to create fixture: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to create fixture: ${err.error?.detail || err.error?.title || err.message}`);
         this.saving.set(false);
       },
     });
@@ -975,7 +975,7 @@ export class MatchesAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 3000);
       },
       error: (err) => {
-        this.error.set(`Failed to update score: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to update score: ${err.error?.detail || err.error?.title || err.message}`);
         this.saving.set(false);
       },
     });

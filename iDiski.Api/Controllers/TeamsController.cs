@@ -27,10 +27,10 @@ public sealed class TeamsController : BaseApiController
     /// <summary>Creates a new team. Returns the new team's ID in the Location header. SuperAdmin only.</summary>
     /// <response code="201">Team created.</response>
     /// <response code="401">Not authenticated.</response>
-    /// <response code="403">Not authorized (SuperAdmin only).</response>
+    /// <response code="403">Not authorized (SuperAdmin, or DivisionAdmin for their own division).</response>
     /// <response code="422">Validation failure (e.g. duplicate ShortCode).</response>
     [HttpPost]
-    [Authorize(Policy = "SuperAdminOnly")]
+    [Authorize(Policy = "CanManageDivisions")]
     [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -74,11 +74,11 @@ public sealed class TeamsController : BaseApiController
     /// </summary>
     /// <response code="204">Team deleted.</response>
     /// <response code="401">Not authenticated.</response>
-    /// <response code="403">Not authorized (SuperAdmin only).</response>
+    /// <response code="403">Not authorized (SuperAdmin, or DivisionAdmin for a team in their division).</response>
     /// <response code="404">Team not found.</response>
     /// <response code="409">Team has match history and cannot be deleted.</response>
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = "SuperAdminOnly")]
+    [Authorize(Policy = "CanManageDivisions")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
