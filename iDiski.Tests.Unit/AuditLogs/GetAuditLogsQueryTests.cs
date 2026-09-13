@@ -120,7 +120,7 @@ public class GetAuditLogsQueryTests : BaseTest
         dbContext.Setup(x => x.AuditLogs).Returns(mockAuditLogs.Object);
 
         var handler = new GetAuditLogsQueryHandler(dbContext.Object);
-        var query = new GetAuditLogsQuery(entityType: "Team");
+        var query = new GetAuditLogsQuery(EntityType: "Team");
 
         // Act
         var result = await handler.Handle(query, CancellationToken.None);
@@ -172,7 +172,7 @@ public class GetAuditLogsQueryTests : BaseTest
         dbContext.Setup(x => x.AuditLogs).Returns(mockAuditLogs.Object);
 
         var handler = new GetAuditLogsQueryHandler(dbContext.Object);
-        var query = new GetAuditLogsQuery(userId: userId);
+        var query = new GetAuditLogsQuery(UserId: userId);
 
         // Act
         var result = await handler.Handle(query, CancellationToken.None);
@@ -236,7 +236,7 @@ public class GetAuditLogsQueryTests : BaseTest
         dbContext.Setup(x => x.AuditLogs).Returns(mockAuditLogs.Object);
 
         var handler = new GetAuditLogsQueryHandler(dbContext.Object);
-        var query = new GetAuditLogsQuery(entityId: entityId);
+        var query = new GetAuditLogsQuery(EntityId: entityId);
 
         // Act
         var result = await handler.Handle(query, CancellationToken.None);
@@ -291,15 +291,15 @@ public class GetAuditLogsQueryTests : BaseTest
         dbContext.Setup(x => x.AuditLogs).Returns(mockAuditLogs.Object);
 
         var handler = new GetAuditLogsQueryHandler(dbContext.Object);
-        var query = new GetAuditLogsQuery(fromDate: fromDate, toDate: toDate);
+        var query = new GetAuditLogsQuery(FromDate: fromDate, ToDate: toDate);
 
         // Act
         var result = await handler.Handle(query, CancellationToken.None);
 
         // Assert
         result.Should().HaveCount(1);
-        result.First().ChangedAt.Should().BeGreaterThanOrEqualTo(fromDate);
-        result.First().ChangedAt.Should().BeLessThanOrEqualTo(toDate);
+        result.First().ChangedAt.Should().BeOnOrAfter(fromDate);
+        result.First().ChangedAt.Should().BeOnOrBefore(toDate);
 
         LogTestPass(testName);
     }
@@ -349,7 +349,7 @@ public class GetAuditLogsQueryTests : BaseTest
         dbContext.Setup(x => x.AuditLogs).Returns(mockAuditLogs.Object);
 
         var handler = new GetAuditLogsQueryHandler(dbContext.Object);
-        var query = new GetAuditLogsQuery(pageNumber: 2, pageSize: 50);
+        var query = new GetAuditLogsQuery(PageNumber: 2, PageSize: 50);
 
         // Act
         var result = await handler.Handle(query, CancellationToken.None);
@@ -385,7 +385,7 @@ public class GetAuditLogsQueryTests : BaseTest
         dbContext.Setup(x => x.AuditLogs).Returns(mockAuditLogs.Object);
 
         var handler = new GetAuditLogsQueryHandler(dbContext.Object);
-        var query = new GetAuditLogsQuery(entityType: "Nonexistent");
+        var query = new GetAuditLogsQuery(EntityType: "Nonexistent");
 
         // Act
         var result = await handler.Handle(query, CancellationToken.None);

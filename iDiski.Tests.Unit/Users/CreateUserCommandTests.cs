@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Xunit;
 using Moq;
 using FluentAssertions;
-using iDiski.Application.Users.Commands;
+using iDiski.Application.Authentication.Commands;
 using iDiski.Application.Common.Interfaces;
 using iDiski.Application.Common.Exceptions;
 using iDiski.Domain.Entities;

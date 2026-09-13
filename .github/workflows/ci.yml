@@ -24,6 +24,7 @@ jobs:
         run: dotnet restore iDiski.sln
 
       - name: Build
+        id: build
         run: dotnet build iDiski.sln --configuration Release --no-restore
 
       # Run the test projects by path rather than through the solution: iDiski.Tests.Unit
@@ -31,7 +32,9 @@ jobs:
       - name: Unit tests
         run: dotnet test iDiski.Tests.Unit/iDiski.Tests.Unit.csproj --configuration Release --logger "trx;LogFileName=unit.trx" --results-directory TestResults
 
+      # Runs even when the unit tests failed, so one red suite does not hide the other.
       - name: Integration tests
+        if: steps.build.outcome == 'success'
         run: dotnet test iDiski.Tests.Integration/iDiski.Tests.Integration.csproj --configuration Release --logger "trx;LogFileName=integration.trx" --results-directory TestResults
 
       - name: Publish test results

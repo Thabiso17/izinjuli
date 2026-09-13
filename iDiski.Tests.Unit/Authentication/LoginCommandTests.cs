@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -10,6 +11,7 @@ using iDiski.Application.Common.Exceptions;
 using iDiski.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using iDiski.Tests.Unit.Common;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace iDiski.Tests.Unit.Authentication;
 
@@ -50,7 +52,9 @@ public class LoginCommandTests : BaseTest
         jwtTokenGenerator.Setup(x => x.GenerateToken(It.IsAny<User>(), It.IsAny<IReadOnlyList<int>>()))
             .Returns("valid_jwt_token");
 
-        var handler = new LoginCommandHandler(dbContext.Object, passwordHasher.Object, jwtTokenGenerator.Object);
+        var handler = new LoginCommandHandler(
+            dbContext.Object, passwordHasher.Object, jwtTokenGenerator.Object,
+            NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand(email, password);
 
         // Act
@@ -96,7 +100,9 @@ public class LoginCommandTests : BaseTest
         dbContext.Setup(x => x.Users).Returns(mockUserSet.Object);
         passwordHasher.Setup(x => x.VerifyPassword(password, user.PasswordHash)).Returns(false);
 
-        var handler = new LoginCommandHandler(dbContext.Object, passwordHasher.Object, jwtTokenGenerator.Object);
+        var handler = new LoginCommandHandler(
+            dbContext.Object, passwordHasher.Object, jwtTokenGenerator.Object,
+            NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand(email, password);
 
         // Act & Assert
@@ -127,7 +133,9 @@ public class LoginCommandTests : BaseTest
 
         dbContext.Setup(x => x.Users).Returns(mockUserSet.Object);
 
-        var handler = new LoginCommandHandler(dbContext.Object, passwordHasher.Object, jwtTokenGenerator.Object);
+        var handler = new LoginCommandHandler(
+            dbContext.Object, passwordHasher.Object, jwtTokenGenerator.Object,
+            NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand(email, password);
 
         // Act & Assert
@@ -169,7 +177,9 @@ public class LoginCommandTests : BaseTest
         dbContext.Setup(x => x.Users).Returns(mockUserSet.Object);
         passwordHasher.Setup(x => x.VerifyPassword(password, user.PasswordHash)).Returns(true);
 
-        var handler = new LoginCommandHandler(dbContext.Object, passwordHasher.Object, jwtTokenGenerator.Object);
+        var handler = new LoginCommandHandler(
+            dbContext.Object, passwordHasher.Object, jwtTokenGenerator.Object,
+            NullLogger<LoginCommandHandler>.Instance);
         var command = new LoginCommand(email, password);
 
         // Act & Assert
