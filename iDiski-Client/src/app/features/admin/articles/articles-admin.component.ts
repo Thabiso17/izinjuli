@@ -421,7 +421,7 @@ export class ArticlesAdminComponent implements OnInit {
           setTimeout(() => this.success.set(null), 3000);
         },
         error: (err) => {
-          this.error.set(`Failed to update article: ${err.error?.message || err.message}`);
+          this.error.set(`Failed to update article: ${err.error?.detail || err.error?.title || err.message}`);
           this.saving.set(false);
         },
       });
@@ -445,7 +445,7 @@ export class ArticlesAdminComponent implements OnInit {
           setTimeout(() => this.success.set(null), 3000);
         },
         error: (err) => {
-          this.error.set(`Failed to create article: ${err.error?.message || err.message}`);
+          this.error.set(`Failed to create article: ${err.error?.detail || err.error?.title || err.message}`);
           this.saving.set(false);
         },
       });
@@ -460,7 +460,7 @@ export class ArticlesAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 3000);
       },
       error: (err) => {
-        this.error.set(`Failed to publish article: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to publish article: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }
@@ -475,7 +475,7 @@ export class ArticlesAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 3000);
       },
       error: (err) => {
-        this.error.set(`Failed to unpublish article: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to unpublish article: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }
@@ -507,12 +507,12 @@ export class ArticlesAdminComponent implements OnInit {
             setTimeout(() => this.success.set(null), 3000);
           },
           error: (err) => {
-            this.error.set(`Failed to ${action} article: ${err.error?.message || err.message}`);
+            this.error.set(`Failed to ${action} article: ${err.error?.detail || err.error?.title || err.message}`);
           },
         });
       },
       error: (err) => {
-        this.error.set(`Failed to fetch article details: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to fetch article details: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }
@@ -529,7 +529,7 @@ export class ArticlesAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 3000);
       },
       error: (err) => {
-        this.error.set(`Failed to delete article: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to delete article: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }

@@ -429,7 +429,7 @@ export class DivisionsAdminComponent implements OnInit {
           setTimeout(() => this.success.set(null), 3000);
         },
         error: (err: any) => {
-          this.error.set(`Failed to save division: ${err.error?.message || err.message}`);
+          this.error.set(`Failed to save division: ${err.error?.detail || err.error?.title || err.message}`);
           this.saving.set(false);
         },
       });
@@ -443,7 +443,7 @@ export class DivisionsAdminComponent implements OnInit {
           setTimeout(() => this.success.set(null), 3000);
         },
         error: (err: any) => {
-          this.error.set(`Failed to save division: ${err.error?.message || err.message}`);
+          this.error.set(`Failed to save division: ${err.error?.detail || err.error?.title || err.message}`);
           this.saving.set(false);
         },
       });
@@ -466,7 +466,7 @@ export class DivisionsAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 3000);
       },
       error: (err) => {
-        this.error.set(`Failed to delete division: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to delete division: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }

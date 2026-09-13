@@ -1,5 +1,6 @@
 using iDiski.Application.Suspensions.Commands;
 using iDiski.Application.Suspensions.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace iDiski.Api.Controllers;
@@ -34,6 +35,7 @@ public class SuspensionsController : BaseApiController
     /// Manually create a suspension for a player
     /// </summary>
     [HttpPost]
+    [Authorize(Policy = "CanManageDivisions")]
     public async Task<IActionResult> Create([FromBody] CreateSuspensionCommand command)
     {
         var suspensionId = await Sender.Send(command);

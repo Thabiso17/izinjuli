@@ -800,7 +800,8 @@ export class PlayersAdminComponent implements OnInit {
       lastName: player.lastName,
       profileImageUrl: player.profileImageUrl || '',
       bio: player.bio || '',
-      dateOfBirth: player.dateOfBirth,
+      // <input type="date"> only accepts yyyy-MM-dd; the API returns a full ISO timestamp.
+      dateOfBirth: player.dateOfBirth?.substring(0, 10) ?? '',
       nationality: player.nationality || '',
       jerseyNumber: player.jerseyNumber,
       position: player.position,

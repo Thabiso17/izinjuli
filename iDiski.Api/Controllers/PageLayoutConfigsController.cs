@@ -1,8 +1,10 @@
 using iDiski.Application.PageLayoutConfigs;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace iDiski.Api.Controllers;
 
+[Authorize(Policy = "SuperAdminOnly")]
 public sealed class PageLayoutConfigsController : BaseApiController
 {
     /// <summary>
@@ -17,6 +19,7 @@ public sealed class PageLayoutConfigsController : BaseApiController
     /// </param>
     /// <response code="200">Ordered component layout for the page.</response>
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(IReadOnlyList<PageLayoutConfigDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetLayout(
         [FromQuery] string pageName,

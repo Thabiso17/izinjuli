@@ -1,10 +1,12 @@
 using iDiski.Application.Videos;
 using iDiski.Application.Videos.Commands;
 using iDiski.Application.Videos.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace iDiski.Api.Controllers;
 
+[Authorize(Policy = "SuperAdminOnly")]
 public sealed class VideosController : BaseApiController
 {
     /// <summary>
@@ -12,6 +14,7 @@ public sealed class VideosController : BaseApiController
     /// </summary>
     /// <param name="limit">Maximum number of videos to return (default 10).</param>
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(List<VideoSummaryDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPublished(
         [FromQuery] int limit = 10,
@@ -33,6 +36,7 @@ public sealed class VideosController : BaseApiController
     /// Gets a single video by ID.
     /// </summary>
     [HttpGet("{id:guid}")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(VideoDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)

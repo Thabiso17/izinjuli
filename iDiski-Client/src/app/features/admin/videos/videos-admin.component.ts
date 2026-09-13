@@ -393,7 +393,7 @@ export class VideosAdminComponent implements OnInit {
           setTimeout(() => this.success.set(null), 3000);
         },
         error: (err) => {
-          this.error.set(`Failed to update video: ${err.error?.message || err.message}`);
+          this.error.set(`Failed to update video: ${err.error?.detail || err.error?.title || err.message}`);
           this.saving.set(false);
         },
       });
@@ -417,7 +417,7 @@ export class VideosAdminComponent implements OnInit {
           setTimeout(() => this.success.set(null), 3000);
         },
         error: (err) => {
-          this.error.set(`Failed to add video: ${err.error?.message || err.message}`);
+          this.error.set(`Failed to add video: ${err.error?.detail || err.error?.title || err.message}`);
           this.saving.set(false);
         },
       });
@@ -432,7 +432,7 @@ export class VideosAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 3000);
       },
       error: (err) => {
-        this.error.set(`Failed to publish video: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to publish video: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }
@@ -447,7 +447,7 @@ export class VideosAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 3000);
       },
       error: (err) => {
-        this.error.set(`Failed to unpublish video: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to unpublish video: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }
@@ -461,7 +461,7 @@ export class VideosAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 3000);
       },
       error: (err) => {
-        this.error.set(`Failed to toggle pin: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to toggle pin: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }
@@ -478,7 +478,7 @@ export class VideosAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 3000);
       },
       error: (err) => {
-        this.error.set(`Failed to delete video: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to delete video: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }

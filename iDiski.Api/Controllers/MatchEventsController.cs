@@ -1,5 +1,6 @@
 using iDiski.Application.MatchEvents.Commands;
 using iDiski.Application.MatchEvents.Queries;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace iDiski.Api.Controllers;
@@ -35,6 +36,7 @@ public class MatchEventsController : BaseApiController
     /// Replaces any existing events for the match
     /// </summary>
     [HttpPost]
+    [Authorize(Policy = "CanManageDivisions")]
     public async Task<IActionResult> RecordEvents([FromBody] RecordMatchEventsCommand command)
     {
         await Sender.Send(command);

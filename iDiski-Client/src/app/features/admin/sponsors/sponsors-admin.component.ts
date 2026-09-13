@@ -475,7 +475,7 @@ export class SponsorsAdminComponent implements OnInit {
           setTimeout(() => this.success.set(null), 3000);
         },
         error: (err: any) => {
-          this.error.set(`Failed to save sponsor: ${err.error?.message || err.message}`);
+          this.error.set(`Failed to save sponsor: ${err.error?.detail || err.error?.title || err.message}`);
           this.saving.set(false);
         },
       });
@@ -489,7 +489,7 @@ export class SponsorsAdminComponent implements OnInit {
           setTimeout(() => this.success.set(null), 3000);
         },
         error: (err: any) => {
-          this.error.set(`Failed to save sponsor: ${err.error?.message || err.message}`);
+          this.error.set(`Failed to save sponsor: ${err.error?.detail || err.error?.title || err.message}`);
           this.saving.set(false);
         },
       });
@@ -514,7 +514,7 @@ export class SponsorsAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 2000);
       },
       error: (err) => {
-        this.error.set(`Failed to upload logo: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to upload logo: ${err.error?.detail || err.error?.title || err.message}`);
         this.uploadingImage.set(false);
       },
     });
@@ -532,7 +532,7 @@ export class SponsorsAdminComponent implements OnInit {
         setTimeout(() => this.success.set(null), 3000);
       },
       error: (err) => {
-        this.error.set(`Failed to delete sponsor: ${err.error?.message || err.message}`);
+        this.error.set(`Failed to delete sponsor: ${err.error?.detail || err.error?.title || err.message}`);
       },
     });
   }

@@ -1,5 +1,6 @@
 using iDiski.Application.Common.Constants;
 using iDiski.Application.Common.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace iDiski.Api.Controllers;
@@ -9,6 +10,7 @@ namespace iDiski.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Policy = "SuperAdminOnly")]
 public sealed class UploadsController : ControllerBase
 {
     private readonly IFileStorageService _fileStorage;

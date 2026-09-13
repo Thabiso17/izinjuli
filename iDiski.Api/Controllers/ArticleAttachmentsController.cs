@@ -1,12 +1,14 @@
 using iDiski.Application.Articles;
 using iDiski.Application.Common.Constants;
 using iDiski.Application.Common.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace iDiski.Api.Controllers;
 
 [ApiController]
 [Route("api/articles/{articleId:guid}/attachments")]
+[Authorize(Policy = "SuperAdminOnly")]
 public class ArticleAttachmentsController : BaseApiController
 {
     private readonly IFileStorageService _fileStorage;
@@ -22,6 +24,7 @@ public class ArticleAttachmentsController : BaseApiController
     /// Get all attachments for an article
     /// </summary>
     [HttpGet]
+    [AllowAnonymous]
     public async Task<IActionResult> GetAttachments(Guid articleId)
     {
         var query = new GetArticleAttachmentsQuery(articleId);

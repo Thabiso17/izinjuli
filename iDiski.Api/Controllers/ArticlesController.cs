@@ -1,11 +1,13 @@
 using iDiski.Application.Articles.Commands;
 using iDiski.Application.Articles.Queries;
 using iDiski.Application.Common.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PublishArticleCommand = iDiski.Application.Articles.PublishArticleCommand;
 
 namespace iDiski.Api.Controllers;
 
+[Authorize(Policy = "SuperAdminOnly")]
 public sealed class ArticlesController : BaseApiController
 {
     // ── PUBLIC ENDPOINTS ──────────────────────────────────────────────────────
@@ -15,6 +17,7 @@ public sealed class ArticlesController : BaseApiController
     /// Filter by tag to power award sections, e.g. tag=Player+of+the+Month.
     /// </summary>
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(PaginatedList<ArticleSummaryDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPublished(
         [FromQuery] string? tag        = null,
@@ -30,6 +33,7 @@ public sealed class ArticlesController : BaseApiController
     /// Angular routing calls this on /news/:slug.
     /// </summary>
     [HttpGet("{slug}")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ArticleDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetBySlug(string slug, CancellationToken ct) =>

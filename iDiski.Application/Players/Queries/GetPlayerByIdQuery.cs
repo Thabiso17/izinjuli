@@ -34,7 +34,11 @@ public sealed class GetPlayerByIdQueryHandler
                 p.ProfileImageUrl,
                 p.Bio,
                 p.DateOfBirth,
-                DateTime.UtcNow.Year - p.DateOfBirth.Year,
+                DateTime.UtcNow.Year - p.DateOfBirth.Year
+                    - (DateTime.UtcNow.Month < p.DateOfBirth.Month
+                        || (DateTime.UtcNow.Month == p.DateOfBirth.Month
+                            && DateTime.UtcNow.Day < p.DateOfBirth.Day)
+                        ? 1 : 0),
                 p.Nationality,
                 p.JerseyNumber,
                 p.Position,
