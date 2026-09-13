@@ -35,14 +35,16 @@ public sealed class StandingsController : BaseApiController
     /// </summary>
     /// <param name="season">Season year.</param>
     /// <param name="topN">Number of players to return. Default 10.</param>
+    /// <param name="divisionId">Optional division filter, matched through the player's team.</param>
     /// <response code="200">Ordered list of top scorers.</response>
     [HttpGet("top-scorers")]
     [ProducesResponseType(typeof(IReadOnlyList<TopScorerDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTopScorers(
-        [FromQuery] int season,
-        [FromQuery] int topN = 10,
+        [FromQuery] int   season,
+        [FromQuery] int   topN = 10,
+        [FromQuery] Guid? divisionId = null,
         CancellationToken ct = default) =>
-        Ok(await Sender.Send(new GetTopScorersQuery(season, topN), ct));
+        Ok(await Sender.Send(new GetTopScorersQuery(season, topN, divisionId), ct));
 
     /// <summary>
     /// Returns head-to-head statistics between two clubs — all-time meetings,

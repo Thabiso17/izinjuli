@@ -32,6 +32,25 @@ export const routes: Routes = [
   },
   // ── PUBLIC PAGES ──────────────────────────────────────────────────────────
   {
+    path: 'divisions',
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./features/divisions/divisions-list.component').then(
+            (m) => m.DivisionsListComponent
+          ),
+      },
+      {
+        path: ':id',
+        loadComponent: () =>
+          import('./features/divisions/division-detail.component').then(
+            (m) => m.DivisionDetailComponent
+          ),
+      },
+    ],
+  },
+  {
     path: 'teams',
     children: [
       {
