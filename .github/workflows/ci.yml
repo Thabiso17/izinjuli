@@ -34,7 +34,7 @@ jobs:
 
       # Runs even when the unit tests failed, so one red suite does not hide the other.
       - name: Integration tests
-        if: steps.build.outcome == 'success'
+        if: '!cancelled() && steps.build.outcome == ''success'''
         run: dotnet test iDiski.Tests.Integration/iDiski.Tests.Integration.csproj --configuration Release --logger "trx;LogFileName=integration.trx" --results-directory TestResults
 
       - name: Publish test results
