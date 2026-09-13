@@ -83,6 +83,14 @@ async function addPlayer(
   page: Page,
   player: { firstName: string; lastName: string; jersey: number },
 ) {
+  // A refused save leaves the modal open, and its backdrop would swallow a click on the page
+  // behind it, so clear it away before opening a fresh one.
+  const openModal = page.locator('.modal.show');
+  if (await openModal.isVisible()) {
+    await openModal.locator('button:has-text("Cancel")').click();
+    await expect(openModal).toBeHidden();
+  }
+
   await page.locator('button:has-text("Add Player")').first().click();
 
   const modal = page.locator('.modal.show');
@@ -96,6 +104,10 @@ async function addPlayer(
   // in the duplicate-jersey test pick it, which is what makes the numbers clash.
   await teamSelect.selectOption({ index: 1 });
 
+  // Position is required and starts empty, so leaving it would keep the save button disabled.
+  // Index 1 is whichever position comes first; which one it is does not matter here.
+  await modal.locator('select[name="position"]').selectOption({ index: 1 });
+
   await modal.locator('input[name="firstName"]').fill(player.firstName);
   await modal.locator('input[name="lastName"]').fill(player.lastName);
   await modal.locator('input[name="jerseyNumber"]').fill(String(player.jersey));
@@ -106,7 +118,12 @@ async function addPlayer(
   const save = page.waitForResponse(
     (response) => response.url().includes('/api/players') && response.request().method() === 'POST',
   );
-  await modal.locator('.modal-footer button.btn-primary').click();
+  const saveButton = modal.locator('.modal-footer button.btn-primary');
+  await expect(
+    saveButton,
+    'the form is still invalid, so the save button never enabled',
+  ).toBeEnabled();
+  await saveButton.click();
 
   return save;
 }
