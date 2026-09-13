@@ -1,0 +1,66 @@
+name: CI
+
+# Runs on every pull request so a branch is known to compile and pass its tests before
+# it reaches main — merging to main deploys to Railway, so a break here is a broken deploy.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend build and tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore iDiski.sln
+
+      - name: Build
+        run: dotnet build iDiski.sln --configuration Release --no-restore
+
+      # Run the test projects by path rather than through the solution: iDiski.Tests.Unit
+      # is not listed in iDiski.sln, so a solution-level run would silently skip it.
+      - name: Unit tests
+        run: dotnet test iDiski.Tests.Unit/iDiski.Tests.Unit.csproj --configuration Release --logger "trx;LogFileName=unit.trx" --results-directory TestResults
+
+      - name: Integration tests
+        run: dotnet test iDiski.Tests.Integration/iDiski.Tests.Integration.csproj --configuration Release --logger "trx;LogFileName=integration.trx" --results-directory TestResults
+
+      - name: Publish test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/
+          if-no-files-found: ignore
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: iDiski-Client
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: iDiski-Client/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npx ng build --configuration production
