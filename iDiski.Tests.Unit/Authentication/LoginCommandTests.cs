@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
@@ -9,6 +8,7 @@ using iDiski.Application.Authentication.Commands;
 using iDiski.Application.Common.Interfaces;
 using iDiski.Application.Common.Exceptions;
 using iDiski.Domain.Entities;
+using iDiski.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using iDiski.Tests.Unit.Common;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -49,7 +49,7 @@ public class LoginCommandTests : BaseTest
 
         dbContext.Setup(x => x.Users).Returns(mockUserSet.Object);
         passwordHasher.Setup(x => x.VerifyPassword(password, user.PasswordHash)).Returns(true);
-        jwtTokenGenerator.Setup(x => x.GenerateToken(It.IsAny<User>(), It.IsAny<IReadOnlyList<int>>()))
+        jwtTokenGenerator.Setup(x => x.GenerateToken(It.IsAny<User>(), It.IsAny<Role[]>()))
             .Returns("valid_jwt_token");
 
         var handler = new LoginCommandHandler(

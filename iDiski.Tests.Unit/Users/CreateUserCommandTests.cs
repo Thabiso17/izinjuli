@@ -11,6 +11,7 @@ using iDiski.Domain.Entities;
 using iDiski.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using iDiski.Tests.Unit.Common;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace iDiski.Tests.Unit.Users;
 
@@ -47,8 +48,10 @@ public class CreateUserCommandTests : BaseTest
         currentUserService.Setup(x => x.IsAuthenticated).Returns(true);
         currentUserService.Setup(x => x.UserId).Returns(Guid.NewGuid());
 
-        var handler = new CreateUserCommandHandler(dbContext.Object, passwordHasher.Object, currentUserService.Object);
-        var command = new CreateUserCommand(email, password, firstName, lastName, new[] { (int)Role.TeamAdmin }, null, null);
+        var handler = new CreateUserCommandHandler(
+            dbContext.Object, passwordHasher.Object, currentUserService.Object,
+            NullLogger<CreateUserCommandHandler>.Instance);
+        var command = new CreateUserCommand(email, password, firstName, lastName, new[] { Role.TeamAdmin }, null, null);
 
         // Act
         var result = await handler.Handle(command, CancellationToken.None);
@@ -88,8 +91,10 @@ public class CreateUserCommandTests : BaseTest
         currentUserService.Setup(x => x.IsAuthenticated).Returns(true);
         currentUserService.Setup(x => x.UserId).Returns(Guid.NewGuid());
 
-        var handler = new CreateUserCommandHandler(dbContext.Object, passwordHasher.Object, currentUserService.Object);
-        var command = new CreateUserCommand(email, password, "Test", "User", new[] { (int)Role.TeamAdmin }, null, null);
+        var handler = new CreateUserCommandHandler(
+            dbContext.Object, passwordHasher.Object, currentUserService.Object,
+            NullLogger<CreateUserCommandHandler>.Instance);
+        var command = new CreateUserCommand(email, password, "Test", "User", new[] { Role.TeamAdmin }, null, null);
 
         // Act & Assert
         await Assert.ThrowsAsync<ValidationException>(async () =>
@@ -114,8 +119,10 @@ public class CreateUserCommandTests : BaseTest
 
         currentUserService.Setup(x => x.IsAuthenticated).Returns(true);
 
-        var handler = new CreateUserCommandHandler(dbContext.Object, passwordHasher.Object, currentUserService.Object);
-        var command = new CreateUserCommand(email, weakPassword, "Test", "User", new[] { (int)Role.TeamAdmin }, null, null);
+        var handler = new CreateUserCommandHandler(
+            dbContext.Object, passwordHasher.Object, currentUserService.Object,
+            NullLogger<CreateUserCommandHandler>.Instance);
+        var command = new CreateUserCommand(email, weakPassword, "Test", "User", new[] { Role.TeamAdmin }, null, null);
 
         // Act & Assert
         // The validator should catch this
@@ -149,8 +156,10 @@ public class CreateUserCommandTests : BaseTest
 
         dbContext.Setup(x => x.UserRoles).Returns(mockUserRoles.Object);
 
-        var handler = new CreateUserCommandHandler(dbContext.Object, passwordHasher.Object, currentUserService.Object);
-        var command = new CreateUserCommand("new@test.com", "SecurePassword123!", "Test", "User", new[] { (int)Role.TeamAdmin }, null, null);
+        var handler = new CreateUserCommandHandler(
+            dbContext.Object, passwordHasher.Object, currentUserService.Object,
+            NullLogger<CreateUserCommandHandler>.Instance);
+        var command = new CreateUserCommand("new@test.com", "SecurePassword123!", "Test", "User", new[] { Role.TeamAdmin }, null, null);
 
         // Act & Assert
         await Assert.ThrowsAsync<ForbiddenException>(async () =>
@@ -173,8 +182,10 @@ public class CreateUserCommandTests : BaseTest
         var passwordHasher = new Mock<IPasswordHasher>();
         var currentUserService = new Mock<ICurrentUserService>();
 
-        var handler = new CreateUserCommandHandler(dbContext.Object, passwordHasher.Object, currentUserService.Object);
-        var command = new CreateUserCommand(invalidEmail, password, "Test", "User", new[] { (int)Role.TeamAdmin }, null, null);
+        var handler = new CreateUserCommandHandler(
+            dbContext.Object, passwordHasher.Object, currentUserService.Object,
+            NullLogger<CreateUserCommandHandler>.Instance);
+        var command = new CreateUserCommand(invalidEmail, password, "Test", "User", new[] { Role.TeamAdmin }, null, null);
 
         // Act & Assert
         await Assert.ThrowsAsync<ValidationException>(async () =>
