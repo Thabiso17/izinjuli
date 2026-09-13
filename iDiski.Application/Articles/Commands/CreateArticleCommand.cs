@@ -1,5 +1,6 @@
 using iDiski.Domain.Entities;
 using FluentValidation;
+using iDiski.Application.Common.Content;
 using iDiski.Application.Common.Interfaces;
 using iDiski.Domain.Services;
 using MediatR;
@@ -48,9 +49,17 @@ public sealed record CreateArticleCommand(
     string[] Tags,
 
     /// <summary>When true, sets IsPublished and PublishedAt immediately on creation.</summary>
-    bool PublishImmediately = false
+    bool PublishImmediately = false,
 
-) : IRequest<CreateArticleResult>;
+    /// <summary>
+    /// What the article is about, narrowing division → team → player. Each level needs the
+    /// one above it. All null writes a league-wide article.
+    /// </summary>
+    Guid? DivisionId = null,
+    Guid? TeamId = null,
+    Guid? PlayerId = null
+
+) : IRequest<CreateArticleResult>, IContentScope;
 
 // ── Result ────────────────────────────────────────────────────────────────────
 
@@ -64,8 +73,10 @@ public sealed record CreateArticleResult(Guid Id, string Slug);
 
 public sealed class CreateArticleCommandValidator : AbstractValidator<CreateArticleCommand>
 {
-    public CreateArticleCommandValidator()
+    public CreateArticleCommandValidator(ILeagueDbContext db)
     {
+        this.AddContentScopeRules(db);
+
         RuleFor(x => x.Title)
             .NotEmpty()
             .MaximumLength(300);
@@ -184,7 +195,10 @@ public sealed class CreateArticleCommandHandler
             Author           = request.Author.Trim(),
             Tags             = normalisedTags,
             IsPublished      = request.PublishImmediately,
-            PublishedAt      = request.PublishImmediately ? DateTime.UtcNow : null
+            PublishedAt      = request.PublishImmediately ? DateTime.UtcNow : null,
+            DivisionId       = request.DivisionId,
+            TeamId           = request.TeamId,
+            PlayerId         = request.PlayerId
         };
 
         _db.Articles.Add(article);

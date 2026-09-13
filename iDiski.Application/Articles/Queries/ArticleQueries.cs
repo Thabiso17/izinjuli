@@ -24,7 +24,10 @@ public sealed record ArticleDto(
     string[]  Tags,
     int       ViewCount,
     DateTime  CreatedAt,
-    DateTime? UpdatedAt
+    DateTime? UpdatedAt,
+    Guid?     DivisionId = null,
+    Guid?     TeamId = null,
+    Guid?     PlayerId = null
 );
 
 /// <summary>
@@ -69,7 +72,8 @@ public sealed class GetArticleBySlugQueryHandler
                 a.Id, a.Title, a.Slug, a.Content, a.Excerpt,
                 a.CoverImageUrl, a.VideoUrl, a.FeaturedImageUrl,
                 a.Author, a.IsPublished, a.PublishedAt, a.Tags,
-                a.ViewCount, a.CreatedAt, a.UpdatedAt))
+                a.ViewCount, a.CreatedAt, a.UpdatedAt,
+                a.DivisionId, a.TeamId, a.PlayerId))
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new NotFoundException(nameof(iDiski.Domain.Entities.Article), request.Slug);
 
@@ -90,7 +94,10 @@ public sealed record GetPublishedArticlesQuery(
     string? Tag        = null,
     string? AuthorName = null,
     int     PageNumber = 1,
-    int     PageSize   = 10
+    int     PageSize   = 10,
+    Guid?   DivisionId = null,
+    Guid?   TeamId     = null,
+    Guid?   PlayerId   = null
 ) : IRequest<PaginatedList<ArticleSummaryDto>>;
 
 public sealed class GetPublishedArticlesQueryHandler
@@ -114,6 +121,15 @@ public sealed class GetPublishedArticlesQueryHandler
 
         if (!string.IsNullOrWhiteSpace(request.AuthorName))
             query = query.Where(a => a.Author == request.AuthorName.Trim());
+
+        if (request.DivisionId.HasValue)
+            query = query.Where(a => a.DivisionId == request.DivisionId.Value);
+
+        if (request.TeamId.HasValue)
+            query = query.Where(a => a.TeamId == request.TeamId.Value);
+
+        if (request.PlayerId.HasValue)
+            query = query.Where(a => a.PlayerId == request.PlayerId.Value);
 
         var projected = query
             .OrderByDescending(a => a.IsPinned)    // Pinned articles first

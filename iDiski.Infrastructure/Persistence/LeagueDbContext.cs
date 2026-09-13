@@ -139,6 +139,10 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
 
             entity.HasIndex(a => a.PublishedAt);
             entity.HasIndex(a => a.IsPinned);
+
+            // Division and team pages filter on these on every load.
+            entity.HasIndex(a => a.DivisionId);
+            entity.HasIndex(a => a.TeamId);
         });
 
         // ── ArticleAttachment ─────────────────────────────────────────────────
@@ -189,6 +193,9 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
 
             entity.HasIndex(v => v.PublishedAt);
             entity.HasIndex(v => v.IsPinned);
+
+            entity.HasIndex(v => v.DivisionId);
+            entity.HasIndex(v => v.TeamId);
         });
 
         // ── Sponsor ───────────────────────────────────────────────────────────

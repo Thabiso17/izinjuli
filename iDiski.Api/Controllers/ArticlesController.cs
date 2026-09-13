@@ -24,9 +24,13 @@ public sealed class ArticlesController : BaseApiController
         [FromQuery] string? authorName = null,
         [FromQuery] int pageNumber     = 1,
         [FromQuery] int pageSize       = 10,
+        [FromQuery] Guid? divisionId   = null,
+        [FromQuery] Guid? teamId       = null,
+        [FromQuery] Guid? playerId     = null,
         CancellationToken ct           = default) =>
         Ok(await Sender.Send(
-            new GetPublishedArticlesQuery(tag, authorName, pageNumber, pageSize), ct));
+            new GetPublishedArticlesQuery(
+                tag, authorName, pageNumber, pageSize, divisionId, teamId, playerId), ct));
 
     /// <summary>
     /// Returns a single published article by its URL slug.

@@ -17,9 +17,13 @@ public sealed class VideosController : BaseApiController
     [AllowAnonymous]
     [ProducesResponseType(typeof(List<VideoSummaryDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPublished(
-        [FromQuery] int limit = 10,
+        [FromQuery] int   limit      = 10,
+        [FromQuery] Guid? divisionId = null,
+        [FromQuery] Guid? teamId     = null,
+        [FromQuery] Guid? playerId   = null,
         CancellationToken ct = default)
-        => Ok(await Sender.Send(new GetPublishedVideosQuery(limit), ct));
+        => Ok(await Sender.Send(
+            new GetPublishedVideosQuery(limit, divisionId, teamId, playerId), ct));
 
     /// <summary>
     /// Returns all videos for admin panel.

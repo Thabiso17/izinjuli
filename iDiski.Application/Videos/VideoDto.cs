@@ -10,7 +10,10 @@ public sealed record VideoDto(
     bool      IsPublished,
     DateTime? PublishedAt,
     bool      IsPinned,
-    int       ViewCount
+    int       ViewCount,
+    Guid?     DivisionId = null,
+    Guid?     TeamId = null,
+    Guid?     PlayerId = null
 );
 
 public sealed record VideoSummaryDto(

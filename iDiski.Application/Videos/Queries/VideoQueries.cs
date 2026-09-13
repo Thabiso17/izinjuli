@@ -11,7 +11,10 @@ namespace iDiski.Application.Videos.Queries;
 // ═════════════════════════════════════════════════════════════════════════════
 
 public sealed record GetPublishedVideosQuery(
-    int Limit = 10
+    int   Limit      = 10,
+    Guid? DivisionId = null,
+    Guid? TeamId     = null,
+    Guid? PlayerId   = null
 ) : IRequest<List<VideoSummaryDto>>;
 
 public sealed class GetPublishedVideosQueryHandler
@@ -25,9 +28,20 @@ public sealed class GetPublishedVideosQueryHandler
         GetPublishedVideosQuery request,
         CancellationToken cancellationToken)
     {
-        return await _db.Videos
+        var query = _db.Videos
             .AsNoTracking()
-            .Where(v => v.IsPublished)
+            .Where(v => v.IsPublished);
+
+        if (request.DivisionId.HasValue)
+            query = query.Where(v => v.DivisionId == request.DivisionId.Value);
+
+        if (request.TeamId.HasValue)
+            query = query.Where(v => v.TeamId == request.TeamId.Value);
+
+        if (request.PlayerId.HasValue)
+            query = query.Where(v => v.PlayerId == request.PlayerId.Value);
+
+        return await query
             .OrderByDescending(v => v.IsPinned)      // Pinned first
             .ThenByDescending(v => v.PublishedAt)    // Then by most recent
             .Take(request.Limit)
@@ -111,7 +125,10 @@ public sealed class GetVideoByIdQueryHandler : IRequestHandler<GetVideoByIdQuery
                 v.IsPublished,
                 v.PublishedAt,
                 v.IsPinned,
-                v.ViewCount))
+                v.ViewCount,
+                v.DivisionId,
+                v.TeamId,
+                v.PlayerId))
             .FirstOrDefaultAsync(cancellationToken);
 
         return video ?? throw new NotFoundException(nameof(Video), request.Id);
