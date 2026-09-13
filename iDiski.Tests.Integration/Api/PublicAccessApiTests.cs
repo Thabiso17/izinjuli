@@ -55,7 +55,7 @@ public class PublicAccessApiTests
     [InlineData("POST", "/api/matchevents")]
     [InlineData("POST", "/api/suspensions")]
     [InlineData("POST", "/api/sponsors")]
-    [InlineData("POST", "/api/authentication/create-user")]
+    [InlineData("POST", "/api/auth/create-user")]
     public async Task Writing_IsRefusedWithoutAToken(string method, string route)
     {
         var client = _fixture.CreateClient();

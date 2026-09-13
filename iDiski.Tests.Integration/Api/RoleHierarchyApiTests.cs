@@ -260,7 +260,7 @@ public class RoleHierarchyApiTests : IAsyncLifetime
     {
         var client = await ClientFor(Role.SuperAdmin);
 
-        var response = await client.PostAsJsonAsync("/api/authentication/create-user", new
+        var response = await client.PostAsJsonAsync("/api/auth/create-user", new
         {
             email = $"new-division-admin-{Guid.NewGuid():N}@test.com",
             password = ApiTestFixture.Password,
@@ -278,7 +278,7 @@ public class RoleHierarchyApiTests : IAsyncLifetime
     {
         var client = await ClientFor(Role.DivisionAdmin);
 
-        var response = await client.PostAsJsonAsync("/api/authentication/create-user", new
+        var response = await client.PostAsJsonAsync("/api/auth/create-user", new
         {
             email = $"new-team-admin-{Guid.NewGuid():N}@test.com",
             password = ApiTestFixture.Password,
@@ -296,7 +296,7 @@ public class RoleHierarchyApiTests : IAsyncLifetime
     {
         var client = await ClientFor(Role.DivisionAdmin);
 
-        var response = await client.PostAsJsonAsync("/api/authentication/create-user", new
+        var response = await client.PostAsJsonAsync("/api/auth/create-user", new
         {
             email = $"escalation-{Guid.NewGuid():N}@test.com",
             password = ApiTestFixture.Password,
@@ -315,7 +315,7 @@ public class RoleHierarchyApiTests : IAsyncLifetime
     {
         var client = await ClientFor(Role.TeamAdmin);
 
-        var response = await client.PostAsJsonAsync("/api/authentication/create-user", new
+        var response = await client.PostAsJsonAsync("/api/auth/create-user", new
         {
             email = $"team-admin-spawn-{Guid.NewGuid():N}@test.com",
             password = ApiTestFixture.Password,

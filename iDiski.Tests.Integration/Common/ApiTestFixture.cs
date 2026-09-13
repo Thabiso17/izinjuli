@@ -84,7 +84,7 @@ public class ApiTestFixture : IAsyncLifetime
         var client = _factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
-            "/api/authentication/login", new LoginCommand(user.Email, Password));
+            "/api/auth/login", new LoginCommand(user.Email, Password));
         response.EnsureSuccessStatusCode();
 
         var login = await response.Content.ReadFromJsonAsync<LoginResponse>()
