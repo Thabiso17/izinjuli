@@ -46,10 +46,15 @@ public static class ContentScopeRules
             .When(x => x.PlayerId.HasValue)
             .WithMessage("Select a team before selecting a player.");
 
+        // Deliberately not checking that the player is currently in the named team. A scope
+        // records who the piece was about when it was written, and players transfer: an
+        // article about a player's time at their old club stays with that club, and must
+        // still be editable afterwards. Nothing records past squads, so a stricter rule
+        // could not tell a historical tag from a wrong one anyway.
         validator.RuleFor(x => x.PlayerId)
-            .MustAsync(async (cmd, playerId, ct) =>
-                await db.Players.AnyAsync(p => p.Id == playerId!.Value && p.TeamId == cmd.TeamId, ct))
-            .When(x => x.PlayerId.HasValue && x.TeamId.HasValue)
-            .WithMessage("That player is not in the selected team.");
+            .MustAsync(async (playerId, ct) =>
+                await db.Players.AnyAsync(p => p.Id == playerId!.Value, ct))
+            .When(x => x.PlayerId.HasValue)
+            .WithMessage("Player not found.");
     }
 }

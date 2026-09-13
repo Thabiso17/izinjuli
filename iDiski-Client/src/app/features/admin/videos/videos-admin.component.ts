@@ -429,8 +429,25 @@ export class VideosAdminComponent implements OnInit {
     }
 
     this.playerService.getAll(teamId, true).subscribe({
-      next: (players) => this.playersInTeam.set(players),
+      next: (players) => {
+        this.playersInTeam.set(players);
+        this.keepTaggedPlayerSelectable(players);
+      },
       error: (err) => console.error('Failed to load players:', err),
+    });
+  }
+
+  /**
+   * A tagged player may have since transferred away, which would leave the dropdown with
+   * no matching option and quietly drop the tag on save. Keep them in the list instead.
+   */
+  private keepTaggedPlayerSelectable(squad: PlayerDto[]) {
+    const taggedId = this.formData.playerId;
+    if (!taggedId || squad.some((player) => player.id === taggedId)) return;
+
+    this.playerService.getById(taggedId).subscribe({
+      next: (player) => this.playersInTeam.set([...squad, player]),
+      error: (err) => console.error('Failed to load tagged player:', err),
     });
   }
 

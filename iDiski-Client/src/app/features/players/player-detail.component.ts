@@ -4,10 +4,12 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { PlayerService, MatchEventService, SuspensionService } from '../../core/services';
 import { PlayerDto, MatchEventDto, SuspensionDto } from '../../core/models';
 import { getImageUrl } from '../../core/utils/image.utils';
+import { ScopedArticlesComponent } from '../../shared/components/scoped-articles.component';
+import { ScopedVideosComponent } from '../../shared/components/scoped-videos.component';
 
 @Component({
   selector: 'app-player-detail',
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, ScopedArticlesComponent, ScopedVideosComponent],
   template: `
     <div class="container py-5">
       @if (loading()) {
@@ -289,6 +291,12 @@ import { getImageUrl } from '../../core/utils/image.utils';
               }
             </div>
           }
+        </div>
+
+        <!-- Scoped by player alone, so pieces written at a previous club appear here too -->
+        <div class="mt-4">
+          <app-scoped-articles [playerId]="player()!.id" heading="Player News" />
+          <app-scoped-videos [playerId]="player()!.id" heading="Player Highlights" />
         </div>
       }
     </div>
