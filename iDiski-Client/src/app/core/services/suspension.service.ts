@@ -9,9 +9,10 @@ export class SuspensionService {
   private readonly http = inject(HttpClient);
   private readonly base = `${environment.apiBaseUrl}/suspensions`;
 
-  getActive(divisionId?: string): Observable<SuspensionDto[]> {
+  getActive(divisionId?: string, teamId?: string): Observable<SuspensionDto[]> {
     let params = new HttpParams();
     if (divisionId) params = params.set('divisionId', divisionId);
+    if (teamId) params = params.set('teamId', teamId);
     return this.http.get<SuspensionDto[]>(`${this.base}/active`, { params });
   }
 

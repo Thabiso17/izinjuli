@@ -711,16 +711,18 @@ export class PlayersAdminComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.playerService.getAll(this.filterTeamId, this.filterActiveOnly).subscribe({
-      next: (data) => {
-        this.players.set(data);
-        this.loading.set(false);
-      },
-      error: (err) => {
-        this.error.set('Failed to load players: ' + err.message);
-        this.loading.set(false);
-      },
-    });
+    this.playerService
+      .getAll(this.filterTeamId, this.filterActiveOnly, this.filterDivisionId)
+      .subscribe({
+        next: (data) => {
+          this.players.set(data);
+          this.loading.set(false);
+        },
+        error: (err) => {
+          this.error.set('Failed to load players: ' + err.message);
+          this.loading.set(false);
+        },
+      });
   }
 
   loadDivisions() {

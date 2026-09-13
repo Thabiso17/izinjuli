@@ -4,11 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { SuspensionService } from '../../../core/services/suspension.service';
 import { PlayerService } from '../../../core/services/player.service';
 import { DivisionService } from '../../../core/services/division.service';
+import { TeamService } from '../../../core/services/team.service';
 import {
   SuspensionDto,
   CreateSuspensionCommand,
   PlayerDto,
   DivisionDto,
+  TeamDto,
 } from '../../../core/models';
 
 @Component({
@@ -37,13 +39,31 @@ import {
               <select
                 class="form-select"
                 [(ngModel)]="filterDivisionId"
-                (ngModelChange)="loadSuspensions()"
+                (ngModelChange)="onFilterDivisionChange()"
               >
                 <option [ngValue]="undefined">All Divisions</option>
                 @for (division of divisions(); track division.id) {
                   <option [ngValue]="division.id">{{ division.name }}</option>
                 }
               </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Filter by Team</label>
+              <select
+                class="form-select"
+                [(ngModel)]="filterTeamId"
+                (ngModelChange)="onFiltersChanged()"
+              >
+                <option [ngValue]="undefined">All Teams</option>
+                @for (team of getTeamsByDivision(filterDivisionId); track team.id) {
+                  <option [ngValue]="team.id">{{ team.name }}</option>
+                }
+              </select>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <button class="btn btn-outline-secondary" (click)="clearFilters()">
+                Clear Filters
+              </button>
             </div>
           </div>
         </div>
@@ -269,10 +289,12 @@ export class SuspensionsAdminComponent implements OnInit {
   private suspensionService = inject(SuspensionService);
   private playerService = inject(PlayerService);
   private divisionService = inject(DivisionService);
+  private teamService = inject(TeamService);
 
   suspensions = signal<SuspensionDto[]>([]);
   players = signal<PlayerDto[]>([]);
   divisions = signal<DivisionDto[]>([]);
+  teams = signal<TeamDto[]>([]);
   loading = signal(false);
   saving = signal(false);
   error = signal<string | null>(null);
@@ -280,11 +302,13 @@ export class SuspensionsAdminComponent implements OnInit {
   showModal = signal(false);
 
   filterDivisionId: string | undefined;
+  filterTeamId: string | undefined;
 
   formData: any = this.getEmptyForm();
 
   ngOnInit() {
     this.loadDivisions();
+    this.loadTeams();
     this.loadPlayers();
     this.loadSuspensions();
   }
@@ -293,7 +317,7 @@ export class SuspensionsAdminComponent implements OnInit {
     this.loading.set(true);
     this.error.set(null);
 
-    this.suspensionService.getActive(this.filterDivisionId).subscribe({
+    this.suspensionService.getActive(this.filterDivisionId, this.filterTeamId).subscribe({
       next: (data) => {
         this.suspensions.set(data);
         this.loading.set(false);
@@ -305,11 +329,54 @@ export class SuspensionsAdminComponent implements OnInit {
     });
   }
 
+  /**
+   * The player picker follows the dashboard filters. Left unfiltered it lists every player in
+   * the league, which is unusable for choosing one to suspend once there is more than a handful
+   * of divisions.
+   */
   loadPlayers() {
-    this.playerService.getAll(undefined, true).subscribe({
-      next: (data) => this.players.set(data),
-      error: (err) => console.error('Failed to load players:', err),
+    this.playerService
+      .getAll(this.filterTeamId, true, this.filterDivisionId)
+      .subscribe({
+        next: (data) => this.players.set(data),
+        error: (err) => console.error('Failed to load players:', err),
+      });
+  }
+
+  loadTeams() {
+    this.teamService.getAll().subscribe({
+      next: (data) => this.teams.set(data),
+      error: (err) => console.error('Failed to load teams:', err),
     });
+  }
+
+  /** Teams of the chosen division, or every team when no division is chosen. */
+  getTeamsByDivision(divisionId: string | undefined): TeamDto[] {
+    const all = this.teams();
+    return divisionId ? all.filter((t) => t.divisionId === divisionId) : all;
+  }
+
+  onFilterDivisionChange() {
+    // The team that was selected may not belong to the newly chosen division.
+    if (this.filterTeamId) {
+      const team = this.teams().find((t) => t.id === this.filterTeamId);
+      if (!team || team.divisionId !== this.filterDivisionId) {
+        this.filterTeamId = undefined;
+      }
+    }
+    this.onFiltersChanged();
+  }
+
+  onFiltersChanged() {
+    this.loadSuspensions();
+    // Reload the picker too, so adding a suspension offers the players you are looking at.
+    this.loadPlayers();
+  }
+
+  clearFilters() {
+    this.filterDivisionId = undefined;
+    this.filterTeamId = undefined;
+    this.onFiltersChanged();
   }
 
   loadDivisions() {

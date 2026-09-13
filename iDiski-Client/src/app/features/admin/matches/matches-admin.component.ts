@@ -330,6 +330,7 @@ import {
                       class="form-select"
                       [(ngModel)]="createFormData.divisionId"
                       name="divisionId"
+                      (ngModelChange)="onCreateDivisionChange()"
                     >
                       <option [ngValue]="null">Select</option>
                       @for (division of divisions(); track division.id) {
@@ -349,7 +350,7 @@ import {
                       required
                     >
                       <option [ngValue]="null">Select Team</option>
-                      @for (team of teams(); track team.id) {
+                      @for (team of getTeamsByDivision(createFormData.divisionId); track team.id) {
                         <option
                           [ngValue]="team.id"
                           [disabled]="team.id === createFormData.awayTeamId"
@@ -368,7 +369,7 @@ import {
                       required
                     >
                       <option [ngValue]="null">Select Team</option>
-                      @for (team of teams(); track team.id) {
+                      @for (team of getTeamsByDivision(createFormData.divisionId); track team.id) {
                         <option
                           [ngValue]="team.id"
                           [disabled]="team.id === createFormData.homeTeamId"
@@ -828,6 +829,29 @@ export class MatchesAdminComponent implements OnInit {
       },
       error: (err) => console.error('Failed to load divisions:', err),
     });
+  }
+
+  /** Teams of the given division, or every team when none is chosen. */
+  getTeamsByDivision(divisionId: string | null | undefined) {
+    const all = this.teams();
+    return divisionId ? all.filter((t) => t.divisionId === divisionId) : all;
+  }
+
+  /**
+   * Changing the division invalidates team choices from the old one. Two clubs from different
+   * divisions should never end up scheduled against each other, and before this the pickers
+   * offered every team in the league regardless of the division selected above them.
+   */
+  onCreateDivisionChange() {
+    const eligible = this.getTeamsByDivision(this.createFormData.divisionId);
+
+    if (!eligible.some((t) => t.id === this.createFormData.homeTeamId)) {
+      this.createFormData.homeTeamId = null;
+    }
+
+    if (!eligible.some((t) => t.id === this.createFormData.awayTeamId)) {
+      this.createFormData.awayTeamId = null;
+    }
   }
 
   clearFilters() {

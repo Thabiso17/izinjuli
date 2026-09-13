@@ -78,6 +78,11 @@ public sealed class GetActiveSuspensionsQueryHandler
             query = query.Where(s => s.Player.Team.DivisionId == request.DivisionId.Value);
         }
 
+        if (request.TeamId.HasValue)
+        {
+            query = query.Where(s => s.Player.TeamId == request.TeamId.Value);
+        }
+
         return await query
             .OrderBy(s => s.EndDate)
             .Select(s => new SuspensionDto(

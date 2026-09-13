@@ -37,13 +37,18 @@ public sealed record MatchResultDto(
 // ═════════════════════════════════════════════════════════════════════════════
 
 /// <summary>Returns a paginated fixture/results list, optionally filtered.</summary>
+/// <param name="DivisionId">
+/// Filter to one division. The matches admin page has always sent this, but neither the
+/// endpoint nor this query accepted it, so choosing a division changed nothing on screen.
+/// </param>
 public sealed record GetFixturesQuery(
     int     Season,
     int?    Matchweek   = null,
     Guid?   TeamId      = null,
     MatchStatus? Status = null,
     int     PageNumber  = 1,
-    int     PageSize    = 20
+    int     PageSize    = 20,
+    Guid?   DivisionId  = null
 ) : IRequest<PaginatedList<MatchResultDto>>;
 
 public sealed class GetFixturesQueryHandler
@@ -71,6 +76,9 @@ public sealed class GetFixturesQueryHandler
 
         if (request.Status.HasValue)
             query = query.Where(m => m.Status == request.Status.Value);
+
+        if (request.DivisionId.HasValue)
+            query = query.Where(m => m.DivisionId == request.DivisionId.Value);
 
         var projected = query
             .OrderBy(m => m.MatchDate)
