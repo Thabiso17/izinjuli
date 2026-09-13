@@ -16,7 +16,7 @@ NC='\033[0m' # No Color
 
 # Paths
 SOLUTION_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TEST_PROJECT_PATH="$SOLUTION_ROOT/iDiski.Tests.Unit"
+TEST_PROJECT_PATH="$SOLUTION_ROOT/iDiski.Tests.Integration"
 REPORT_DIR="$SOLUTION_ROOT/test-reports"
 LOGS_DIR="$REPORT_DIR/logs"
 TIMESTAMP=$(date +"%Y-%m-%d_%H%M%S")
