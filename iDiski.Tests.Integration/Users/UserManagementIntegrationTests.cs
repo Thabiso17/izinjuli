@@ -6,6 +6,7 @@ using iDiski.Domain.Entities;
 using iDiski.Domain.Enums;
 using iDiski.Infrastructure.Services;
 using iDiski.Tests.Integration.Common;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace iDiski.Tests.Integration.Users;
@@ -169,7 +170,7 @@ public class UserManagementIntegrationTests : IClassFixture<IntegrationTestFixtu
         {
             Id = divisionId,
             Name = "Test Division",
-            ShortCode = "TD",
+            ShortCode = "TDA",
             Season = 2026,
             Gender = Gender.Male,
             CreatedAt = DateTime.UtcNow,
@@ -240,7 +241,7 @@ public class UserManagementIntegrationTests : IClassFixture<IntegrationTestFixtu
         {
             Id = divisionId,
             Name = "Test Division",
-            ShortCode = "TD",
+            ShortCode = "TDB",
             Season = 2026,
             Gender = Gender.Male,
             CreatedAt = DateTime.UtcNow,
@@ -330,7 +331,7 @@ public class UserManagementIntegrationTests : IClassFixture<IntegrationTestFixtu
         {
             Id = divisionId,
             Name = "Test Division",
-            ShortCode = "TD",
+            ShortCode = "TDC",
             Season = 2026,
             Gender = Gender.Male,
             CreatedAt = DateTime.UtcNow,
@@ -392,11 +393,15 @@ public class UserManagementIntegrationTests : IClassFixture<IntegrationTestFixtu
             UpdatedAt = DateTime.UtcNow
         };
 
-        // Act & Assert - Should throw constraint violation
+        // Act
         _fixture.DbContext.Users.Add(user2);
+        var save = async () => await _fixture.DbContext.SaveChangesAsync();
 
-        // This should fail during SaveChanges, but for this test we just check both were attempted
-        var allUsers = _fixture.DbContext.Users.ToList();
-        allUsers.Should().HaveCountGreaterThanOrEqualTo(1);
+        // Assert
+        await save.Should().ThrowAsync<DbUpdateException>();
+
+        // Leave the context clean: the rejected insert is still tracked, and would otherwise
+        // resurface in whichever test saves next.
+        _fixture.DbContext.Entry(user2).State = EntityState.Detached;
     }
 }

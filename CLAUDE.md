@@ -218,7 +218,9 @@ Swagger UI available in Development mode at `/openapi/v1.json` via SwaggerUI end
 4. Create controller endpoint that dispatches via `Sender.Send(command)`
 
 ### Testing business logic
-- Everything runs against a real `LeagueDbContext` in `iDiski.Tests.Integration`, built by `IntegrationTestFixture` with `TestDataSeeder`, and grouped by feature folder mirroring `iDiski.Application/`
+- Everything runs against a real PostgreSQL database: `IntegrationTestFixture` starts a container per test class and applies the project's migrations, so tests exercise the same schema a deploy produces
+- Use `LeagueScenario` to seed a league whose role assignments line up. Note `TestDataSeeder` is older, unused, and assigns teams to hardcoded ids matching no user it creates
+- Tests in a class share one database, so anything with a unique index — an email, a team short code, a division's season and short code — has to differ per test
 - There is deliberately no mock-based unit project. One existed and was removed: EF Core's async operators (`FirstOrDefaultAsync`, `AnyAsync`, `AsNoTracking`) are static extension methods that Moq cannot intercept, so every test built that way failed the moment it was run
 - FluentValidation runs in the MediatR pipeline, not inside handlers, so a test that calls a handler directly will never raise `ValidationException` — exercise validators on their own
-- End-to-end flows against a real `LeagueDbContext` belong in `iDiski.Tests.Integration` (`IntegrationTestFixture` + `TestDataSeeder`)
+- End-to-end flows belong in `iDiski.Tests.Integration`, which runs against real PostgreSQL via Testcontainers — Docker must be available to run them
