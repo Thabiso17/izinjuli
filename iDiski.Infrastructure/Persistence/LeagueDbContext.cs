@@ -414,41 +414,44 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
         });
     }
 
+    // ── Every DateTime reaching the database is UTC ───────────────────────────
+    protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+    {
+        // Applied to every DateTime column in the model. Npgsql rejects any Kind but Utc on a
+        // timestamptz column, and a converter is the only place that catches all of them: it
+        // runs as the value is written, so it does not matter which save overload was called or
+        // whether the row even passed through the change tracker.
+        configurationBuilder.Properties<DateTime>().HaveConversion<UtcDateTimeConverter>();
+        configurationBuilder.Properties<DateTime?>().HaveConversion<UtcNullableDateTimeConverter>();
+    }
+
     // ── Auto-stamp UpdatedAt ──────────────────────────────────────────────────
-    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    //
+    // Both of these are the methods every other overload funnels through, which is why the hook
+    // lives here rather than on SaveChangesAsync(CancellationToken): a call to SaveChanges() or
+    // to the two-argument async overload would walk straight past that one, and the synchronous
+    // path was doing exactly that — it never stamped UpdatedAt at all.
+
+    public override int SaveChanges(bool acceptAllChangesOnSuccess)
+    {
+        StampUpdatedAt();
+        return base.SaveChanges(acceptAllChangesOnSuccess);
+    }
+
+    public override Task<int> SaveChangesAsync(
+        bool acceptAllChangesOnSuccess,
+        CancellationToken cancellationToken = default)
+    {
+        StampUpdatedAt();
+        return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+    }
+
+    private void StampUpdatedAt()
     {
         foreach (var entry in ChangeTracker.Entries<BaseEntity>())
         {
             if (entry.State == EntityState.Modified)
                 entry.Entity.UpdatedAt = DateTime.UtcNow;
-        }
-
-        NormalizeDateTimesToUtc();
-
-        return base.SaveChangesAsync(cancellationToken);
-    }
-
-    // Npgsql only accepts DateTimeKind.Utc for "timestamp with time zone" columns. Values bound
-    // from request bodies come in as Unspecified; DateTime.Now-based values come in as Local.
-    private void NormalizeDateTimesToUtc()
-    {
-        foreach (var entry in ChangeTracker.Entries())
-        {
-            if (entry.State is not (EntityState.Added or EntityState.Modified))
-                continue;
-
-            foreach (var property in entry.Properties)
-            {
-                switch (property.CurrentValue)
-                {
-                    case DateTime { Kind: DateTimeKind.Unspecified } dateTime:
-                        property.CurrentValue = DateTime.SpecifyKind(dateTime, DateTimeKind.Utc);
-                        break;
-                    case DateTime { Kind: DateTimeKind.Local } dateTime:
-                        property.CurrentValue = dateTime.ToUniversalTime();
-                        break;
-                }
-            }
         }
     }
 }

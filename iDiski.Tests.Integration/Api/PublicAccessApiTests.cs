@@ -28,17 +28,19 @@ public class PublicAccessApiTests
     [InlineData("/api/players")]
     [InlineData("/api/articles")]
     [InlineData("/api/videos")]
-    [InlineData("/api/standings")]
     [InlineData("/api/sponsors")]
+    [InlineData("/api/matchresults?season=2026")]
+    [InlineData("/api/standings/table?season=2026")]
     public async Task TheSiteTheVisitorSees_IsReachableWithoutSigningIn(string route)
     {
         var client = _fixture.CreateClient();
 
         var response = await client.GetAsync(route);
 
-        response.StatusCode.Should().NotBe(HttpStatusCode.Unauthorized,
-            $"{route} feeds the public site, so locking it would blank the homepage");
-        response.StatusCode.Should().NotBe(HttpStatusCode.Forbidden);
+        // 200 rather than merely "not 401": a route that no longer exists answers 404, which
+        // would pass a laxer assertion while the homepage section it feeds sits empty.
+        response.StatusCode.Should().Be(HttpStatusCode.OK,
+            $"{route} feeds the public site, so locking it would blank a section of the page");
     }
 
     [Theory]

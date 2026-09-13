@@ -39,6 +39,11 @@ public class IntegrationTestFixture : IAsyncLifetime
 
         var options = new DbContextOptionsBuilder<LeagueDbContext>()
             .UseNpgsql(_postgres.GetConnectionString())
+            // Matching Program.cs: the API suppresses this so a deploy is never blocked by
+            // model drift, and a fixture that did not would fail where production succeeds.
+            .ConfigureWarnings(warnings =>
+                warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId
+                    .PendingModelChangesWarning))
             .Options;
 
         DbContext = new LeagueDbContext(options);
