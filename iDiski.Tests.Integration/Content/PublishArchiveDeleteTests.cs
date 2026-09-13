@@ -2,9 +2,8 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
-using iDiski.Application.Articles;
 using iDiski.Application.Articles.Commands;
-using ArticleQueries = iDiski.Application.Articles.Queries;
+using iDiski.Application.Articles.Queries;
 using iDiski.Application.Common.Exceptions;
 using iDiski.Domain.Entities;
 using iDiski.Tests.Integration.Common;
@@ -59,8 +58,8 @@ public class PublishArchiveDeleteTests : IClassFixture<IntegrationTestFixture>
         stored.Should().NotBeNull("archiving retires content, it does not delete it");
         stored!.IsArchived.Should().BeTrue();
 
-        var published = await new ArticleQueries.GetPublishedArticlesQueryHandler(_fixture.DbContext)
-            .Handle(new ArticleQueries.GetPublishedArticlesQuery(PageSize: 50), CancellationToken.None);
+        var published = await new GetPublishedArticlesQueryHandler(_fixture.DbContext)
+            .Handle(new GetPublishedArticlesQuery(PageSize: 50), CancellationToken.None);
         published.Items.Should().NotContain(a => a.Id == article.Id);
     }
 
@@ -83,8 +82,8 @@ public class PublishArchiveDeleteTests : IClassFixture<IntegrationTestFixture>
         await new UnarchiveArticleCommandHandler(_fixture.DbContext)
             .Handle(new UnarchiveArticleCommand(article.Id), CancellationToken.None);
 
-        var published = await new ArticleQueries.GetPublishedArticlesQueryHandler(_fixture.DbContext)
-            .Handle(new ArticleQueries.GetPublishedArticlesQuery(PageSize: 50), CancellationToken.None);
+        var published = await new GetPublishedArticlesQueryHandler(_fixture.DbContext)
+            .Handle(new GetPublishedArticlesQuery(PageSize: 50), CancellationToken.None);
         published.Items.Should().Contain(a => a.Id == article.Id);
     }
 
@@ -133,8 +132,8 @@ public class PublishArchiveDeleteTests : IClassFixture<IntegrationTestFixture>
             published: true, archived: true,
             divisionId: scenario.DivisionOneId, teamId: scenario.TeamAId);
 
-        var forDivision = await new ArticleQueries.GetPublishedArticlesQueryHandler(_fixture.DbContext)
-            .Handle(new ArticleQueries.GetPublishedArticlesQuery(
+        var forDivision = await new GetPublishedArticlesQueryHandler(_fixture.DbContext)
+            .Handle(new GetPublishedArticlesQuery(
                 PageSize: 50, DivisionId: scenario.DivisionOneId), CancellationToken.None);
 
         forDivision.Items.Should().NotContain(a => a.Id == article.Id);

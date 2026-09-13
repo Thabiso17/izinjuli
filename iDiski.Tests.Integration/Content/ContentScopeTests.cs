@@ -33,7 +33,7 @@ public class ContentScopeTests : IClassFixture<IntegrationTestFixture>
         TeamWithoutDivision,
         PlayerWithoutTeam,
         TeamFromAnotherDivision,
-        PlayerFromAnotherTeam,
+        PlayerWhoHasSinceMoved,
         UnknownDivision,
     }
 
@@ -48,8 +48,11 @@ public class ContentScopeTests : IClassFixture<IntegrationTestFixture>
     [InlineData(Scope.PlayerWithoutTeam, false)]
     // And the levels must actually belong together.
     [InlineData(Scope.TeamFromAnotherDivision, false)]
-    [InlineData(Scope.PlayerFromAnotherTeam, false)]
     [InlineData(Scope.UnknownDivision, false)]
+    // Allowed on purpose: the player has moved on since, and the piece stays with the club
+    // it was written about. Nothing records past squads, so a stricter rule could not tell a
+    // historical tag from a wrong one.
+    [InlineData(Scope.PlayerWhoHasSinceMoved, true)]
     public async Task ArticleScope_IsAcceptedOnlyWhenTheLevelsAgree(Scope scope, bool expectedValid)
     {
         var scenario = await LeagueScenario.CreateAsync(_fixture.DbContext);
@@ -75,7 +78,7 @@ public class ContentScopeTests : IClassFixture<IntegrationTestFixture>
     [InlineData(Scope.TeamWithoutDivision, false)]
     [InlineData(Scope.PlayerWithoutTeam, false)]
     [InlineData(Scope.TeamFromAnotherDivision, false)]
-    [InlineData(Scope.PlayerFromAnotherTeam, false)]
+    [InlineData(Scope.PlayerWhoHasSinceMoved, true)]
     public async Task VideoScope_FollowsTheSameRules(Scope scope, bool expectedValid)
     {
         var scenario = await LeagueScenario.CreateAsync(_fixture.DbContext);
@@ -127,8 +130,9 @@ public class ContentScopeTests : IClassFixture<IntegrationTestFixture>
             Scope.PlayerWithoutTeam => (s.DivisionOneId, null, s.PlayerAId),
             // TeamC belongs to DivisionTwo, so pairing it with DivisionOne is a mismatch.
             Scope.TeamFromAnotherDivision => (s.DivisionOneId, s.TeamCId, null),
-            // PlayerA plays for TeamA, not TeamB.
-            Scope.PlayerFromAnotherTeam => (s.DivisionOneId, s.TeamBId, s.PlayerAId),
+            // PlayerA plays for TeamA, so pairing them with TeamB is what a piece about their
+            // time at a previous club looks like.
+            Scope.PlayerWhoHasSinceMoved => (s.DivisionOneId, s.TeamBId, s.PlayerAId),
             Scope.UnknownDivision => (Guid.NewGuid(), null, null),
             _ => throw new ArgumentOutOfRangeException(nameof(scope)),
         };

@@ -3,7 +3,6 @@ using iDiski.Application.Articles.Queries;
 using iDiski.Application.Common.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using PublishArticleCommand = iDiski.Application.Articles.PublishArticleCommand;
 
 namespace iDiski.Api.Controllers;
 
