@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { accounts, signInAndWaitForAdmin } from './helpers';
 
 /**
@@ -47,7 +47,7 @@ test.describe('competition formats', () => {
 
     const modal = page.locator('.modal.show');
     await expect(modal).toBeVisible();
-    await modal.locator('select[name="divisionId"]').selectOption({ label: name });
+    await selectDivision(modal.locator('select[name="divisionId"]'), name);
 
     // The dialog used to promise a round-robin whatever it was about to build.
     await expect(modal.locator('[data-testid="generate-explains-format"]')).toContainText(
@@ -60,6 +60,10 @@ test.describe('competition formats', () => {
   });
 
   test('a group competition asks how many groups, and a league does not', async ({ page }) => {
+    // Both made here rather than borrowing whatever else is in the database: picking "some
+    // other division" can land on a group competition another test created, and then the
+    // comparison proves nothing.
+    const league = await createDivision(page, 'League');
     const groups = await createDivision(page, 'GroupAndKnockout');
 
     await page.goto('/admin/matches');
@@ -67,22 +71,16 @@ test.describe('competition formats', () => {
     await page.locator('button:has-text("Generate Fixtures")').first().click();
 
     const modal = page.locator('.modal.show');
-    await modal.locator('select[name="divisionId"]').selectOption({ label: groups });
+    const division = modal.locator('select[name="divisionId"]');
 
+    await selectDivision(division, groups);
     await expect(modal.locator('[data-testid="group-count"]')).toBeVisible();
     await expect(modal.locator('[data-testid="teams-advancing"]')).toBeVisible();
 
     // Switching to a league puts the dialog back, rather than leaving group questions on a
     // competition that has no groups.
-    const divisions = modal.locator('select[name="divisionId"] option');
-    const league = (await divisions.allInnerTexts())
-      .map((t) => t.trim())
-      .find((t) => t && t !== 'Select Division' && t !== groups);
-
-    if (league) {
-      await modal.locator('select[name="divisionId"]').selectOption({ label: league });
-      await expect(modal.locator('[data-testid="group-count"]')).toHaveCount(0);
-    }
+    await selectDivision(division, league);
+    await expect(modal.locator('[data-testid="group-count"]')).toHaveCount(0);
   });
 
   test('a knockout division with four teams generates a bracket', async ({ page }) => {
@@ -99,7 +97,7 @@ test.describe('competition formats', () => {
     await page.locator('button:has-text("Generate Fixtures")').first().click();
 
     const modal = page.locator('.modal.show');
-    await modal.locator('select[name="divisionId"]').selectOption({ label: name });
+    await selectDivision(modal.locator('select[name="divisionId"]'), name);
     await modal.locator('input[name="season"]').fill('2033');
     await modal.locator('input[name="startDate"]').fill('2033-06-04');
     // A tournament played out over one weekend: every round on the same day.
@@ -138,7 +136,7 @@ test.describe('competition formats', () => {
     await page.locator('button:has-text("Generate Fixtures")').first().click();
 
     const generate = page.locator('.modal.show');
-    await generate.locator('select[name="divisionId"]').selectOption({ label: name });
+    await selectDivision(generate.locator('select[name="divisionId"]'), name);
     await generate.locator('input[name="season"]').fill('2034');
     await generate.locator('input[name="startDate"]').fill('2034-06-03');
     await generate.locator('button:has-text("Generate Fixtures")').last().click();
@@ -187,6 +185,19 @@ test.describe('competition formats', () => {
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
+/**
+ * Picks a division by name, whatever the page has wrapped around it — the teams page appends
+ * the season, so an exact label match finds nothing there.
+ */
+async function selectDivision(select: Locator, divisionName: string) {
+  const labels = (await select.locator('option').allInnerTexts()).map((t) => t.trim());
+  const index = labels.findIndex((label) => label.includes(divisionName));
+
+  expect(index, `no option on this page named ${divisionName}`).toBeGreaterThan(-1);
+
+  await select.selectOption({ index });
+}
+
 function unique() {
   return `${Date.now()}${Math.floor(Math.random() * 1000)}`.slice(-8);
 }
@@ -229,7 +240,7 @@ async function createTeam(page: Page, divisionName: string, teamName: string) {
 
   await modal.locator('input[name="name"]').fill(teamName);
   await modal.locator('input[name="shortCode"]').fill(shortCode('T'));
-  await modal.locator('select[name="divisionId"]').selectOption({ label: divisionName });
+  await selectDivision(modal.locator('select[name="divisionId"]'), divisionName);
   await modal.locator('input[name="founded"]').fill('2020');
 
   await modal.locator('[data-testid="save-team"]').click();
