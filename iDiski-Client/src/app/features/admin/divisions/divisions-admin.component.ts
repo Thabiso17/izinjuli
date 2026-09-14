@@ -9,6 +9,8 @@ import {
   CompetitionFormat,
   COMPETITION_FORMAT_LABEL,
   COMPETITION_FORMAT_HINT,
+  COMPETITION_STATUS_LABEL,
+  COMPETITION_STATUS_CLASS,
 } from '../../../core/models';
 
 @Component({
@@ -87,7 +89,8 @@ import {
                   <th>Gender</th>
                   <th>Teams</th>
                   <th>Matches</th>
-                  <th>Status</th>
+                  <th>Visible</th>
+                  <th>Progress</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -116,6 +119,19 @@ import {
                       >
                         {{ division.isActive ? 'Active' : 'Inactive' }}
                       </span>
+                    </td>
+                    <td data-testid="division-status-cell">
+                      <!-- Derived from the results, unlike the column beside it: that one is
+                           somebody deciding a division should be shown, this one is whether
+                           the competition has actually run its course. -->
+                      <span [class]="'badge ' + statusClass[division.status]">
+                        {{ statusLabel[division.status] }}
+                      </span>
+                      @if (division.playedCount > 0 && division.status !== 'Completed') {
+                        <div class="text-muted small mt-1">
+                          {{ division.playedCount }} of {{ division.matchCount }} played
+                        </div>
+                      }
                     </td>
                     <td>
                       <button
@@ -411,6 +427,8 @@ export class DivisionsAdminComponent implements OnInit {
 
   readonly formats: CompetitionFormat[] = ['League', 'Knockout', 'GroupAndKnockout'];
   readonly formatLabel = COMPETITION_FORMAT_LABEL;
+  readonly statusLabel = COMPETITION_STATUS_LABEL;
+  readonly statusClass = COMPETITION_STATUS_CLASS;
 
   /** formData is loosely typed, so the lookup goes through here rather than indexing it. */
   formatHintFor(format: CompetitionFormat): string {

@@ -23,6 +23,30 @@ export const COMPETITION_FORMAT_HINT: Record<CompetitionFormat, string> = {
   GroupAndKnockout: 'Groups first, then the teams that come through play a bracket.',
 };
 
+/**
+ * How far through its own life a competition is. Worked out by the API from the results
+ * themselves rather than stored, so it cannot go stale the way a flag somebody ticks does.
+ */
+export type CompetitionStatus = 'NotStarted' | 'InProgress' | 'Completed';
+
+export const COMPETITION_STATUS_LABEL: Record<CompetitionStatus, string> = {
+  NotStarted: 'Not started',
+  InProgress: 'In progress',
+  Completed: 'Completed',
+};
+
+/** Bootstrap contextual class per status, so the badge reads the same on every screen. */
+export const COMPETITION_STATUS_CLASS: Record<CompetitionStatus, string> = {
+  NotStarted: 'bg-secondary',
+  InProgress: 'bg-success',
+  Completed: 'bg-dark',
+};
+
+/** On now or still to come — the distinction the divisions page filters on. */
+export function isCurrentCompetition(status: CompetitionStatus): boolean {
+  return status !== 'Completed';
+}
+
 export interface DivisionDto {
   id: string;
   name: string;
@@ -37,6 +61,12 @@ export interface DivisionDto {
   description: string | null;
   teamCount: number;
   matchCount: number;
+  /** Fixtures with a result, and fixtures still expected. `matchCount` is every fixture drawn. */
+  playedCount: number;
+  pendingCount: number;
+  /** Whether the tie nothing follows has been played. Always false for a league. */
+  finalPlayed: boolean;
+  status: CompetitionStatus;
 }
 
 export interface CreateDivisionCommand {

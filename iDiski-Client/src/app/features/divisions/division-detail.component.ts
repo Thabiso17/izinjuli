@@ -75,6 +75,23 @@ import { ScopedVideosComponent } from '../../shared/components/scoped-videos.com
           </div>
         </div>
 
+        <!-- Who won it. A finished competition that never names its winner is the one thing
+             every reader is looking for and the page did not say: the bracket marked who went
+             through each tie, and then stopped at the final without drawing the conclusion. -->
+        @if (champion(); as winner) {
+          <div class="card shadow-sm mb-4 border-warning" data-testid="champion">
+            <div class="card-body d-flex align-items-center gap-3">
+              <i class="bi bi-trophy-fill text-warning fs-1"></i>
+              <div>
+                <div class="text-uppercase text-muted small fw-semibold">
+                  {{ div.format === 'League' ? 'Champions' : 'Winners' }}
+                </div>
+                <div class="h4 mb-0 fw-bold">{{ winner }}</div>
+              </div>
+            </div>
+          </div>
+        }
+
         <div class="row g-4">
           <!-- Groups first, because that is the order they are played in. Full width: eight
                groups of four is eight tables, and they do not belong squeezed into a column
@@ -370,6 +387,51 @@ export class DivisionDetailComponent implements OnInit {
           error: () => settle(),
         });
     }
+  }
+
+  /**
+   * Who won it, or null while it is still being played.
+   *
+   * Read off what the page has already loaded rather than asked for: a cup's winner is the
+   * side that won the final, and a league's is whoever finished top. Deriving it here means no
+   * extra request and no second opinion — the API decides whether the competition is finished,
+   * and the same fixtures that drew the bracket say who won.
+   */
+  champion(): string | null {
+    const division = this.division();
+    if (!division || division.status !== 'Completed') return null;
+
+    if (division.format === 'League') return this.standings()[0]?.teamName ?? null;
+
+    // The final is the round of two. The API identifies it as the tie nothing follows, which
+    // is the same fixture by construction — a bracket is built down to two and stops — and the
+    // round size is what the fixture list actually carries.
+    const final = this.fixtures().find(
+      (f) => f.stage === 'Knockout' && f.knockoutRoundSize === 2 && f.status === 'Completed',
+    );
+
+    if (!final) return null;
+
+    const side = this.wonBy(final);
+    if (!side) return null;
+
+    return (side === 'home' ? final.homeTeamName : final.awayTeamName) ?? null;
+  }
+
+  /**
+   * Which side went through. Penalties settle a tie that ninety minutes did not, so a side can
+   * lose on the day and still lift the trophy.
+   */
+  private wonBy(tie: MatchResultDto): 'home' | 'away' | null {
+    if (tie.homeScore !== tie.awayScore) return tie.homeScore > tie.awayScore ? 'home' : 'away';
+
+    const home = tie.homePenalties;
+    const away = tie.awayPenalties;
+
+    if (home === null || away === null || home === undefined || away === undefined) return null;
+    if (home === away) return null;
+
+    return home > away ? 'home' : 'away';
   }
 
   private loadTopScorers(division: DivisionDto): void {
