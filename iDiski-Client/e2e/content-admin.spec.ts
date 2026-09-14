@@ -115,15 +115,17 @@ test.describe('content admin', () => {
 
     const toggles = page.locator('[data-testid="toggle-visibility"]');
 
-    // The editor only ever lists components that are already configured, so a database with
-    // no layout rows gives an empty board. That is worth knowing about, but it is not this
-    // test's to assert against — there is no way to add one from here.
-    if ((await toggles.count()) === 0) {
-      test.skip(true, 'no layout components are configured in this environment');
-    }
+    // The board lists every component the site can render, configured or not. It used to list
+    // only saved rows, so a database with no layout rows gave an empty board — and since the
+    // public homepage reads the same rows, it rendered nothing, with no way to fix it from
+    // the one screen that exists to fix it.
+    await expect(
+      toggles.first(),
+      'the editor must offer something to arrange even before anything is configured',
+    ).toBeVisible();
 
-    // Nothing has changed yet, and saving nothing is not an action the page offers.
-    await expect(save).toBeDisabled();
+    const count = await toggles.count();
+    expect(count, 'every registered component should be listed').toBeGreaterThanOrEqual(5);
 
     await toggles.first().click();
     await expect(save).toBeEnabled();
@@ -143,6 +145,22 @@ test.describe('content admin', () => {
     // Put it back, so a rerun starts from the same homepage this one did.
     await toggles.first().click();
     await save.click();
+  });
+
+  test('the homepage shows its sections even with nothing configured', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    // The homepage is built from the same layout rows the editor writes, and it had no
+    // fallback: an empty table meant an empty page for every visitor. A fresh install
+    // showed nothing at all.
+    await expect(page.locator('app-root')).not.toHaveText('');
+    await expect(page.locator('text=Failed to load page layout')).toHaveCount(0);
+
+    // Whatever the configuration, the page has content rather than a bare shell.
+    const sections = page.locator('section, article, .card');
+    expect(await sections.count(), 'the homepage rendered no sections at all')
+      .toBeGreaterThan(0);
   });
 });
 
