@@ -175,6 +175,13 @@ test.describe('competition formats', () => {
     await modal.locator('[data-testid="group-count"]').fill('2');
     await modal.locator('[data-testid="teams-advancing"]').fill('2');
 
+    // Groups honour home and away, and the dialog opens on it — which is right for a
+    // Champions League group stage and doubles the fixtures. Said explicitly here so the
+    // count below is about the shape of the competition rather than about a default.
+    // The radio itself is a visually hidden Bootstrap btn-check, so the label is the
+    // clickable part.
+    await modal.locator('label[for="singleRound"]').click();
+
     // The dialog should already be describing this shape before anything is written.
     await expect(modal.locator('[data-testid="group-shape"]')).toContainText('8 teams');
 
@@ -189,8 +196,9 @@ test.describe('competition formats', () => {
 
     const body = await response.json();
 
-    // Two groups of four is six ties each, and four qualifiers make two semi-finals and a
-    // final. Exact, because a group competition of this size is never anything else.
+    // Played once each: two groups of four is six ties a group, and four qualifiers make two
+    // semi-finals and a final. Exact, because a group competition of this size played single
+    // round is never anything else.
     expect(body.fixturesGenerated, 'twelve group ties and three bracket ties').toBe(15);
 
     // The public page shows the groups first and the bracket beside them — which is the whole
