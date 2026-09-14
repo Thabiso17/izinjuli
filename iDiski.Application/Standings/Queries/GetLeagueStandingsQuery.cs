@@ -46,7 +46,11 @@ public sealed class GetLeagueStandingsQueryHandler
         var matchQuery = _db.MatchResults
             .AsNoTracking()
             .Where(m => m.Season == request.Season &&
-                        m.Status == MatchStatus.Completed);
+                        m.Status == MatchStatus.Completed &&
+                        // A table is made of matches played for points. Winning a semi-final
+                        // takes you to the final, not up the league, so bracket fixtures are
+                        // left out of it; group fixtures are a league in miniature and count.
+                        m.Stage != MatchStage.Knockout);
 
         if (request.DivisionId.HasValue)
             matchQuery = matchQuery.Where(m => m.DivisionId == request.DivisionId.Value);

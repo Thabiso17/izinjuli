@@ -18,7 +18,14 @@ namespace iDiski.Application.Matches.Commands;
 /// <param name="Season">Season year (e.g., 2025)</param>
 /// <param name="IsHomeAndAway">True for home-and-away (2 rounds), false for single round-robin</param>
 /// <param name="StartDate">Date of first matchweek</param>
-/// <param name="DaysBetweenMatchweeks">Days between each matchweek (default 7)</param>
+/// <param name="DaysBetweenMatchweeks">
+/// Days between each matchweek. Zero is allowed, and is what a weekend tournament needs: every
+/// round played on the same day.
+/// </param>
+/// <param name="GroupCount">How many groups to split the teams into. Group stages only.</param>
+/// <param name="TeamsAdvancingPerGroup">
+/// How many of each group go through to the bracket. The organiser chooses; two is the usual.
+/// </param>
 /// <param name="ReplaceExisting">
 /// Whether to clear the division's existing fixtures for this season first.
 ///
@@ -33,7 +40,9 @@ public sealed record GenerateFixturesCommand(
     bool     IsHomeAndAway,
     DateTime StartDate,
     int      DaysBetweenMatchweeks = 7,
-    bool     ReplaceExisting = false
+    bool     ReplaceExisting = false,
+    int?     GroupCount = null,
+    int      TeamsAdvancingPerGroup = 2
 ) : IRequest<GenerateFixturesResult>;
 
 public sealed record GenerateFixturesResult(
@@ -50,9 +59,20 @@ public sealed class GenerateFixturesCommandValidator : AbstractValidator<Generat
         RuleFor(x => x.DivisionId).NotEmpty();
         RuleFor(x => x.Season).GreaterThan(2000).LessThan(2100);
         RuleFor(x => x.StartDate).GreaterThan(DateTime.MinValue);
+        // Zero is deliberate: a tournament played out over a single weekend puts every round
+        // on the same day, which the old minimum of one day made impossible to express.
         RuleFor(x => x.DaysBetweenMatchweeks)
-            .InclusiveBetween(1, 30)
-            .WithMessage("Days between matchweeks must be between 1 and 30");
+            .InclusiveBetween(0, 30)
+            .WithMessage("Days between matchweeks must be between 0 and 30");
+
+        RuleFor(x => x.GroupCount)
+            .GreaterThanOrEqualTo(2)
+            .When(x => x.GroupCount.HasValue)
+            .WithMessage("A group stage needs at least two groups");
+
+        RuleFor(x => x.TeamsAdvancingPerGroup)
+            .GreaterThanOrEqualTo(1)
+            .WithMessage("At least one team has to come out of each group");
     }
 }
 

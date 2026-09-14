@@ -37,12 +37,17 @@ public static class StandingsCalculator
         IReadOnlyList<MatchResult> completedMatches,
         IReadOnlyList<Team> teams)
     {
-        // Index matches per team for O(1) form lookups later
+        // Index matches per team for O(1) form lookups later.
+        //
+        // A fixture with an empty slot is skipped: a knockout bracket is created before anyone
+        // has qualified for it, and a semi-final waiting on its teams says nothing about
+        // anybody's record.
         var matchesByTeam = completedMatches
+            .Where(m => m.HomeTeamId is not null && m.AwayTeamId is not null)
             .SelectMany(m => new[]
             {
-                (TeamId: m.HomeTeamId, Match: m, IsHome: true),
-                (TeamId: m.AwayTeamId, Match: m, IsHome: false)
+                (TeamId: m.HomeTeamId!.Value, Match: m, IsHome: true),
+                (TeamId: m.AwayTeamId!.Value, Match: m, IsHome: false)
             })
             .GroupBy(x => x.TeamId)
             .ToDictionary(g => g.Key, g => g.ToList());

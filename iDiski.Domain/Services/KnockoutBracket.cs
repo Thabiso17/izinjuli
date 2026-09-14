@@ -136,6 +136,41 @@ public static class KnockoutBracket
         return rounds.SelectMany(r => r).ToList();
     }
 
+    /// <summary>
+    /// An empty bracket for <paramref name="entrantCount"/> qualifiers, every slot waiting.
+    ///
+    /// This is what a group stage feeds. Nobody knows who is coming until the groups finish,
+    /// but the organiser still wants the shape of the knockout — how many rounds, on what
+    /// dates — settled when the competition is drawn up.
+    /// </summary>
+    public static List<MatchResult> BuildEmpty(
+        int entrantCount,
+        Guid divisionId,
+        int season,
+        DateTime firstRoundDate,
+        int daysBetweenRounds,
+        int firstMatchweek = 1)
+    {
+        if (entrantCount < 2)
+            throw new ArgumentException(
+                "A knockout needs at least two qualifiers.", nameof(entrantCount));
+
+        // Placeholder ids stand in for entrants so the rounds and links come out the same as a
+        // seeded bracket; the slots are then cleared, leaving the shape without the names.
+        var placeholders = Enumerable.Range(0, entrantCount).Select(_ => Guid.NewGuid()).ToList();
+
+        var bracket = Build(
+            placeholders, divisionId, season, firstRoundDate, daysBetweenRounds, firstMatchweek);
+
+        foreach (var match in bracket)
+        {
+            match.HomeTeamId = null;
+            match.AwayTeamId = null;
+        }
+
+        return bracket;
+    }
+
     /// <summary>The name a round of this size goes by.</summary>
     public static string RoundName(int roundSize) => roundSize switch
     {
