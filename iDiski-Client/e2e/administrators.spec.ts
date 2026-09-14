@@ -15,7 +15,11 @@ test.describe('administrators', () => {
     await page.goto('/admin/users');
     await expect(page).toHaveURL(/\/admin\/users/);
 
-    const before = await page.locator('[data-testid="admin-row"]').count();
+    // The rows render behind a loading flag, so counting the moment the page is asked for
+    // counts nothing and the comparison at the end is then against zero.
+    const rows = page.locator('[data-testid="admin-row"]');
+    await expect(rows.first()).toBeVisible();
+    const before = await rows.count();
 
     await page.locator('[data-testid="add-admin"]').click();
     const modal = page.locator('.modal.show');
@@ -43,11 +47,11 @@ test.describe('administrators', () => {
     await save.click();
 
     await expect(page.locator('.alert-success')).toBeVisible();
-    await expect(page.locator('[data-testid="admin-row"]')).toHaveCount(before + 1);
+    await expect(rows).toHaveCount(before + 1);
     await expect(page.locator(`text=${email}`)).toBeVisible();
   });
 
-  test('the new administrator can sign in', async ({ page }) => {
+  test('the new administrator can sign in', async ({ page, browser, baseURL }) => {
     await signInAndWaitForAdmin(page, accounts.superAdmin);
     await page.goto('/admin/users');
 
@@ -70,9 +74,19 @@ test.describe('administrators', () => {
 
     // The point of creating one: an account that is actually usable. Anything short of this
     // is a row in a table.
-    await page.goto('/login');
-    await signIn(page, { email, password });
-    await expect(page).toHaveURL(/\/admin/, { timeout: 20_000 });
+    //
+    // In a second browser, because that is the real situation — a different person, on their
+    // own machine — and because this page cannot get back to the login form: /login is behind
+    // noAuthGuard, so an admin who is still signed in is bounced straight back to /admin.
+    const theirBrowser = await browser.newContext({ baseURL });
+    const theirPage = await theirBrowser.newPage();
+
+    try {
+      await signIn(theirPage, { email, password });
+      await expect(theirPage).toHaveURL(/\/admin/, { timeout: 20_000 });
+    } finally {
+      await theirBrowser.close();
+    }
   });
 
   test('the list says what each administrator is', async ({ page }) => {
