@@ -1,0 +1,207 @@
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Json;
+using System.Threading.Tasks;
+using FluentAssertions;
+using iDiski.Domain.Entities;
+using iDiski.Domain.Enums;
+using iDiski.Tests.Integration.Common;
+using Xunit;
+
+namespace iDiski.Tests.Integration.Api;
+
+/// <summary>
+/// Which fixtures a division admin may write to.
+///
+/// The endpoints are guarded by <c>CanManageDivisions</c>, which asks only whether somebody is
+/// a division admin at all — never which divisions. Neither match command opted into the
+/// ownership behaviour, so any division admin could enter or change the score of any match in
+/// the league. Entering a result is not just a row: it moves a table, and in a knockout it puts
+/// a club into the next round.
+///
+/// Over HTTP rather than against a handler, because the thing being tested is the pipeline —
+/// calling a handler directly skips the behaviour that does the checking, and would pass just
+/// as happily with the hole still open.
+/// </summary>
+[Collection(ApiCollection.Name)]
+public class MatchScopeApiTests : IAsyncLifetime
+{
+    private readonly ApiTestFixture _fixture;
+
+    private Guid _ownDivision;
+    private Guid _otherDivision;
+    private (Guid Home, Guid Away) _ownClubs;
+    private (Guid Home, Guid Away) _otherClubs;
+    private Guid _ownFixture;
+    private Guid _otherFixture;
+
+    private User _divisionAdmin = null!;
+    private User _superAdmin = null!;
+
+    public MatchScopeApiTests(ApiTestFixture fixture) => _fixture = fixture;
+
+    public async Task InitializeAsync()
+    {
+        _ownDivision = await ADivisionAsync();
+        _otherDivision = await ADivisionAsync();
+
+        _ownClubs = await TwoClubsInAsync(_ownDivision);
+        _otherClubs = await TwoClubsInAsync(_otherDivision);
+
+        _ownFixture = await AFixtureInAsync(_ownDivision, _ownClubs);
+        _otherFixture = await AFixtureInAsync(_otherDivision, _otherClubs);
+
+        _divisionAdmin = await _fixture.SeedUserAsync(Role.DivisionAdmin, divisionId: _ownDivision);
+        _superAdmin = await _fixture.SeedUserAsync(Role.SuperAdmin);
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
+    [Fact]
+    public async Task ADivisionAdminCannotScoreAMatchInSomebodyElsesDivision()
+    {
+        var client = await _fixture.CreateClientAsAsync(_divisionAdmin);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/matchresults/{_otherFixture}/score",
+            ScoreOf(_otherFixture, 9, 0));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // And nothing was written on the way to being refused.
+        var after = await _fixture.WithDbAsync(db => db.MatchResults.FindAsync(_otherFixture).AsTask());
+        after!.HomeScore.Should().Be(0);
+        after.Status.Should().Be(MatchStatus.Scheduled);
+    }
+
+    [Fact]
+    public async Task ADivisionAdminCanStillScoreAMatchInTheirOwnDivision()
+    {
+        // The half that stops this being a fix that simply refuses everybody.
+        var client = await _fixture.CreateClientAsAsync(_divisionAdmin);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/matchresults/{_ownFixture}/score",
+            ScoreOf(_ownFixture, 2, 1));
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var after = await _fixture.WithDbAsync(db => db.MatchResults.FindAsync(_ownFixture).AsTask());
+        after!.HomeScore.Should().Be(2);
+        after.Status.Should().Be(MatchStatus.Completed);
+    }
+
+    [Fact]
+    public async Task ADivisionAdminCannotDrawAFixtureIntoSomebodyElsesDivision()
+    {
+        var client = await _fixture.CreateClientAsAsync(_divisionAdmin);
+
+        var response = await client.PostAsJsonAsync("/api/matchresults", new
+        {
+            matchDate = new DateTime(2041, 4, 1, 0, 0, 0, DateTimeKind.Utc),
+            matchweekNumber = 2,
+            season = 2041,
+            homeTeamId = _otherClubs.Home,
+            awayTeamId = _otherClubs.Away,
+            venue = (string?)null,
+            referee = (string?)null,
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task ASuperAdminIsUnaffected()
+    {
+        // SuperAdmin passes every ownership check by design, and must keep doing so — they are
+        // the only person who can put right a fixture nobody else's scope covers.
+        var client = await _fixture.CreateClientAsAsync(_superAdmin);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/matchresults/{_otherFixture}/score",
+            ScoreOf(_otherFixture, 3, 3));
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    // ── helpers ───────────────────────────────────────────────────────────────
+
+    private static object ScoreOf(Guid id, int home, int away) => new
+    {
+        id,
+        homeScore = home,
+        awayScore = away,
+        status = "Completed",
+        notes = (string?)null,
+    };
+
+    private Task<Guid> ADivisionAsync() => _fixture.WithDbAsync(async db =>
+    {
+        var id = Guid.NewGuid();
+
+        db.Divisions.Add(new Division
+        {
+            Id = id,
+            Name = $"Division {ApiTestFixture.Code("N")}",
+            ShortCode = ApiTestFixture.Code("MS"),
+            Season = 2041,
+            Gender = Gender.Male,
+            IsActive = true,
+            Format = CompetitionFormat.League,
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        await db.SaveChangesAsync();
+        return id;
+    });
+
+    private Task<(Guid Home, Guid Away)> TwoClubsInAsync(Guid divisionId) =>
+        _fixture.WithDbAsync(async db =>
+        {
+            var ids = new List<Guid>();
+
+            for (var i = 0; i < 2; i++)
+            {
+                var id = Guid.NewGuid();
+                ids.Add(id);
+
+                db.Teams.Add(new Team
+                {
+                    Id = id,
+                    Name = $"Club {ApiTestFixture.Code("N")}",
+                    ShortCode = ApiTestFixture.Code("M"),
+                    DivisionId = divisionId,
+                    Founded = 2020,
+                    CreatedAt = DateTime.UtcNow,
+                });
+            }
+
+            await db.SaveChangesAsync();
+            return (ids[0], ids[1]);
+        });
+
+    private Task<Guid> AFixtureInAsync(Guid divisionId, (Guid Home, Guid Away) clubs) =>
+        _fixture.WithDbAsync(async db =>
+        {
+            var id = Guid.NewGuid();
+
+            db.MatchResults.Add(new MatchResult
+            {
+                Id = id,
+                DivisionId = divisionId,
+                HomeTeamId = clubs.Home,
+                AwayTeamId = clubs.Away,
+                MatchDate = new DateTime(2041, 3, 1, 0, 0, 0, DateTimeKind.Utc),
+                MatchweekNumber = 1,
+                Season = 2041,
+                Status = MatchStatus.Scheduled,
+                Stage = MatchStage.League,
+                CreatedAt = DateTime.UtcNow,
+            });
+
+            await db.SaveChangesAsync();
+            return id;
+        });
+}
