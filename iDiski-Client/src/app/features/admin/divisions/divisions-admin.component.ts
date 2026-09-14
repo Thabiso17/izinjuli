@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DivisionService } from '../../../core/services/division.service';
+import { AuthService } from '../../../core/services/auth.service';
 import {
   DivisionDto,
   CreateDivisionCommand,
@@ -24,9 +25,11 @@ import {
           <p class="text-muted">Manage league divisions, age groups, and seasons</p>
         </div>
         <div class="col-auto">
-          <button class="btn btn-primary" data-testid="add-division" (click)="showAddModal()">
-            <i class="bi bi-plus-circle"></i> Add Division
-          </button>
+          @if (auth.isSuperAdmin()) {
+            <button class="btn btn-primary" data-testid="add-division" (click)="showAddModal()">
+              <i class="bi bi-plus-circle"></i> Add Division
+            </button>
+          }
         </div>
       </div>
 
@@ -134,6 +137,12 @@ import {
                       }
                     </td>
                     <td>
+                      <!-- Editing a division is super-admin only at the API — PUT
+                           /api/divisions/{id} carries SuperAdminOnly — so for anybody else
+                           this page is a scoped read-only view of their own competitions.
+                           Offering an action the API will refuse is how a 403 reaches somebody
+                           who did nothing wrong. -->
+                      @if (auth.isSuperAdmin()) {
                       <button
                         class="btn btn-sm btn-outline-primary me-2"
                         (click)="showEditModal(division)"
@@ -141,18 +150,24 @@ import {
                       >
                         <i class="bi bi-pencil"></i>
                       </button>
-                      <button
-                        class="btn btn-sm btn-outline-danger"
-                        (click)="confirmDelete(division)"
-                        [disabled]="division.teamCount > 0 || division.matchCount > 0"
-                        [title]="
-                          division.teamCount > 0 || division.matchCount > 0
-                            ? 'Cannot delete: has teams or matches'
-                            : 'Delete'
-                        "
-                      >
-                        <i class="bi bi-trash"></i>
-                      </button>
+                      }
+
+                      <!-- Deleting a division is super-admin only at the API, so offering it
+                           to a division admin could only ever end in a 403. -->
+                      @if (auth.isSuperAdmin()) {
+                        <button
+                          class="btn btn-sm btn-outline-danger"
+                          (click)="confirmDelete(division)"
+                          [disabled]="division.teamCount > 0 || division.matchCount > 0"
+                          [title]="
+                            division.teamCount > 0 || division.matchCount > 0
+                              ? 'Cannot delete: has teams or matches'
+                              : 'Delete'
+                          "
+                        >
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      }
                     </td>
                   </tr>
                 }
@@ -169,9 +184,11 @@ import {
             <i class="bi bi-inbox display-1 text-muted"></i>
             <h3 class="mt-3">No Divisions Found</h3>
             <p class="text-muted">Create your first division to get started</p>
-            <button class="btn btn-primary" data-testid="add-division" (click)="showAddModal()">
-              <i class="bi bi-plus-circle"></i> Add Division
-            </button>
+            @if (auth.isSuperAdmin()) {
+              <button class="btn btn-primary" data-testid="add-division" (click)="showAddModal()">
+                <i class="bi bi-plus-circle"></i> Add Division
+              </button>
+            }
           </div>
         </div>
       }
@@ -385,6 +402,8 @@ import {
 })
 export class DivisionsAdminComponent implements OnInit {
   private divisionService = inject(DivisionService);
+  // Public: the template asks it what to offer, so a row nobody may edit shows no Edit button.
+  readonly auth = inject(AuthService);
 
   divisions = signal<DivisionDto[]>([]);
   loading = signal(false);
@@ -409,7 +428,10 @@ export class DivisionsAdminComponent implements OnInit {
 
     this.divisionService.getAll(this.filterSeason, this.filterActive).subscribe({
       next: (data) => {
-        this.divisions.set(data);
+        // Narrowed to what this administrator actually administers. Creating a division is
+        // super-admin only, so for everybody else this list is exactly the competitions they
+        // were assigned — not the whole league with an Edit button on every row.
+        this.divisions.set(data.filter(d => this.auth.canAdministerDivision(d.id)));
         this.loading.set(false);
       },
       error: (err) => {

@@ -7,6 +7,13 @@ namespace iDiski.Application.Authentication.Queries;
 
 public sealed record GetCurrentUserQuery : IRequest<CurrentUserDto>;
 
+/// <param name="AdministeredDivisionIds">
+/// The divisions this user is assigned to, and <paramref name="AdministeredTeamIds"/> the
+/// teams. Roles alone say what kind of administrator somebody is, never which competitions
+/// they administer — so every admin screen showed every division and every club, with an Edit
+/// button on rows the API would refuse to save. Empty for a super admin, who administers
+/// everything and is told so by <paramref name="IsSuperAdmin"/> rather than by a list.
+/// </param>
 public sealed record CurrentUserDto(
     Guid Id,
     string Email,
@@ -14,7 +21,9 @@ public sealed record CurrentUserDto(
     string LastName,
     string? ProfileImageUrl,
     string[] Roles,
-    bool IsSuperAdmin
+    bool IsSuperAdmin,
+    Guid[] AdministeredDivisionIds,
+    Guid[] AdministeredTeamIds
 );
 
 public sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQuery, CurrentUserDto>
@@ -39,6 +48,8 @@ public sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQ
         // 2. Fetch user with roles
         var user = await _db.Users
             .Include(u => u.UserRoles)
+            .Include(u => u.UserDivisions)
+            .Include(u => u.UserTeams)
             .FirstOrDefaultAsync(u => u.Id == _currentUserService.UserId, cancellationToken)
             ?? throw new NotFoundException(nameof(Domain.Entities.User), _currentUserService.UserId);
 
@@ -57,7 +68,16 @@ public sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQ
             LastName: user.LastName,
             ProfileImageUrl: user.ProfileImageUrl,
             Roles: roles,
-            IsSuperAdmin: isSuperAdmin
+            IsSuperAdmin: isSuperAdmin,
+            // Left empty for a super admin rather than listing every division in the league:
+            // they are not scoped to a set, and a caller that treated the list as the scope
+            // would silently narrow them the moment a new division was created.
+            AdministeredDivisionIds: isSuperAdmin
+                ? Array.Empty<Guid>()
+                : user.UserDivisions.Select(ud => ud.DivisionId).ToArray(),
+            AdministeredTeamIds: isSuperAdmin
+                ? Array.Empty<Guid>()
+                : user.UserTeams.Select(ut => ut.TeamId).ToArray()
         );
     }
 }

@@ -1,7 +1,7 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { Observable, tap, catchError, firstValueFrom } from 'rxjs';
+import { Observable, tap, catchError, firstValueFrom, switchMap, map, of } from 'rxjs';
 import {
   LoginRequest,
   LoginResponse,
@@ -41,6 +41,56 @@ export class AuthService {
            false;
   });
 
+  /**
+   * Whether this user's scope is known yet. A freshly signed-in user whose profile request
+   * failed has roles but no assignments, and narrowing a screen on that would show them an
+   * empty page rather than their own clubs. Unknown means show everything, exactly as before —
+   * the API still refuses anything they may not do.
+   */
+  scopeIsKnown = computed(() => {
+    const user = this.currentUser();
+    return !!user && (user.isSuperAdmin || user.administeredDivisionIds !== undefined);
+  });
+
+  administeredDivisionIds = computed(() => this.currentUser()?.administeredDivisionIds ?? []);
+  administeredTeamIds = computed(() => this.currentUser()?.administeredTeamIds ?? []);
+
+  /** A super admin administers every division; anybody else, the ones they are assigned to. */
+  canAdministerDivision(divisionId: string | null | undefined): boolean {
+    if (this.isSuperAdmin()) return true;
+    if (!this.scopeIsKnown()) return true;
+    if (!divisionId) return false;
+
+    return this.administeredDivisionIds().includes(divisionId);
+  }
+
+  /**
+   * Creating or deleting a club is division-admin and above at the API (CanManageDivisions);
+   * a team admin manages the club they were given but cannot add or remove one.
+   */
+  canCreateTeam(): boolean {
+    return this.isSuperAdmin() || this.hasRole(Role.DivisionAdmin);
+  }
+
+  canDeleteTeam(team: { id: string; divisionId?: string | null }): boolean {
+    return this.canCreateTeam() && this.canAdministerTeam(team);
+  }
+
+  /**
+   * A team is administered by its own team admins and by the admins of the division it plays
+   * in — the same hierarchy the API enforces, rather than a second opinion about it. A team
+   * with no division is nobody's but a super admin's.
+   */
+  canAdministerTeam(team: { id: string; divisionId?: string | null }): boolean {
+    if (this.isSuperAdmin()) return true;
+    if (!this.scopeIsKnown()) return true;
+
+    return (
+      this.administeredTeamIds().includes(team.id) ||
+      (!!team.divisionId && this.administeredDivisionIds().includes(team.divisionId))
+    );
+  }
+
 
   login(request: LoginRequest): Observable<LoginResponse> {
     this.isLoading.set(true);
@@ -63,6 +113,19 @@ export class AuthService {
 
         this.isLoading.set(false);
       }),
+      // The login response says who somebody is but not what they administer — /me is the
+      // only payload carrying that. Without this step a division admin who signs in and goes
+      // straight to an admin page has no assignments loaded, and the screens that scope
+      // themselves to those assignments would have nothing to scope by. Session restore
+      // already calls /me; this is the other way in.
+      switchMap(response =>
+        this.getCurrentUser().pipe(
+          map(() => response),
+          // A profile that fails to load must not fail the sign-in: the token is good and the
+          // roles are known. The screens fall back to showing everything, as they did before.
+          catchError(() => of(response)),
+        ),
+      ),
       catchError(err => {
         this.isLoading.set(false);
         this.logger.error('Login request failed', err);
