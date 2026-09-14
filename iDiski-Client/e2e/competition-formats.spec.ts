@@ -170,8 +170,12 @@ test.describe('competition formats', () => {
 
     const divisionId = await division.inputValue();
 
-    await modal.locator('input[name="season"]').fill('2035');
-    await modal.locator('input[name="startDate"]').fill('2035-06-01');
+    // The dialog fills in the division's own season. Left as it lands rather than typed over:
+    // a division is one season's competition, and fixtures generated into a different year
+    // are written where that division's page will never look for them.
+    await expect(modal.locator('input[name="season"]')).toHaveValue('2033');
+
+    await modal.locator('input[name="startDate"]').fill('2033-06-01');
     await modal.locator('[data-testid="group-count"]').fill('2');
     await modal.locator('[data-testid="teams-advancing"]').fill('2');
 

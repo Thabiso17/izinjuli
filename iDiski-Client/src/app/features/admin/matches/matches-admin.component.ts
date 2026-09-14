@@ -926,11 +926,20 @@ export class MatchesAdminComponent implements OnInit {
    * how many groups there are.
    */
   /**
-   * Groups of four, which is how an organiser thinks about it: thirty-two entrants make eight
-   * groups, not "eight" as a number they worked out themselves. Adjustable afterwards — this
-   * only sets the starting point when a division is chosen.
+   * What choosing a division fills in for itself: its season, and groups of four, which is how
+   * an organiser thinks about it — thirty-two entrants make eight groups, not "eight" as a
+   * number they worked out themselves. Both adjustable afterwards; this only sets the starting
+   * point when a division is chosen.
    */
   onGenerateDivisionChanged(): void {
+    // A division is one season's competition — its season is part of what identifies it — but
+    // this dialog opened on the current year whatever was picked. Generating a 2033 division's
+    // fixtures into 2026 succeeded and then showed nothing: the division's own page reads its
+    // own season, so the whole competition was written somewhere nobody looks. Still editable,
+    // for the organiser who really is building next season early.
+    const season = this.generateDivision()?.season;
+    if (season) this.generateFormData.season = season;
+
     if (this.generateFormat() !== 'GroupAndKnockout') return;
 
     const teams = this.generateDivision()?.teamCount ?? 0;
