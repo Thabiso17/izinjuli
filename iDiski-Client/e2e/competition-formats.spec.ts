@@ -223,6 +223,117 @@ test.describe('competition formats', () => {
     await expect(page.locator('[data-testid="bracket"]')).toBeVisible();
   });
 
+  test('a competition that has been played says so, and names its winner', async ({ page }) => {
+    // A league of two is the cheapest competition that can actually be finished: one fixture,
+    // one result, and the whole thing is over. Everything this checks — the status the API
+    // derives, the filter on the public page, the champion — needs a finished competition, and
+    // playing a bracket out would be the same assertions behind twenty more clicks.
+    const name = await createDivision(page, 'League');
+
+    await createTeam(page, name, `Finisher A ${unique()}`);
+    await createTeam(page, name, `Finisher B ${unique()}`);
+
+    await page.goto('/admin/matches');
+    await page.waitForLoadState('networkidle');
+    await page.locator('button:has-text("Generate Fixtures")').first().click();
+
+    const modal = page.locator('.modal.show');
+    const division = modal.locator('select[name="divisionId"]');
+    await selectDivision(division, name);
+
+    const divisionId = await division.inputValue();
+
+    await modal.locator('input[name="startDate"]').fill('2033-07-01');
+
+    // Played once through. The dialog opens on home and away, which would make this two
+    // fixtures and leave the league unfinished after one result — the competition would be
+    // correctly reported as still in progress and this test would be testing nothing it meant
+    // to. The radio is a visually hidden Bootstrap btn-check, so the label is the clickable
+    // part.
+    await modal.locator('label[for="singleRound"]').click();
+
+    const generated = page.waitForResponse(
+      (r) => r.url().includes('/api/matchresults/generate') && r.request().method() === 'POST',
+    );
+
+    await modal.locator('button:has-text("Generate Fixtures")').last().click();
+
+    const created = await generated;
+    expect(created.status(), await created.text()).toBe(200);
+
+    // Two clubs playing once is one fixture, so one result finishes the whole competition.
+    // Asserted rather than assumed: this number is the reason the rest of the test works.
+    expect((await created.json()).fixturesGenerated, 'two clubs, played once').toBe(1);
+
+    await expect(modal).toBeHidden();
+
+    // ── Drawn but unplayed is not under way ────────────────────────────────
+    await page.goto(`/divisions/${divisionId}`);
+    await page.waitForLoadState('networkidle');
+
+    await expect(
+      page.locator('[data-testid="champion"]'),
+      'nobody has won anything yet',
+    ).toHaveCount(0);
+
+    // ── Play it ────────────────────────────────────────────────────────────
+    await page.goto('/admin/matches');
+    await page.waitForLoadState('networkidle');
+
+    // Narrowed to this division: several tests in this file generate into 2033, and "the first
+    // fixture on the page" would otherwise be somebody else's.
+    const filters = page.locator('.card.mb-4').first();
+    await selectDivision(filters.locator('select').first(), name);
+    await filters.locator('input[type="number"]').first().fill('2033');
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('button:has-text("Enter Score")').first().click();
+
+    const score = page.locator('.modal.show');
+    await expect(score).toBeVisible();
+
+    await score.locator('input[name="homeScore"]').fill('3');
+    await score.locator('input[name="awayScore"]').fill('0');
+    await score.locator('button:has-text("Update Score")').last().click();
+    await expect(score).toBeHidden();
+
+    // ── Now it is finished, and says who won ───────────────────────────────
+    await page.goto(`/divisions/${divisionId}`);
+    await page.waitForLoadState('networkidle');
+
+    const champion = page.locator('[data-testid="champion"]');
+    await expect(
+      champion,
+      'a finished competition that never names its winner is the one thing every reader wants',
+    ).toBeVisible();
+    await expect(champion).toContainText('Champions');
+
+    // ── And the public list files it under the finished ones ───────────────
+    await page.goto('/divisions');
+    await page.waitForLoadState('networkidle');
+
+    const seasonPicker = page.locator('select').first();
+    if (await seasonPicker.count()) {
+      const labels = (await seasonPicker.locator('option').allInnerTexts()).map((t) => t.trim());
+      const index = labels.findIndex((label) => label.includes('2033'));
+      if (index > -1) await seasonPicker.selectOption({ index });
+      await page.waitForLoadState('networkidle');
+    }
+
+    const card = page.locator('.division-card', { hasText: name });
+
+    // Current is the default, and a competition that has been played is not current.
+    await expect(card).toHaveCount(0);
+
+    await page.locator('[data-testid="scope-completed"]').click();
+    await expect(card).toHaveCount(1);
+    await expect(card.locator('[data-testid="division-status"]')).toContainText('Completed');
+
+    // And it is still reachable, rather than filtered out of existence.
+    await page.locator('[data-testid="scope-all"]').click();
+    await expect(card).toHaveCount(1);
+  });
+
   test('a drawn knockout tie asks for the shootout instead of refusing', async ({ page }) => {
     const name = await createDivision(page, 'Knockout');
 

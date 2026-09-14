@@ -27,6 +27,19 @@ export interface CurrentUserDto {
   profileImageUrl?: string;
   roles: string[];
   isSuperAdmin: boolean;
+  /**
+   * What this administrator actually administers. A role says what kind of administrator
+   * somebody is, never which competitions — so without these every admin screen showed the
+   * whole league and offered Edit on rows the API would refuse to save.
+   *
+   * Both are empty for a super admin, who is not scoped to a set: `isSuperAdmin` says so
+   * instead, and treating the empty list as their scope would lock them out of everything.
+   *
+   * Optional because the login response is a smaller payload than /me. Undefined means "not
+   * known yet", which is not the same as "assigned to nothing".
+   */
+  administeredDivisionIds?: string[];
+  administeredTeamIds?: string[];
 }
 
 export interface ForgotPasswordRequest {

@@ -241,7 +241,20 @@ public sealed class GetDivisionsQueryHandler
                 d.EndDate,
                 d.Description,
                 d.Teams.Count,
-                d.Matches.Count
+                d.Matches.Count,
+                // The three signals the competition's status is worked out from. Counted in
+                // the database rather than fetched and counted here: a division's fixture list
+                // is a season's worth of rows, and the page only needs the totals.
+                d.Matches.Count(m => m.Status == MatchStatus.Completed),
+                d.Matches.Count(m =>
+                    m.Status == MatchStatus.Scheduled ||
+                    m.Status == MatchStatus.InProgress ||
+                    m.Status == MatchStatus.Postponed),
+                // The final is the tie nothing follows. A league has none, and does not ask.
+                d.Matches.Any(m =>
+                    m.Stage == MatchStage.Knockout &&
+                    m.NextMatchId == null &&
+                    m.Status == MatchStatus.Completed)
             ))
             .ToListAsync(cancellationToken);
     }
@@ -277,7 +290,20 @@ public sealed class GetDivisionByIdQueryHandler
                 d.EndDate,
                 d.Description,
                 d.Teams.Count,
-                d.Matches.Count
+                d.Matches.Count,
+                // The three signals the competition's status is worked out from. Counted in
+                // the database rather than fetched and counted here: a division's fixture list
+                // is a season's worth of rows, and the page only needs the totals.
+                d.Matches.Count(m => m.Status == MatchStatus.Completed),
+                d.Matches.Count(m =>
+                    m.Status == MatchStatus.Scheduled ||
+                    m.Status == MatchStatus.InProgress ||
+                    m.Status == MatchStatus.Postponed),
+                // The final is the tie nothing follows. A league has none, and does not ask.
+                d.Matches.Any(m =>
+                    m.Stage == MatchStage.Knockout &&
+                    m.NextMatchId == null &&
+                    m.Status == MatchStatus.Completed)
             ))
             .FirstOrDefaultAsync(cancellationToken);
     }

@@ -30,3 +30,17 @@ public interface IRequirePlayerAccess
 {
     Guid PlayerId { get; }
 }
+
+/// <summary>
+/// Implemented by commands scoped to a single fixture, whose division is not in the request
+/// payload — a score update carries only the match id. AuthorizationBehaviour resolves the
+/// fixture's division and applies DivisionOwnershipRequirement to it.
+///
+/// A fixture with no division resolves to Guid.Empty, which nobody but a SuperAdmin owns.
+/// That is the safe direction: an orphaned fixture predating the division guard can still be
+/// repaired, but only by somebody who can see the whole league.
+/// </summary>
+public interface IRequireMatchAccess
+{
+    Guid MatchId { get; }
+}

@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TeamService } from '../../../core/services/team.service';
+import { AuthService } from '../../../core/services/auth.service';
 import { DivisionService } from '../../../core/services/division.service';
 import { UploadService } from '../../../core/services/upload.service';
 import { TeamDto, CreateTeamRequest, UpdateTeamRequest, DivisionDto } from '../../../core/models';
@@ -17,9 +18,11 @@ import { TeamDto, CreateTeamRequest, UpdateTeamRequest, DivisionDto } from '../.
           <p class="text-muted">Manage football teams and their details</p>
         </div>
         <div class="col-auto">
-          <button class="btn btn-primary" data-testid="add-team" (click)="showAddModal()">
-            <i class="bi bi-plus-circle"></i> Add Team
-          </button>
+          @if (auth.canCreateTeam()) {
+            <button class="btn btn-primary" data-testid="add-team" (click)="showAddModal()">
+              <i class="bi bi-plus-circle"></i> Add Team
+            </button>
+          }
         </div>
       </div>
 
@@ -37,7 +40,7 @@ import { TeamDto, CreateTeamRequest, UpdateTeamRequest, DivisionDto } from '../.
         <div class="row g-4">
           @for (team of teams(); track team.id) {
             <div class="col-md-6 col-lg-4">
-              <div class="card h-100 shadow-sm">
+              <div class="card h-100 shadow-sm" data-testid="team-card">
                 <div class="card-body">
                   <div class="d-flex align-items-start mb-3">
                     @if (team.logoUrl) {
@@ -119,24 +122,32 @@ import { TeamDto, CreateTeamRequest, UpdateTeamRequest, DivisionDto } from '../.
                   }
 
                   <div class="d-flex gap-2">
+                    <!-- The list is already narrowed to what this administrator administers,
+                         so for them this is always true. Kept as a guard rather than an
+                         assumption: offering an action the API will refuse is how a 403
+                         reaches somebody who did nothing wrong. -->
+                    @if (auth.canAdministerTeam(team)) {
                     <button
                       class="btn btn-sm btn-outline-primary flex-grow-1"
                       (click)="showEditModal(team)"
                     >
                       <i class="bi bi-pencil"></i> Edit
                     </button>
-                    <button
-                      class="btn btn-sm btn-outline-danger"
-                      (click)="confirmDelete(team)"
-                      [disabled]="team.playerCount > 0"
-                      [title]="
-                        team.playerCount > 0
-                          ? 'Cannot delete: has players'
-                          : 'Delete team'
-                      "
-                    >
-                      <i class="bi bi-trash"></i>
-                    </button>
+                    }
+                    @if (auth.canDeleteTeam(team)) {
+                      <button
+                        class="btn btn-sm btn-outline-danger"
+                        (click)="confirmDelete(team)"
+                        [disabled]="team.playerCount > 0"
+                        [title]="
+                          team.playerCount > 0
+                            ? 'Cannot delete: has players'
+                            : 'Delete team'
+                        "
+                      >
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    }
                   </div>
                 </div>
               </div>
@@ -152,9 +163,11 @@ import { TeamDto, CreateTeamRequest, UpdateTeamRequest, DivisionDto } from '../.
             <i class="bi bi-shield display-1 text-muted"></i>
             <h3 class="mt-3">No Teams Found</h3>
             <p class="text-muted">Add your first team to get started</p>
-            <button class="btn btn-primary" data-testid="add-team" (click)="showAddModal()">
-              <i class="bi bi-plus-circle"></i> Add Team
-            </button>
+            @if (auth.canCreateTeam()) {
+              <button class="btn btn-primary" data-testid="add-team" (click)="showAddModal()">
+                <i class="bi bi-plus-circle"></i> Add Team
+              </button>
+            }
           </div>
         </div>
       }
@@ -420,6 +433,8 @@ import { TeamDto, CreateTeamRequest, UpdateTeamRequest, DivisionDto } from '../.
 })
 export class TeamsAdminComponent implements OnInit {
   private teamService = inject(TeamService);
+  // Public: the template asks it what to offer, so a club nobody may edit shows no Edit button.
+  readonly auth = inject(AuthService);
   private divisionService = inject(DivisionService);
   private uploadService = inject(UploadService);
 
@@ -448,7 +463,10 @@ export class TeamsAdminComponent implements OnInit {
 
     this.teamService.getAll().subscribe({
       next: (data) => {
-        this.teams.set(data);
+        // Narrowed to the clubs this administrator administers — their own, or every club in
+        // a division they run. A team admin looking after one club had been scrolling the
+        // whole league with an Edit button on every row of it.
+        this.teams.set(data.filter(t => this.auth.canAdministerTeam(t)));
         this.loading.set(false);
       },
       error: (err) => {

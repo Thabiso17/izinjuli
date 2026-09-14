@@ -1,3 +1,4 @@
+using iDiski.Application.Common.Authorization;
 using iDiski.Application.Common.Exceptions;
 using iDiski.Application.Common.Interfaces;
 using iDiski.Application.Common.Models;
@@ -184,6 +185,14 @@ public sealed class GetMatchByIdQueryHandler
 // COMMANDS
 // ═════════════════════════════════════════════════════════════════════════════
 
+/// <summary>
+/// Scoped to the home club's division. [Authorize(Policy = "CanManageDivisions")] on the
+/// endpoint only asks whether the requester is a division admin at all — it does not ask
+/// *which* divisions — so without this any division admin could put a fixture into anybody's
+/// competition. Checking the home club is enough: the handler refuses a fixture whose two
+/// clubs are in different divisions, so either the away club is in the same division or there
+/// is no fixture to authorise.
+/// </summary>
 public sealed record CreateMatchResultCommand(
     DateTime MatchDate,
     int      MatchweekNumber,
@@ -192,7 +201,10 @@ public sealed record CreateMatchResultCommand(
     Guid     AwayTeamId,
     string?  Venue,
     string?  Referee
-) : IRequest<Guid>;
+) : IRequest<Guid>, IRequireTeamAccess
+{
+    Guid IRequireTeamAccess.TeamId => HomeTeamId;
+}
 
 public sealed class CreateMatchResultCommandValidator
     : AbstractValidator<CreateMatchResultCommand>
@@ -282,7 +294,13 @@ public sealed class CreateMatchResultCommandHandler
     }
 }
 
-/// <summary>Updates the score and status of a match — used when submitting final results.</summary>
+/// <summary>
+/// Updates the score and status of a match — used when submitting final results.
+///
+/// Scoped to the division the fixture belongs to. This is the one that mattered most: entering
+/// a result is not just a row, it moves a table and, in a knockout, puts a club into the next
+/// round. Any division admin could previously do that to any competition in the league.
+/// </summary>
 /// <param name="HomePenalties">
 /// Shootout score, for a knockout tie level after ninety minutes. A league match is happy to
 /// end in a draw; a bracket fixture has to send somebody through.
@@ -295,7 +313,10 @@ public sealed record UpdateMatchScoreCommand(
     string?     Notes,
     int?        HomePenalties = null,
     int?        AwayPenalties = null
-) : IRequest;
+) : IRequest, IRequireMatchAccess
+{
+    Guid IRequireMatchAccess.MatchId => Id;
+}
 
 public sealed class UpdateMatchScoreCommandValidator
     : AbstractValidator<UpdateMatchScoreCommand>
