@@ -244,7 +244,27 @@ test.describe('competition formats', () => {
     const divisionId = await division.inputValue();
 
     await modal.locator('input[name="startDate"]').fill('2033-07-01');
+
+    // Played once through. The dialog opens on home and away, which would make this two
+    // fixtures and leave the league unfinished after one result — the competition would be
+    // correctly reported as still in progress and this test would be testing nothing it meant
+    // to. The radio is a visually hidden Bootstrap btn-check, so the label is the clickable
+    // part.
+    await modal.locator('label[for="singleRound"]').click();
+
+    const generated = page.waitForResponse(
+      (r) => r.url().includes('/api/matchresults/generate') && r.request().method() === 'POST',
+    );
+
     await modal.locator('button:has-text("Generate Fixtures")').last().click();
+
+    const created = await generated;
+    expect(created.status(), await created.text()).toBe(200);
+
+    // Two clubs playing once is one fixture, so one result finishes the whole competition.
+    // Asserted rather than assumed: this number is the reason the rest of the test works.
+    expect((await created.json()).fixturesGenerated, 'two clubs, played once').toBe(1);
+
     await expect(modal).toBeHidden();
 
     // ── Drawn but unplayed is not under way ────────────────────────────────
