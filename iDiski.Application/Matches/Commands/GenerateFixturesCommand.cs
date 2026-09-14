@@ -1,6 +1,7 @@
 using iDiski.Application.Common.Exceptions;
 using iDiski.Application.Common.Interfaces;
 using iDiski.Domain.Entities;
+using iDiski.Domain.Services;
 using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
@@ -137,14 +138,27 @@ public sealed class GenerateFixturesCommandHandler
             _db.MatchResults.RemoveRange(existing);
         }
 
-        // 4. Generate round-robin fixtures
-        var fixtures = GenerateRoundRobinFixtures(
-            teams,
-            division.Id,
-            request.Season,
-            request.IsHomeAndAway,
-            request.StartDate,
-            request.DaysBetweenMatchweeks);
+        // 4. Build the fixtures the way this competition is played
+        var fixtures = division.Format switch
+        {
+            CompetitionFormat.Knockout => KnockoutBracket.Build(
+                teams.Select(t => t.Id).ToList(),
+                division.Id,
+                request.Season,
+                request.StartDate,
+                request.DaysBetweenMatchweeks),
+
+            CompetitionFormat.GroupAndKnockout => GenerateGroupsAndBracket(
+                teams, division, request),
+
+            _ => GenerateRoundRobinFixtures(
+                teams,
+                division.Id,
+                request.Season,
+                request.IsHomeAndAway,
+                request.StartDate,
+                request.DaysBetweenMatchweeks),
+        };
 
         // 5. Save to database
         _db.MatchResults.AddRange(fixtures);
@@ -161,6 +175,91 @@ public sealed class GenerateFixturesCommandHandler
             FirstMatchDate: firstDate,
             LastMatchDate: lastDate
         );
+    }
+
+    /// <summary>
+    /// Groups first, then the bracket the qualifiers will play.
+    ///
+    /// The bracket is created empty. Nobody knows who is coming out of the groups yet, but the
+    /// organiser still wants the shape of the knockout settled when the competition is drawn
+    /// up — how many rounds, on what dates, at what venue.
+    /// </summary>
+    private static List<MatchResult> GenerateGroupsAndBracket(
+        List<Team> teams,
+        Division division,
+        GenerateFixturesCommand request)
+    {
+        var groupCount = request.GroupCount ?? 2;
+
+        if (groupCount > teams.Count / 2)
+        {
+            throw new Common.Exceptions.ValidationException(
+                new List<FluentValidation.Results.ValidationFailure>
+                {
+                    new("GroupCount",
+                        $"{teams.Count} teams cannot fill {groupCount} groups — each group "
+                        + "needs at least two.")
+                });
+        }
+
+        // Deal the teams out one at a time rather than cutting the list into blocks, so an
+        // uneven entry list spreads the extra teams across groups instead of loading the last.
+        var groups = Enumerable.Range(0, groupCount).Select(_ => new List<Team>()).ToList();
+        for (var i = 0; i < teams.Count; i++)
+            groups[i % groupCount].Add(teams[i]);
+
+        var smallestGroup = groups.Min(g => g.Count);
+        if (request.TeamsAdvancingPerGroup > smallestGroup)
+        {
+            throw new Common.Exceptions.ValidationException(
+                new List<FluentValidation.Results.ValidationFailure>
+                {
+                    new("TeamsAdvancingPerGroup",
+                        $"Cannot advance {request.TeamsAdvancingPerGroup} from every group when "
+                        + $"the smallest holds {smallestGroup}.")
+                });
+        }
+
+        var fixtures = new List<MatchResult>();
+
+        for (var i = 0; i < groups.Count; i++)
+        {
+            var name = ((char)('A' + i)).ToString();
+
+            var groupFixtures = GenerateRoundRobinFixtures(
+                groups[i],
+                division.Id,
+                request.Season,
+                request.IsHomeAndAway,
+                request.StartDate,
+                request.DaysBetweenMatchweeks);
+
+            foreach (var fixture in groupFixtures)
+            {
+                fixture.Stage = MatchStage.Group;
+                fixture.GroupName = name;
+            }
+
+            fixtures.AddRange(groupFixtures);
+        }
+
+        // The bracket picks up the matchweek after the longest group finishes, so a group with
+        // fewer teams does not leave the knockout starting on top of another group's last round.
+        var groupMatchweeks = fixtures.Count == 0 ? 0 : fixtures.Max(f => f.MatchweekNumber);
+        var qualifiers = groups.Count * request.TeamsAdvancingPerGroup;
+
+        var bracketStart = DateTime.SpecifyKind(request.StartDate, DateTimeKind.Utc)
+            .AddDays(groupMatchweeks * request.DaysBetweenMatchweeks);
+
+        fixtures.AddRange(KnockoutBracket.BuildEmpty(
+            qualifiers,
+            division.Id,
+            request.Season,
+            bracketStart,
+            request.DaysBetweenMatchweeks,
+            groupMatchweeks + 1));
+
+        return fixtures;
     }
 
     /// <summary>
