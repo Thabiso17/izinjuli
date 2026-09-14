@@ -274,8 +274,16 @@ app.MapControllers(); // This maps your ArticlesController, TeamsController, etc
 app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", timestamp = DateTime.UtcNow }))
    .WithTags("Health");
 
+// ── OPERATOR ENDPOINTS ────────────────────────────────────────────────────────
+// These migrate and seed the database. Every one of them was reachable by anybody who knew
+// the URL, in production, with no sign-in at all — including the reset below, which truncates
+// every table in the league. Outside Development they now require a super admin, and the
+// destructive ones are not mapped in production at all.
+var operatorOnly = (RouteHandlerBuilder route) =>
+    app.Environment.IsDevelopment() ? route : route.RequireAuthorization("SuperAdminOnly");
+
 // Migration endpoint - run this first on Railway to create database schema
-app.MapPost("/api/migrate", async (LeagueDbContext db) =>
+operatorOnly(app.MapPost("/api/migrate", async (LeagueDbContext db) =>
 {
     try
     {
@@ -286,89 +294,97 @@ app.MapPost("/api/migrate", async (LeagueDbContext db) =>
     {
         return Results.Problem($"Migration failed: {ex.Message}");
     }
-}).WithTags("Database");
+}).WithTags("Database"));
 
 // Manual SQL execution endpoint - for applying migrations when EF Core fails
-app.MapPost("/api/migrate/manual", async (LeagueDbContext db) =>
+// Development only: raw DDL against the live schema, kept for local recovery.
+if (app.Environment.IsDevelopment())
 {
-    try
+    app.MapPost("/api/migrate/manual", async (LeagueDbContext db) =>
     {
-        // Add IsPinned column to Articles if it doesn't exist
-        await db.Database.ExecuteSqlRawAsync(@"
-            DO $$
-            BEGIN
-                IF NOT EXISTS (SELECT 1 FROM information_schema.columns
-                               WHERE table_name='Articles' AND column_name='IsPinned') THEN
-                    ALTER TABLE ""Articles"" ADD COLUMN ""IsPinned"" boolean NOT NULL DEFAULT false;
-                    CREATE INDEX ""IX_Articles_IsPinned"" ON ""Articles"" (""IsPinned"");
-                END IF;
-            END $$;
-        ");
+        try
+        {
+            // Add IsPinned column to Articles if it doesn't exist
+            await db.Database.ExecuteSqlRawAsync(@"
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                                   WHERE table_name='Articles' AND column_name='IsPinned') THEN
+                        ALTER TABLE ""Articles"" ADD COLUMN ""IsPinned"" boolean NOT NULL DEFAULT false;
+                        CREATE INDEX ""IX_Articles_IsPinned"" ON ""Articles"" (""IsPinned"");
+                    END IF;
+                END $$;
+            ");
 
-        // Create Videos table if it doesn't exist
-        await db.Database.ExecuteSqlRawAsync(@"
-            CREATE TABLE IF NOT EXISTS ""Videos"" (
-                ""Id"" uuid NOT NULL,
-                ""Title"" character varying(300) NOT NULL,
-                ""VideoUrl"" character varying(500) NOT NULL,
-                ""Description"" text,
-                ""ThumbnailUrl"" text,
-                ""Author"" character varying(100) NOT NULL,
-                ""IsPublished"" boolean NOT NULL,
-                ""PublishedAt"" timestamp with time zone,
-                ""IsPinned"" boolean NOT NULL,
-                ""ViewCount"" integer NOT NULL,
-                ""CreatedAt"" timestamp with time zone NOT NULL,
-                ""UpdatedAt"" timestamp with time zone NOT NULL,
-                CONSTRAINT ""PK_Videos"" PRIMARY KEY (""Id"")
-            );
+            // Create Videos table if it doesn't exist
+            await db.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE IF NOT EXISTS ""Videos"" (
+                    ""Id"" uuid NOT NULL,
+                    ""Title"" character varying(300) NOT NULL,
+                    ""VideoUrl"" character varying(500) NOT NULL,
+                    ""Description"" text,
+                    ""ThumbnailUrl"" text,
+                    ""Author"" character varying(100) NOT NULL,
+                    ""IsPublished"" boolean NOT NULL,
+                    ""PublishedAt"" timestamp with time zone,
+                    ""IsPinned"" boolean NOT NULL,
+                    ""ViewCount"" integer NOT NULL,
+                    ""CreatedAt"" timestamp with time zone NOT NULL,
+                    ""UpdatedAt"" timestamp with time zone NOT NULL,
+                    CONSTRAINT ""PK_Videos"" PRIMARY KEY (""Id"")
+                );
 
-            CREATE INDEX IF NOT EXISTS ""IX_Videos_IsPinned"" ON ""Videos"" (""IsPinned"");
-            CREATE INDEX IF NOT EXISTS ""IX_Videos_PublishedAt"" ON ""Videos"" (""PublishedAt"");
-        ");
+                CREATE INDEX IF NOT EXISTS ""IX_Videos_IsPinned"" ON ""Videos"" (""IsPinned"");
+                CREATE INDEX IF NOT EXISTS ""IX_Videos_PublishedAt"" ON ""Videos"" (""PublishedAt"");
+            ");
 
-        // Update migration history
-        await db.Database.ExecuteSqlRawAsync(@"
-            INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
-            VALUES ('20260523160000_AddIsPinnedToArticle', '9.0.0')
-            ON CONFLICT DO NOTHING;
+            // Update migration history
+            await db.Database.ExecuteSqlRawAsync(@"
+                INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
+                VALUES ('20260523160000_AddIsPinnedToArticle', '9.0.0')
+                ON CONFLICT DO NOTHING;
 
-            INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
-            VALUES ('20260523160100_AddVideoEntity', '9.0.0')
-            ON CONFLICT DO NOTHING;
-        ");
+                INSERT INTO ""__EFMigrationsHistory"" (""MigrationId"", ""ProductVersion"")
+                VALUES ('20260523160100_AddVideoEntity', '9.0.0')
+                ON CONFLICT DO NOTHING;
+            ");
 
-        return Results.Ok(new { message = "Manual migrations applied successfully!" });
-    }
-    catch (Exception ex)
-    {
-        return Results.Problem($"Manual migration failed: {ex.Message}");
-    }
-}).WithTags("Database");
+            return Results.Ok(new { message = "Manual migrations applied successfully!" });
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem($"Manual migration failed: {ex.Message}");
+        }
+    }).WithTags("Database");
+}
 
 // Fix UpdatedAt column nullability in Videos table
-app.MapPost("/api/migrate/fix-videos", async (LeagueDbContext db) =>
+// Development only: raw DDL against the live schema, long since applied by a migration.
+if (app.Environment.IsDevelopment())
 {
-    try
+    app.MapPost("/api/migrate/fix-videos", async (LeagueDbContext db) =>
     {
-        await db.Database.ExecuteSqlRawAsync(@"
-            ALTER TABLE ""Videos"" ALTER COLUMN ""UpdatedAt"" DROP NOT NULL;
-        ");
+        try
+        {
+            await db.Database.ExecuteSqlRawAsync(@"
+                ALTER TABLE ""Videos"" ALTER COLUMN ""UpdatedAt"" DROP NOT NULL;
+            ");
 
-        return Results.Ok(new { message = "Videos table UpdatedAt column fixed successfully!" });
-    }
-    catch (Exception ex)
-    {
-        return Results.Problem($"Fix failed: {ex.Message}");
-    }
-}).WithTags("Database");
+            return Results.Ok(new { message = "Videos table UpdatedAt column fixed successfully!" });
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem($"Fix failed: {ex.Message}");
+        }
+    }).WithTags("Database");
+}
 
 // ── SEED DATA ENDPOINTS ───────────────────────────────────────────────────────
 // Call these endpoints to seed the database with sample data
 
 // Basic seed (current season data)
 // Example: GET http://localhost:5207/api/seed
-app.MapGet("/api/seed", async (LeagueDbContext db, IServiceProvider services) =>
+operatorOnly(app.MapGet("/api/seed", async (LeagueDbContext db, IServiceProvider services) =>
 {
     try
     {
@@ -379,11 +395,11 @@ app.MapGet("/api/seed", async (LeagueDbContext db, IServiceProvider services) =>
     {
         return Results.Problem($"Failed to seed database: {ex.Message}");
     }
-}).WithTags("Seed");
+}).WithTags("Seed"));
 
 // Historical seed (PSL 2015/16, Premier League 2012/13, WPL 2019/20)
 // Example: GET http://localhost:5207/api/seed/historical
-app.MapGet("/api/seed/historical", async (LeagueDbContext db) =>
+operatorOnly(app.MapGet("/api/seed/historical", async (LeagueDbContext db) =>
 {
     try
     {
@@ -394,11 +410,11 @@ app.MapGet("/api/seed/historical", async (LeagueDbContext db) =>
     {
         return Results.Problem($"Failed to seed historical data: {ex.Message}");
     }
-}).WithTags("Seed");
+}).WithTags("Seed"));
 
 // Comprehensive historical seed with REAL players, results, and match events
 // Example: GET http://localhost:5207/api/seed/comprehensive
-app.MapGet("/api/seed/comprehensive", async (LeagueDbContext db) =>
+operatorOnly(app.MapGet("/api/seed/comprehensive", async (LeagueDbContext db) =>
 {
     try
     {
@@ -417,35 +433,40 @@ app.MapGet("/api/seed/comprehensive", async (LeagueDbContext db) =>
     {
         return Results.Problem($"Failed to seed comprehensive data: {ex.Message}");
     }
-}).WithTags("Seed");
+}).WithTags("Seed"));
 
 // Clear all data and reseed comprehensive
-// WARNING: This deletes ALL data! Example: DELETE http://localhost:5207/api/seed/reset
-app.MapDelete("/api/seed/reset", async (LeagueDbContext db) =>
+// Development only. This truncates every table in the league — matches, players, teams,
+// divisions, articles, sponsors — and there is no version of production where a stranger,
+// or anybody, should be able to do that over HTTP.
+if (app.Environment.IsDevelopment())
 {
-    try
+    app.MapDelete("/api/seed/reset", async (LeagueDbContext db) =>
     {
-        // Delete all data in correct order (respecting foreign keys)
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"MatchEvents\" CASCADE");
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Suspensions\" CASCADE");
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"MatchResults\" CASCADE");
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Players\" CASCADE");
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Articles\" CASCADE");
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Teams\" CASCADE");
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Divisions\" CASCADE");
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Sponsors\" CASCADE");
-        await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"PageLayoutConfigs\" CASCADE");
+        try
+        {
+            // Delete all data in correct order (respecting foreign keys)
+            await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"MatchEvents\" CASCADE");
+            await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Suspensions\" CASCADE");
+            await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"MatchResults\" CASCADE");
+            await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Players\" CASCADE");
+            await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Articles\" CASCADE");
+            await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Teams\" CASCADE");
+            await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Divisions\" CASCADE");
+            await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"Sponsors\" CASCADE");
+            await db.Database.ExecuteSqlRawAsync("TRUNCATE TABLE \"PageLayoutConfigs\" CASCADE");
 
-        // Reseed comprehensive data
-        await iDiski.Infrastructure.Seed.ComprehensiveHistoricalSeeder.SeedComprehensiveData(db);
+            // Reseed comprehensive data
+            await iDiski.Infrastructure.Seed.ComprehensiveHistoricalSeeder.SeedComprehensiveData(db);
 
-        return Results.Ok(new { message = "Database cleared and reseeded with comprehensive data!" });
-    }
-    catch (Exception ex)
-    {
-        return Results.Problem($"Failed to reset and reseed: {ex.Message}");
-    }
-}).WithTags("Seed");
+            return Results.Ok(new { message = "Database cleared and reseeded with comprehensive data!" });
+        }
+        catch (Exception ex)
+        {
+            return Results.Problem($"Failed to reset and reseed: {ex.Message}");
+        }
+    }).WithTags("Seed");
+}
 
 app.Run();
 

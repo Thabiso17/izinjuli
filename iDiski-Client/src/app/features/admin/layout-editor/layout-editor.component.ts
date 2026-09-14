@@ -60,6 +60,7 @@ import { PageLayoutConfigDto, LayoutZone, PageLayoutConfigEditorItem } from '../
                         }
                       </div>
                       <button
+                        data-testid="toggle-visibility"
                         (click)="toggleVisibility(item)"
                         class="px-3 py-1 text-sm rounded transition-colors"
                         [class.bg-green-100]="item.isVisible"
@@ -113,6 +114,7 @@ import { PageLayoutConfigDto, LayoutZone, PageLayoutConfigEditorItem } from '../
                         }
                       </div>
                       <button
+                        data-testid="toggle-visibility"
                         (click)="toggleVisibility(item)"
                         class="px-3 py-1 text-sm rounded transition-colors"
                         [class.bg-green-100]="item.isVisible"
@@ -153,6 +155,7 @@ import { PageLayoutConfigDto, LayoutZone, PageLayoutConfigEditorItem } from '../
               Reset
             </button>
             <button
+              data-testid="save-layout"
               (click)="saveLayout()"
               [disabled]="!hasUnsavedChanges() || saving()"
               class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -222,18 +225,55 @@ export class LayoutEditorComponent implements OnInit {
     });
   }
 
+  /**
+   * Every component the site knows how to render, with saved settings laid over the top.
+   *
+   * Listing only the saved rows made this page unable to fix the one thing it exists for: a
+   * database with no layout rows gave an empty board, and the homepage — which reads the same
+   * rows — rendered nothing, with no way out from the UI. It also meant a section added in
+   * code stayed invisible here until somebody wrote a row by hand.
+   *
+   * A component nobody has configured starts visible, in the zone it was written for. A blank
+   * homepage is far more likely to be a fault than somebody's intention.
+   */
   private buildEditorState(configs: PageLayoutConfigDto[]): void {
-    const items: PageLayoutConfigEditorItem[] = configs.map((config) => {
-      const entry = this.registry.getComponent(config.componentName);
-      return {
-        ...config,
-        zone: entry?.defaultZone || 'main',
-      };
-    });
+    const saved = new Map(configs.map((config) => [config.componentName, config]));
 
-    this.mainZoneItems.set(items.filter((item) => item.zone === 'main'));
-    this.sidebarZoneItems.set(items.filter((item) => item.zone === 'sidebar'));
-    this.hasUnsavedChanges.set(false);
+    // Saved rows keep the order they were given; anything new goes after them.
+    const highestOrder = configs.reduce((highest, c) => Math.max(highest, c.displayOrder), -1);
+    let nextOrder = highestOrder + 1;
+
+    const items: PageLayoutConfigEditorItem[] = this.registry
+      .getAllComponentNames()
+      .map((componentName) => {
+        const entry = this.registry.getComponent(componentName);
+        const config = saved.get(componentName);
+
+        if (config) {
+          return { ...config, zone: entry?.defaultZone || 'main' };
+        }
+
+        return {
+          id: '',
+          pageName: 'main',
+          componentName,
+          displayOrder: nextOrder++,
+          isVisible: true,
+          configJson: null,
+          modifiedByUser: '',
+          zone: entry?.defaultZone || 'main',
+        };
+      });
+
+    const byOrder = (a: PageLayoutConfigEditorItem, b: PageLayoutConfigEditorItem) =>
+      a.displayOrder - b.displayOrder;
+
+    this.mainZoneItems.set(items.filter((item) => item.zone === 'main').sort(byOrder));
+    this.sidebarZoneItems.set(items.filter((item) => item.zone === 'sidebar').sort(byOrder));
+
+    // A component that has never been saved is a change waiting to be written, so the save
+    // button is live from the start rather than pretending the board matches the database.
+    this.hasUnsavedChanges.set(items.some((item) => !item.id));
   }
 
   onDrop(event: CdkDragDrop<PageLayoutConfigEditorItem[]>, targetZone: LayoutZone): void {

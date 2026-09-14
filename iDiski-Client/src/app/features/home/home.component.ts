@@ -78,7 +78,9 @@ export class HomeComponent implements OnInit {
 
     this.layoutService.getLayout('main').subscribe({
       next: (configs) => {
-        const sections = this.buildSections(configs);
+        const sections = this.buildSections(
+          configs.length > 0 ? configs : this.defaultLayout(),
+        );
 
         // Separate into main and sidebar zones
         const main = sections.filter(s => {
@@ -101,6 +103,30 @@ export class HomeComponent implements OnInit {
         this.loading.set(false);
       },
     });
+  }
+
+  /**
+   * What to show when nothing has been configured at all.
+   *
+   * The homepage is built entirely from saved layout rows, so an empty table rendered an
+   * empty page — no fixtures, no standings, no articles — and the editor could not fix it,
+   * because it too listed only saved rows. A fresh install showed visitors nothing.
+   *
+   * This is the fallback rather than a write: the first save from the layout editor puts
+   * real rows in, and from then on the editor is in charge. Only a completely empty table
+   * falls back, so an administrator who has deliberately hidden every section keeps their
+   * blank page.
+   */
+  private defaultLayout(): PageLayoutConfigDto[] {
+    return this.registry.getAllComponentNames().map((componentName, index) => ({
+      id: '',
+      pageName: 'main',
+      componentName,
+      displayOrder: index,
+      isVisible: true,
+      configJson: null,
+      modifiedByUser: '',
+    }));
   }
 
   private buildSections(configs: PageLayoutConfigDto[]): RenderedSection[] {

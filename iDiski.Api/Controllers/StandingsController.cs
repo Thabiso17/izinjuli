@@ -26,8 +26,10 @@ public sealed class StandingsController : BaseApiController
         [FromQuery] int   season,
         [FromQuery] Guid? divisionId = null,
         [FromQuery] int?  upToMatchweek = null,
+        [FromQuery] string? group = null,
         CancellationToken ct = default) =>
-        Ok(await Sender.Send(new GetLeagueStandingsQuery(season, divisionId, upToMatchweek), ct));
+        Ok(await Sender.Send(
+            new GetLeagueStandingsQuery(season, divisionId, upToMatchweek, group), ct));
 
     /// <summary>
     /// Returns the top scorers leaderboard for a season.

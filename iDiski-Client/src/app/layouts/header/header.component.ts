@@ -204,6 +204,17 @@ import { AuthService } from '../../core/services/auth.service';
                     <li><hr class="dropdown-divider" /></li>
                     <li>
                       <a
+                        class="dropdown-item"
+                        routerLink="/admin/users"
+                        routerLinkActive="active"
+                        (click)="closeMenu()"
+                        data-testid="nav-administrators"
+                      >
+                        <i class="bi bi-people me-2"></i>Administrators
+                      </a>
+                    </li>
+                    <li>
+                      <a
                         class="dropdown-item text-danger"
                         routerLink="/admin/clear-data"
                         routerLinkActive="active"

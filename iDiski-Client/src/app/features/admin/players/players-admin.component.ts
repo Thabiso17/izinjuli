@@ -116,6 +116,7 @@ import { getImageUrl } from '../../../core/utils/image.utils';
                 @for (player of players(); track player.id) {
                   <tr
                     class="player-row"
+                    data-testid="player-row"
                     [class.selected]="selectedPlayerId() === player.id"
                     (click)="selectPlayer(player.id)"
                   >
@@ -138,7 +139,7 @@ import { getImageUrl } from '../../../core/utils/image.utils';
                       }
                     </td>
                     <td class="fw-semibold">{{ player.fullName }}</td>
-                    <td>{{ player.teamName }}</td>
+                    <td data-testid="player-team">{{ player.teamName }}</td>
                     <td>
                       <span class="badge bg-secondary">{{ player.jerseyNumber }}</span>
                     </td>

@@ -58,6 +58,11 @@ export interface GenerateFixturesCommand {
   isHomeAndAway: boolean;
   startDate: string; // ISO date string
   daysBetweenMatchweeks: number;
+  replaceExisting?: boolean;
+  /** Groups-then-knockout only: how many groups to split the entrants into. */
+  groupCount?: number;
+  /** Groups-then-knockout only: how many come out of each group into the bracket. */
+  teamsAdvancingPerGroup?: number;
 }
 
 export interface GenerateFixturesResult {

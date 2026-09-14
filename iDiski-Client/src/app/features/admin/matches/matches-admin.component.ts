@@ -7,11 +7,14 @@ import { TeamService } from '../../../core/services/team.service';
 import { DivisionService } from '../../../core/services/division.service';
 import {
   MatchResultDto,
+  knockoutRoundName,
+  shootoutSuffix,
   CreateMatchCommand,
   UpdateMatchScoreCommand,
   TeamDto,
   DivisionDto,
   MatchStatus,
+  CompetitionFormat,
 } from '../../../core/models';
 
 @Component({
@@ -125,7 +128,7 @@ import {
         <div class="row g-3">
           @for (match of matches(); track match.id) {
             <div class="col-12">
-              <div class="card shadow-sm">
+              <div class="card shadow-sm" data-testid="match-card">
                 <div class="card-body">
                   <div class="row align-items-center">
                     <div class="col-md-2">
@@ -139,8 +142,17 @@ import {
                         {{ match.matchDate | date: 'HH:mm' }}
                       </div>
                       @if (match.divisionName) {
-                        <div class="badge bg-info text-dark mt-2">
+                        <div class="badge bg-info text-dark mt-2" data-testid="match-division">
                           {{ match.divisionName }}
+                        </div>
+                      }
+                      @if (roundName(match.knockoutRoundSize); as round) {
+                        <div class="badge bg-dark mt-2 ms-1" data-testid="match-round">
+                          {{ round }}
+                        </div>
+                      } @else if (match.groupName) {
+                        <div class="badge bg-secondary mt-2 ms-1" data-testid="match-group">
+                          Group {{ match.groupName }}
                         </div>
                       }
                     </div>
@@ -157,7 +169,9 @@ import {
                                 style="width: 30px; height: 30px; object-fit: contain"
                               />
                             }
-                            <span class="fw-semibold">{{ match.homeTeamName }}</span>
+                            <span class="fw-semibold" data-testid="match-home">
+                              {{ match.homeTeamName || 'To be decided' }}
+                            </span>
                           </div>
                         </div>
 
@@ -165,6 +179,11 @@ import {
                         <div class="text-center px-4">
                           <div class="fs-4 fw-bold">
                             {{ match.scoreDisplay }}
+                            @if (shootout(match); as pens) {
+                              <div class="small text-muted" data-testid="shootout-score">
+                                {{ pens }}
+                              </div>
+                            }
                           </div>
                           <span
                             class="badge"
@@ -181,7 +200,9 @@ import {
                         <!-- Away Team -->
                         <div class="text-start" style="flex: 1">
                           <div class="d-flex align-items-center gap-2">
-                            <span class="fw-semibold">{{ match.awayTeamName }}</span>
+                            <span class="fw-semibold" data-testid="match-away">
+                              {{ match.awayTeamName || 'To be decided' }}
+                            </span>
                             @if (match.awayTeamLogo) {
                               <img
                                 [src]="match.awayTeamLogo"
@@ -497,10 +518,29 @@ import {
             </div>
             <div class="modal-body">
               <form #generateForm="ngForm">
-                <div class="alert alert-info">
+                <div class="alert alert-info" data-testid="generate-explains-format">
                   <i class="bi bi-info-circle me-2"></i>
-                  <strong>Auto-generate all fixtures</strong> for a division using the round-robin algorithm.
-                  Each team will play every other team once (single) or twice (home & away).
+                  @switch (generateFormat()) {
+                    @case ('Knockout') {
+                      <strong>A knockout bracket.</strong> Every round is drawn up now, down to
+                      the final — the later rounds wait with empty slots, and each winner moves
+                      into the fixture they have earned as results come in. Entrants are seeded
+                      so the strongest two can only meet in the final, and if the entry list is
+                      not a power of two the strongest get a bye.
+                    }
+                    @case ('GroupAndKnockout') {
+                      <strong>Groups, then a knockout.</strong> Everyone plays their own group
+                      in full, and the bracket the qualifiers will contest is drawn up at the
+                      same time — empty, because nobody has come through yet.
+                    }
+                    @default {
+                      <strong>A league.</strong> Every team plays every other, once or twice,
+                      and the table decides it.
+                    }
+                  }
+                  <div class="mt-2 small">
+                    This follows the division's format. To change it, change the division.
+                  </div>
                 </div>
 
                 <div class="mb-3">
@@ -508,6 +548,7 @@ import {
                   <select
                     class="form-select"
                     [(ngModel)]="generateFormData.divisionId"
+                    (ngModelChange)="onGenerateDivisionChanged()"
                     name="divisionId"
                     required
                   >
@@ -555,15 +596,16 @@ import {
                       [(ngModel)]="generateFormData.daysBetweenMatchweeks"
                       name="daysBetweenMatchweeks"
                       required
-                      min="1"
+                      min="0"
                       max="30"
                       placeholder="7"
                     />
                     <small class="text-muted">Typically 7 days (weekly)</small>
                   </div>
 
+                  @if (generateFormat() !== 'Knockout') {
                   <div class="col-md-6">
-                    <label class="form-label">Format *</label>
+                    <label class="form-label">Meetings *</label>
                     <div class="btn-group w-100" role="group">
                       <input
                         type="radio"
@@ -592,6 +634,64 @@ import {
                     <small class="text-muted d-block mt-1">
                       {{ generateFormData.isHomeAndAway ? 'Each team plays twice (home/away)' : 'Each team plays once' }}
                     </small>
+                  </div>
+                  }
+
+                  @if (generateFormat() === 'GroupAndKnockout') {
+                    <div class="col-md-6">
+                      <label class="form-label">Groups *</label>
+                      <input
+                        type="number"
+                        class="form-control"
+                        [(ngModel)]="generateFormData.groupCount"
+                        name="groupCount"
+                        data-testid="group-count"
+                        min="2"
+                        max="16"
+                        required
+                      />
+                      <small class="text-muted">Each group needs at least two teams.</small>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Advancing from each group *</label>
+                      <input
+                        type="number"
+                        class="form-control"
+                        [(ngModel)]="generateFormData.teamsAdvancingPerGroup"
+                        name="teamsAdvancingPerGroup"
+                        data-testid="teams-advancing"
+                        min="1"
+                        max="8"
+                        required
+                      />
+                      <small class="text-muted">
+                        This decides how big the bracket is.
+                      </small>
+                    </div>
+
+                    <div class="col-12">
+                      <div class="alert alert-light border mb-0 py-2" data-testid="group-shape">
+                        {{ groupShape() }}
+                      </div>
+                    </div>
+                  }
+                </div>
+                <div class="form-check mt-3">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="replaceExisting"
+                    [(ngModel)]="generateFormData.replaceExisting"
+                    name="replaceExisting"
+                  />
+                  <label class="form-check-label" for="replaceExisting">
+                    Replace this division's existing fixtures for the season
+                  </label>
+                  <div class="form-text">
+                    Generating adds to what is already there. Leave this unticked and the league
+                    will refuse rather than give the division a second copy of its season. Ticking
+                    it clears the current fixtures first, and is refused once any of them have
+                    been played.
                   </div>
                 </div>
               </form>
@@ -667,6 +767,42 @@ import {
                       min="0"
                     />
                   </div>
+
+                  @if (needsAShootout()) {
+                    <div class="col-12">
+                      <div class="alert alert-warning py-2 mb-0 small" data-testid="shootout-needed">
+                        Level after ninety minutes, and a cup tie has to send somebody through.
+                        Record the shootout, or this result cannot be saved.
+                      </div>
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label">Home Penalties *</label>
+                      <input
+                        type="number"
+                        class="form-control"
+                        [(ngModel)]="scoreFormData.homePenalties"
+                        name="homePenalties"
+                        data-testid="home-penalties"
+                        min="0"
+                      />
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label">Away Penalties *</label>
+                      <input
+                        type="number"
+                        class="form-control"
+                        [(ngModel)]="scoreFormData.awayPenalties"
+                        name="awayPenalties"
+                        data-testid="away-penalties"
+                        min="0"
+                      />
+                    </div>
+                    <div class="col-12">
+                      <small class="text-muted" data-testid="who-goes-through">
+                        {{ whoGoesThrough() }}
+                      </small>
+                    </div>
+                  }
 
                   <div class="col-12">
                     <label class="form-label">Status *</label>
@@ -784,12 +920,127 @@ export class MatchesAdminComponent implements OnInit {
 
   createFormData: any = this.getEmptyCreateForm();
   scoreFormData: any = { homeScore: 0, awayScore: 0, status: 'Completed', notes: '' };
-  generateFormData = {
+  /**
+   * The format of the division chosen in the generate dialog, which decides what the dialog
+   * asks for. A bracket has no home and away leg, and only a group competition needs to know
+   * how many groups there are.
+   */
+  /**
+   * What choosing a division fills in for itself: its season, and groups of four, which is how
+   * an organiser thinks about it — thirty-two entrants make eight groups, not "eight" as a
+   * number they worked out themselves. Both adjustable afterwards; this only sets the starting
+   * point when a division is chosen.
+   */
+  onGenerateDivisionChanged(): void {
+    // A division is one season's competition — its season is part of what identifies it — but
+    // this dialog opened on the current year whatever was picked. Generating a 2033 division's
+    // fixtures into 2026 succeeded and then showed nothing: the division's own page reads its
+    // own season, so the whole competition was written somewhere nobody looks. Still editable,
+    // for the organiser who really is building next season early.
+    const season = this.generateDivision()?.season;
+    if (season) this.generateFormData.season = season;
+
+    if (this.generateFormat() !== 'GroupAndKnockout') return;
+
+    const teams = this.generateDivision()?.teamCount ?? 0;
+    if (teams < 4) return;
+
+    const groups = Math.max(2, Math.min(Math.round(teams / 4), Math.floor(teams / 2)));
+    this.generateFormData.groupCount = groups;
+  }
+
+  private generateDivision(): DivisionDto | undefined {
+    return this.divisions().find((d) => d.id === this.generateFormData.divisionId);
+  }
+
+  /**
+   * What the numbers currently in the form will actually produce. A group stage is easy to
+   * ask for and hard to picture, and the shape is only obvious once it is written out —
+   * getting it wrong means deleting a whole competition's fixtures to try again.
+   */
+  groupShape(): string {
+    const teams = this.generateDivision()?.teamCount ?? 0;
+    const groups = Number(this.generateFormData.groupCount);
+    const advancing = Number(this.generateFormData.teamsAdvancingPerGroup);
+
+    if (!teams) return 'Choose a division to see the shape of the competition.';
+    if (!groups || groups < 2) return 'A group stage needs at least two groups.';
+    if (groups > Math.floor(teams / 2)) {
+      return `${teams} teams cannot fill ${groups} groups — each group needs at least two.`;
+    }
+
+    // Teams are dealt out one at a time, so an uneven entry leaves some groups one larger
+    // rather than loading the last group with everyone left over.
+    const smaller = Math.floor(teams / groups);
+    const larger = smaller + 1;
+    const largerCount = teams % groups;
+
+    const sizes =
+      largerCount === 0
+        ? `${groups} groups of ${smaller}`
+        : `${largerCount} group${largerCount === 1 ? '' : 's'} of ${larger} and ` +
+          `${groups - largerCount} of ${smaller}`;
+
+    // A group can be played once through or home and away — a World Cup group is single, the
+    // old Champions League group stage was double — and it doubles the fixtures either way.
+    // Leaving it out of a summary that claims to say what will be produced hides a factor of
+    // two from the person about to commit to it.
+    const meetings = this.generateFormData.isHomeAndAway ? 2 : 1;
+    const tiesIn = (size: number) => (size * (size - 1)) / 2;
+
+    const groupTies =
+      meetings *
+      (largerCount * tiesIn(larger) + (groups - largerCount) * tiesIn(smaller));
+
+    const played =
+      meetings === 2
+        ? `played home and away: ${groupTies} group ties`
+        : `played once through: ${groupTies} group ties`;
+
+    if (!advancing || advancing < 1) return `${teams} teams → ${sizes}, ${played}.`;
+    if (advancing > smaller) {
+      return `${teams} teams → ${sizes}. Cannot advance ${advancing} from every group when the smallest holds ${smaller}.`;
+    }
+
+    const qualifiers = groups * advancing;
+    let bracket = 2;
+    while (bracket < qualifiers) bracket *= 2;
+
+    const round = knockoutRoundName(bracket) ?? `Round of ${bracket}`;
+    const byes = bracket - qualifiers;
+
+    const knockout =
+      byes === 0
+        ? `${qualifiers} qualify for the ${round}`
+        : `${qualifiers} qualify for the ${round}, with ${byes} ` +
+          `bye${byes === 1 ? '' : 's'}`;
+
+    return `${teams} teams → ${sizes}, ${played}. Top ${advancing} from each → ${knockout}.`;
+  }
+
+  generateFormat(): CompetitionFormat {
+    const chosen = this.divisions().find((d) => d.id === this.generateFormData.divisionId);
+    return chosen?.format ?? 'League';
+  }
+
+  generateFormData: {
+    divisionId: string;
+    season: number;
+    isHomeAndAway: boolean;
+    startDate: string;
+    daysBetweenMatchweeks: number;
+    replaceExisting: boolean;
+    groupCount: number;
+    teamsAdvancingPerGroup: number;
+  } = {
     divisionId: '',
     season: new Date().getFullYear(),
     isHomeAndAway: true,
     startDate: '',
-    daysBetweenMatchweeks: 7
+    daysBetweenMatchweeks: 7,
+    replaceExisting: false,
+    groupCount: 2,
+    teamsAdvancingPerGroup: 2
   };
 
   ngOnInit() {
@@ -849,6 +1100,9 @@ export class MatchesAdminComponent implements OnInit {
   }
 
   /** Teams of the given division, or every team when none is chosen. */
+  /** What a bracket round of that size is called. */
+  roundName = knockoutRoundName;
+
   getTeamsByDivision(divisionId: string | null | undefined) {
     const all = this.teams();
     return divisionId ? all.filter((t) => t.divisionId === divisionId) : all;
@@ -928,7 +1182,12 @@ export class MatchesAdminComponent implements OnInit {
       season: this.filterSeason,
       isHomeAndAway: true,
       startDate: new Date().toISOString().split('T')[0],
-      daysBetweenMatchweeks: 7
+      daysBetweenMatchweeks: 7,
+      // Always reopens unticked: replacing a season is a deliberate choice, never a leftover
+      // from the last time the modal was open.
+      replaceExisting: false,
+      groupCount: 2,
+      teamsAdvancingPerGroup: 2
     };
     this.showGenerateFixturesModal.set(true);
   }
@@ -946,7 +1205,16 @@ export class MatchesAdminComponent implements OnInit {
       season: this.generateFormData.season,
       isHomeAndAway: this.generateFormData.isHomeAndAway,
       startDate: this.generateFormData.startDate,
-      daysBetweenMatchweeks: this.generateFormData.daysBetweenMatchweeks
+      daysBetweenMatchweeks: this.generateFormData.daysBetweenMatchweeks,
+      replaceExisting: this.generateFormData.replaceExisting,
+      // Only meaningful for a group competition, and sending them otherwise would put numbers
+      // on the request that the format has no use for.
+      ...(this.generateFormat() === 'GroupAndKnockout'
+        ? {
+            groupCount: this.generateFormData.groupCount,
+            teamsAdvancingPerGroup: this.generateFormData.teamsAdvancingPerGroup
+          }
+        : {})
     };
 
     this.matchService.generateFixtures(command).subscribe({
@@ -998,6 +1266,38 @@ export class MatchesAdminComponent implements OnInit {
     });
   }
 
+  /**
+   * A knockout tie that finished level. A league match is perfectly happy to end in a draw;
+   * a bracket fixture has to name somebody to go into the next round, so the shootout is the
+   * only way the result can be recorded at all.
+   */
+  shootout(match: MatchResultDto): string | null {
+    return shootoutSuffix(match.homePenalties, match.awayPenalties);
+  }
+
+  needsAShootout(): boolean {
+    const match = this.selectedMatch();
+    if (!match || match.stage !== 'Knockout') return false;
+
+    return Number(this.scoreFormData.homeScore) === Number(this.scoreFormData.awayScore);
+  }
+
+  /** Says who the shootout has sent through, so the entry can be checked before it is saved. */
+  whoGoesThrough(): string {
+    const match = this.selectedMatch();
+    if (!match) return '';
+
+    const home = this.numberOrUndefined(this.scoreFormData.homePenalties);
+    const away = this.numberOrUndefined(this.scoreFormData.awayPenalties);
+
+    // Nothing to say until both are filled in.
+    if (home === undefined || away === undefined) return '';
+    if (home === away) return 'A shootout cannot be level either — somebody has to win it.';
+
+    const through = home > away ? match.homeTeamName : match.awayTeamName;
+    return `${through} goes through.`;
+  }
+
   showScoreModal(match: MatchResultDto) {
     this.selectedMatch.set(match);
     this.scoreFormData = {
@@ -1005,8 +1305,17 @@ export class MatchesAdminComponent implements OnInit {
       awayScore: match.awayScore,
       status: match.status === 'Scheduled' ? 'Completed' : match.status,
       notes: match.notes || '',
+      homePenalties: match.homePenalties ?? null,
+      awayPenalties: match.awayPenalties ?? null,
     };
     this.showUpdateScoreModal.set(true);
+  }
+
+  private numberOrUndefined(value: unknown): number | undefined {
+    if (value === null || value === undefined || value === '') return undefined;
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
   }
 
   closeScoreModal() {
@@ -1026,6 +1335,14 @@ export class MatchesAdminComponent implements OnInit {
       awayScore: this.scoreFormData.awayScore,
       status: this.scoreFormData.status as MatchStatus,
       notes: this.scoreFormData.notes || undefined,
+      // Sent only when the tie is actually level, so a decisive result that was corrected
+      // from a draw does not keep the shootout that settled the earlier one.
+      ...(this.needsAShootout()
+        ? {
+            homePenalties: this.numberOrUndefined(this.scoreFormData.homePenalties),
+            awayPenalties: this.numberOrUndefined(this.scoreFormData.awayPenalties),
+          }
+        : {}),
     };
 
     this.matchService.updateScore(this.selectedMatch()!.id, command).subscribe({

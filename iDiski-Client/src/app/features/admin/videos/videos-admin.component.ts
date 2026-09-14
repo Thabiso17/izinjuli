@@ -29,7 +29,7 @@ interface VideoFormData {
           <p class="text-muted">Upload and manage featured videos for the homepage</p>
         </div>
         <div class="col-auto">
-          <button class="btn btn-primary" (click)="showAddModal()">
+          <button class="btn btn-primary" data-testid="add-video" (click)="showAddModal()">
             <i class="bi bi-plus-circle"></i> Add Video
           </button>
         </div>
@@ -174,7 +174,7 @@ interface VideoFormData {
             <i class="bi bi-camera-video display-1 text-muted"></i>
             <h3 class="mt-3">No Videos Found</h3>
             <p class="text-muted">Add your first video to get started</p>
-            <button class="btn btn-primary" (click)="showAddModal()">
+            <button class="btn btn-primary" data-testid="add-video" (click)="showAddModal()">
               <i class="bi bi-plus-circle"></i> Add Video
             </button>
           </div>
@@ -364,6 +364,7 @@ interface VideoFormData {
               <button
                 type="button"
                 class="btn btn-primary"
+                data-testid="save-video"
                 (click)="saveVideo()"
                 [disabled]="videoForm.invalid || saving()"
               >

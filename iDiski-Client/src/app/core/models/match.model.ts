@@ -7,6 +7,44 @@ export type MatchStatus =
   | 'Postponed'
   | 'Cancelled';
 
+export type MatchStage = 'League' | 'Group' | 'Knockout';
+
+/**
+ * What a round of that size is called. Derived from the number of teams left rather than sent
+ * down as a label, so the bracket names itself whatever size it is.
+ */
+/**
+ * How a shootout reads beside the score, or null when there was not one.
+ *
+ * Built here rather than in the projection for the same reason the round name is: composing
+ * it in SQL means concatenating integers, which translates on one provider and throws on
+ * another — and it would throw while loading the entire fixtures list.
+ */
+export function shootoutSuffix(
+  homePenalties: number | null | undefined,
+  awayPenalties: number | null | undefined,
+): string | null {
+  if (homePenalties === null || homePenalties === undefined) return null;
+  if (awayPenalties === null || awayPenalties === undefined) return null;
+
+  return `(${homePenalties}-${awayPenalties} on penalties)`;
+}
+
+export function knockoutRoundName(teamsLeft: number | null | undefined): string | null {
+  if (!teamsLeft) return null;
+
+  switch (teamsLeft) {
+    case 2:
+      return 'Final';
+    case 4:
+      return 'Semi-final';
+    case 8:
+      return 'Quarter-final';
+    default:
+      return `Round of ${teamsLeft}`;
+  }
+}
+
 export interface MatchResultDto {
   id: string;
   matchDate: string;
@@ -19,17 +57,28 @@ export interface MatchResultDto {
   scoreDisplay: string;
   homeScore: number;
   awayScore: number;
-  homeTeamId: string;
-  homeTeamName: string;
+  // Null until a knockout slot is filled: a semi-final is scheduled while the quarter-finals
+  // are still being played, so it has a date and a venue before it has teams.
+  homeTeamId: string | null;
+  homeTeamName: string | null;
   homeTeamLogo: string | null;
-  homeTeamShortCode: string;
-  awayTeamId: string;
-  awayTeamName: string;
+  homeTeamShortCode: string | null;
+  awayTeamId: string | null;
+  awayTeamName: string | null;
   awayTeamLogo: string | null;
-  awayTeamShortCode: string;
+  awayTeamShortCode: string | null;
   notes: string | null;
   divisionId: string | null;
   divisionName: string | null;
+  /** Which part of the competition this belongs to. */
+  stage: MatchStage;
+  /** For a group-stage fixture: "A", "B", and so on. */
+  groupName: string | null;
+  /** Teams left at this point in a bracket: 2 is the final, 4 the semi-finals. */
+  knockoutRoundSize: number | null;
+  /** A shootout, when a knockout tie finished level. Null for everything else. */
+  homePenalties: number | null;
+  awayPenalties: number | null;
   events: any[]; // Will be populated with MatchEventDto[]
 }
 
@@ -50,6 +99,9 @@ export interface UpdateMatchScoreCommand {
   awayScore: number;
   status: MatchStatus;
   notes?: string;
+  /** Only for a knockout tie level after ninety minutes; somebody has to go through. */
+  homePenalties?: number;
+  awayPenalties?: number;
 }
 
 // src/app/core/models/pagination.model.ts

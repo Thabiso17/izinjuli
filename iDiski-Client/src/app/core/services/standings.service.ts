@@ -18,11 +18,14 @@ export class StandingsService {
   getLeagueTable(
     season: number,
     divisionId?: string,
-    upToMatchweek?: number
+    upToMatchweek?: number,
+    /** One group of a group stage. Omitted, the table covers the whole division. */
+    group?: string
   ): Observable<LeagueTableDto> {
     let params = new HttpParams().set('season', season.toString());
     if (divisionId) params = params.set('divisionId', divisionId);
     if (upToMatchweek !== undefined) params = params.set('upToMatchweek', upToMatchweek.toString());
+    if (group) params = params.set('group', group);
     return this.http.get<LeagueTableDto>(`${this.base}/table`, { params });
   }
 

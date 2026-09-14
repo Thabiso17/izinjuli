@@ -41,7 +41,7 @@ interface UpdateSponsorCommand extends CreateSponsorCommand {
           <p class="text-muted">Manage sponsor logos and ad placements</p>
         </div>
         <div class="col-auto">
-          <button class="btn btn-primary" (click)="showAddModal()">
+          <button class="btn btn-primary" data-testid="add-sponsor" (click)="showAddModal()">
             <i class="bi bi-plus-circle"></i> Add Sponsor
           </button>
         </div>
@@ -141,7 +141,7 @@ interface UpdateSponsorCommand extends CreateSponsorCommand {
             <i class="bi bi-tag display-1 text-muted"></i>
             <h3 class="mt-3">No Sponsors Found</h3>
             <p class="text-muted">Add your first sponsor to get started</p>
-            <button class="btn btn-primary" (click)="showAddModal()">
+            <button class="btn btn-primary" data-testid="add-sponsor" (click)="showAddModal()">
               <i class="bi bi-plus-circle"></i> Add Sponsor
             </button>
           </div>
@@ -342,6 +342,7 @@ interface UpdateSponsorCommand extends CreateSponsorCommand {
               <button
                 type="button"
                 class="btn btn-primary"
+                data-testid="save-sponsor"
                 (click)="saveSponsor()"
                 [disabled]="sponsorForm.invalid || saving()"
               >

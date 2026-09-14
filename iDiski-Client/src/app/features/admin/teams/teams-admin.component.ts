@@ -17,7 +17,7 @@ import { TeamDto, CreateTeamRequest, UpdateTeamRequest, DivisionDto } from '../.
           <p class="text-muted">Manage football teams and their details</p>
         </div>
         <div class="col-auto">
-          <button class="btn btn-primary" (click)="showAddModal()">
+          <button class="btn btn-primary" data-testid="add-team" (click)="showAddModal()">
             <i class="bi bi-plus-circle"></i> Add Team
           </button>
         </div>
@@ -152,7 +152,7 @@ import { TeamDto, CreateTeamRequest, UpdateTeamRequest, DivisionDto } from '../.
             <i class="bi bi-shield display-1 text-muted"></i>
             <h3 class="mt-3">No Teams Found</h3>
             <p class="text-muted">Add your first team to get started</p>
-            <button class="btn btn-primary" (click)="showAddModal()">
+            <button class="btn btn-primary" data-testid="add-team" (click)="showAddModal()">
               <i class="bi bi-plus-circle"></i> Add Team
             </button>
           </div>
@@ -395,6 +395,7 @@ import { TeamDto, CreateTeamRequest, UpdateTeamRequest, DivisionDto } from '../.
               <button
                 type="button"
                 class="btn btn-primary"
+                data-testid="save-team"
                 (click)="saveTeam()"
                 [disabled]="teamForm.invalid || saving()"
               >

@@ -70,6 +70,7 @@ public sealed class CreateDivisionCommandHandler
             Name = request.Name,
             ShortCode = request.ShortCode.ToUpperInvariant(),
             Season = request.Season,
+            Format = request.Format,
             AgeGroup = request.AgeGroup,
             Gender = gender,
             StartDate = request.StartDate.HasValue ? DateTime.SpecifyKind(request.StartDate.Value, DateTimeKind.Utc) : null,
@@ -133,9 +134,27 @@ public sealed class UpdateDivisionCommandHandler
             _ => null
         };
 
+        // Changing the format once fixtures exist would leave them describing a competition
+        // that is no longer being played — league fixtures in a bracket with nothing linking
+        // them, or a bracket in a league table. The fixtures have to go first.
+        if (request.Format != division.Format)
+        {
+            var hasFixtures = await _db.MatchResults
+                .AnyAsync(m => m.DivisionId == division.Id, cancellationToken);
+
+            if (hasFixtures)
+            {
+                throw new InvalidOperationException(
+                    "This division already has fixtures, so how it is played cannot be changed "
+                    + "now. Delete the fixtures first, then change the format and generate them "
+                    + "again.");
+            }
+        }
+
         division.Name = request.Name;
         division.ShortCode = request.ShortCode.ToUpperInvariant();
         division.Season = request.Season;
+        division.Format = request.Format;
         division.AgeGroup = request.AgeGroup;
         division.Gender = gender;
         division.IsActive = request.IsActive;
@@ -214,6 +233,7 @@ public sealed class GetDivisionsQueryHandler
                 d.Name,
                 d.ShortCode,
                 d.Season,
+                d.Format,
                 d.AgeGroup,
                 d.Gender.HasValue ? d.Gender.Value.ToString() : null,
                 d.IsActive,
@@ -249,6 +269,7 @@ public sealed class GetDivisionByIdQueryHandler
                 d.Name,
                 d.ShortCode,
                 d.Season,
+                d.Format,
                 d.AgeGroup,
                 d.Gender.HasValue ? d.Gender.Value.ToString() : null,
                 d.IsActive,
