@@ -97,7 +97,12 @@ test.describe('competition formats', () => {
     await page.locator('button:has-text("Generate Fixtures")').first().click();
 
     const modal = page.locator('.modal.show');
-    await selectDivision(modal.locator('select[name="divisionId"]'), name);
+    const division = modal.locator('select[name="divisionId"]');
+    await selectDivision(division, name);
+
+    // Taken from the select rather than from the public list, which filters by season.
+    const divisionId = await division.inputValue();
+
     await modal.locator('input[name="season"]').fill('2033');
     await modal.locator('input[name="startDate"]').fill('2033-06-04');
     // A tournament played out over one weekend: every round on the same day.
@@ -122,6 +127,23 @@ test.describe('competition formats', () => {
       body.firstMatchDate.slice(0, 10),
       'with no days between rounds the whole thing is played on one day',
     ).toBe(body.lastMatchDate.slice(0, 10));
+
+    // And the public page draws it as a bracket. A league table says nothing about a cup —
+    // knockout ties are deliberately kept out of the standings, so this page used to tell a
+    // knockout division it had no matches however many were played.
+    await page.goto(`/divisions/${divisionId}`);
+    await page.waitForLoadState('networkidle');
+
+    const bracket = page.locator('[data-testid="bracket"]');
+    await expect(bracket).toBeVisible();
+
+    // Two rounds, drawn before either was played: the semi-finals and the final.
+    await expect(bracket.locator('[data-testid="bracket-round"]')).toHaveCount(2);
+    await expect(bracket.locator('[data-testid="bracket-tie"]')).toHaveCount(3);
+
+    // The final has nobody in it yet, which is the point of drawing the whole thing up front.
+    await expect(bracket).toContainText('Final');
+    await expect(bracket).toContainText('To be decided');
   });
 
   test('a drawn knockout tie asks for the shootout instead of refusing', async ({ page }) => {

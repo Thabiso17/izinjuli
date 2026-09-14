@@ -1,15 +1,22 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { DivisionService, StandingsService } from '../../core/services';
-import { DivisionDto, StandingDto, TopScorerDto } from '../../core/models';
+import { DivisionService, MatchService, StandingsService } from '../../core/services';
+import { DivisionDto, MatchResultDto, StandingDto, TopScorerDto } from '../../core/models';
+import { BracketComponent } from './bracket.component';
 import { getImageUrl } from '../../core/utils/image.utils';
 import { ScopedArticlesComponent } from '../../shared/components/scoped-articles.component';
 import { ScopedVideosComponent } from '../../shared/components/scoped-videos.component';
 
 @Component({
   selector: 'app-division-detail',
-  imports: [CommonModule, RouterLink, ScopedArticlesComponent, ScopedVideosComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    ScopedArticlesComponent,
+    ScopedVideosComponent,
+    BracketComponent,
+  ],
   template: `
     <div class="container py-5">
       @if (loading()) {
@@ -67,12 +74,36 @@ import { ScopedVideosComponent } from '../../shared/components/scoped-videos.com
         </div>
 
         <div class="row g-4">
-          <!-- League table -->
+          <!-- The bracket, for a competition that has one. A league table says nothing about
+               a cup: knockout ties are deliberately kept out of the standings, so this page
+               used to tell a knockout division it had no matches however many were played. -->
+          @if (division()?.format !== 'League') {
+            <div class="col-12">
+              <section class="card shadow-sm mb-4">
+                <div class="card-body">
+                  <h2 class="h4 mb-4">
+                    <i class="bi bi-diagram-3 text-primary me-2"></i>
+                    {{ division()?.format === 'GroupAndKnockout' ? 'Knockout Stage' : 'Bracket' }}
+                  </h2>
+
+                  @if (fixturesLoading()) {
+                    <div class="text-center py-4">
+                      <div class="spinner-border spinner-border-sm" role="status"></div>
+                    </div>
+                  } @else {
+                    <app-bracket [matches]="fixtures()" />
+                  }
+                </div>
+              </section>
+            </div>
+          }
+
           <div class="col-lg-8">
             <section class="card shadow-sm mb-4">
               <div class="card-body">
                 <h2 class="h4 mb-4">
-                  <i class="bi bi-table text-primary me-2"></i>League Table
+                  <i class="bi bi-table text-primary me-2"></i>
+                  {{ division()?.format === 'GroupAndKnockout' ? 'Group Stage' : 'League Table' }}
                 </h2>
 
                 @if (standingsLoading()) {
@@ -222,13 +253,16 @@ export class DivisionDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly divisionService = inject(DivisionService);
   private readonly standingsService = inject(StandingsService);
+  private readonly matchService = inject(MatchService);
 
   division = signal<DivisionDto | null>(null);
   standings = signal<StandingDto[]>([]);
+  fixtures = signal<MatchResultDto[]>([]);
   topScorers = signal<TopScorerDto[]>([]);
 
   loading = signal(true);
   standingsLoading = signal(true);
+  fixturesLoading = signal(true);
   scorersLoading = signal(true);
   error = signal<string | null>(null);
 
@@ -248,6 +282,9 @@ export class DivisionDetailComponent implements OnInit {
         this.loading.set(false);
         this.loadStandings(division);
         this.loadTopScorers(division);
+
+        if (division.format !== 'League') this.loadBracket(division);
+        else this.fixturesLoading.set(false);
       },
       error: (err) => {
         this.error.set(
@@ -266,6 +303,20 @@ export class DivisionDetailComponent implements OnInit {
       },
       error: () => this.standingsLoading.set(false),
     });
+  }
+
+  private loadBracket(division: DivisionDto): void {
+    // A page size that holds a bracket of sixty-four and its group stage. Paging this would
+    // mean a bracket missing its later rounds, which is worse than a slow page.
+    this.matchService
+      .getAll(division.season, undefined, undefined, undefined, division.id, 1, 200)
+      .subscribe({
+        next: (page) => {
+          this.fixtures.set(page.items);
+          this.fixturesLoading.set(false);
+        },
+        error: () => this.fixturesLoading.set(false),
+      });
   }
 
   private loadTopScorers(division: DivisionDto): void {
