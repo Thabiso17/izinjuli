@@ -101,9 +101,9 @@ import {
               </thead>
               <tbody>
                 @for (suspension of suspensions(); track suspension.id) {
-                  <tr>
+                  <tr data-testid="suspension-row">
                     <td class="fw-semibold">{{ suspension.playerName }}</td>
-                    <td>{{ suspension.teamName }}</td>
+                    <td data-testid="suspension-team">{{ suspension.teamName }}</td>
                     <td>
                       <span class="text-danger">
                         <i class="bi bi-exclamation-triangle"></i>

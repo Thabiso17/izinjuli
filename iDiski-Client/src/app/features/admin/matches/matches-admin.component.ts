@@ -125,7 +125,7 @@ import {
         <div class="row g-3">
           @for (match of matches(); track match.id) {
             <div class="col-12">
-              <div class="card shadow-sm">
+              <div class="card shadow-sm" data-testid="match-card">
                 <div class="card-body">
                   <div class="row align-items-center">
                     <div class="col-md-2">
@@ -139,7 +139,7 @@ import {
                         {{ match.matchDate | date: 'HH:mm' }}
                       </div>
                       @if (match.divisionName) {
-                        <div class="badge bg-info text-dark mt-2">
+                        <div class="badge bg-info text-dark mt-2" data-testid="match-division">
                           {{ match.divisionName }}
                         </div>
                       }
@@ -157,7 +157,7 @@ import {
                                 style="width: 30px; height: 30px; object-fit: contain"
                               />
                             }
-                            <span class="fw-semibold">{{ match.homeTeamName }}</span>
+                            <span class="fw-semibold" data-testid="match-home">{{ match.homeTeamName }}</span>
                           </div>
                         </div>
 
@@ -181,7 +181,7 @@ import {
                         <!-- Away Team -->
                         <div class="text-start" style="flex: 1">
                           <div class="d-flex align-items-center gap-2">
-                            <span class="fw-semibold">{{ match.awayTeamName }}</span>
+                            <span class="fw-semibold" data-testid="match-away">{{ match.awayTeamName }}</span>
                             @if (match.awayTeamLogo) {
                               <img
                                 [src]="match.awayTeamLogo"
