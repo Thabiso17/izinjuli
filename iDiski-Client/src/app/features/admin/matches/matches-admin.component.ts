@@ -143,6 +143,15 @@ import {
                           {{ match.divisionName }}
                         </div>
                       }
+                      @if (match.roundName) {
+                        <div class="badge bg-dark mt-2 ms-1" data-testid="match-round">
+                          {{ match.roundName }}
+                        </div>
+                      } @else if (match.groupName) {
+                        <div class="badge bg-secondary mt-2 ms-1" data-testid="match-group">
+                          Group {{ match.groupName }}
+                        </div>
+                      }
                     </div>
 
                     <div class="col-md-7">
@@ -157,7 +166,9 @@ import {
                                 style="width: 30px; height: 30px; object-fit: contain"
                               />
                             }
-                            <span class="fw-semibold" data-testid="match-home">{{ match.homeTeamName }}</span>
+                            <span class="fw-semibold" data-testid="match-home">
+                              {{ match.homeTeamName || 'To be decided' }}
+                            </span>
                           </div>
                         </div>
 
@@ -181,7 +192,9 @@ import {
                         <!-- Away Team -->
                         <div class="text-start" style="flex: 1">
                           <div class="d-flex align-items-center gap-2">
-                            <span class="fw-semibold" data-testid="match-away">{{ match.awayTeamName }}</span>
+                            <span class="fw-semibold" data-testid="match-away">
+                              {{ match.awayTeamName || 'To be decided' }}
+                            </span>
                             @if (match.awayTeamLogo) {
                               <img
                                 [src]="match.awayTeamLogo"

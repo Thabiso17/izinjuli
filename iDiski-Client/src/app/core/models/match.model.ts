@@ -7,6 +7,8 @@ export type MatchStatus =
   | 'Postponed'
   | 'Cancelled';
 
+export type MatchStage = 'League' | 'Group' | 'Knockout';
+
 export interface MatchResultDto {
   id: string;
   matchDate: string;
@@ -19,17 +21,27 @@ export interface MatchResultDto {
   scoreDisplay: string;
   homeScore: number;
   awayScore: number;
-  homeTeamId: string;
-  homeTeamName: string;
+  // Null until a knockout slot is filled: a semi-final is scheduled while the quarter-finals
+  // are still being played, so it has a date and a venue before it has teams.
+  homeTeamId: string | null;
+  homeTeamName: string | null;
   homeTeamLogo: string | null;
-  homeTeamShortCode: string;
-  awayTeamId: string;
-  awayTeamName: string;
+  homeTeamShortCode: string | null;
+  awayTeamId: string | null;
+  awayTeamName: string | null;
   awayTeamLogo: string | null;
-  awayTeamShortCode: string;
+  awayTeamShortCode: string | null;
   notes: string | null;
   divisionId: string | null;
   divisionName: string | null;
+  /** Which part of the competition this belongs to. */
+  stage: MatchStage;
+  /** For a group-stage fixture: "A", "B", and so on. */
+  groupName: string | null;
+  /** Teams left at this point in a bracket: 2 is the final, 4 the semi-finals. */
+  knockoutRoundSize: number | null;
+  /** That round's name, worked out server-side so every screen says the same thing. */
+  roundName: string | null;
   events: any[]; // Will be populated with MatchEventDto[]
 }
 

@@ -27,7 +27,11 @@ test.describe('generating fixtures', () => {
     await expect(modal).toBeVisible();
 
     await modal.locator('select[name="divisionId"]').selectOption({ label: division! });
-    await modal.locator('input[name="startDate"]').fill('2027-03-01');
+    // A season the seeded league has no fixtures for. Reusing the current one now fails by
+    // design: generating twice would give the division a second copy of its season, and the
+    // guard refuses rather than append.
+    await modal.locator('input[name="season"]').fill('2031');
+    await modal.locator('input[name="startDate"]').fill('2031-03-01');
 
     const generated = page.waitForResponse(
       (r) =>
@@ -61,7 +65,8 @@ test.describe('generating fixtures', () => {
     await expect(modal).toBeVisible();
 
     await modal.locator('select[name="divisionId"]').selectOption({ label: division! });
-    await modal.locator('input[name="startDate"]').fill('2027-03-01');
+    await modal.locator('input[name="season"]').fill('2032');
+    await modal.locator('input[name="startDate"]').fill('2032-03-01');
     await modal.locator('button:has-text("Generate Fixtures")').last().click();
 
     const failure = page.locator('.alert-danger');

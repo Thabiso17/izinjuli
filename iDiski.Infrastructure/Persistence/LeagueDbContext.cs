@@ -113,6 +113,27 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
                   .WithMany(t => t.AwayMatches)
                   .HasForeignKey(m => m.AwayTeamId)
                   .OnDelete(DeleteBehavior.Restrict);
+
+            entity.Property(m => m.Stage)
+                  .HasConversion<string>()
+                  .HasMaxLength(20);
+
+            entity.Property(m => m.NextMatchSlot)
+                  .HasConversion<string>()
+                  .HasMaxLength(10);
+
+            entity.Property(m => m.GroupName).HasMaxLength(20);
+
+            // The bracket link. Restrict rather than cascade: deleting a quarter-final should
+            // fail while a semi-final still points at it, not quietly take the rest of the
+            // bracket with it.
+            entity.HasOne(m => m.NextMatch)
+                  .WithMany()
+                  .HasForeignKey(m => m.NextMatchId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            // Fixture lists for a knockout are read a round at a time.
+            entity.HasIndex(m => new { m.DivisionId, m.Season, m.Stage });
         });
 
         // ── Article ───────────────────────────────────────────────────────────
@@ -260,6 +281,10 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
             entity.Property(d => d.Gender)
                   .HasConversion<string>()
                   .HasMaxLength(10);
+
+            entity.Property(d => d.Format)
+                  .HasConversion<string>()
+                  .HasMaxLength(20);
 
             entity.Property(d => d.Description).HasMaxLength(500);
 

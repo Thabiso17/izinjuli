@@ -21,15 +21,28 @@ public sealed record MatchResultDto(
     string      ScoreDisplay,
     int         HomeScore,
     int         AwayScore,
-    Guid        HomeTeamId,
-    string      HomeTeamName,
+    // Nullable throughout, because a knockout fixture exists before its teams do: the
+    // semi-final is scheduled while the quarter-finals are still being played.
+    Guid?       HomeTeamId,
+    string?     HomeTeamName,
     string?     HomeTeamLogo,
-    string      HomeTeamShortCode,
-    Guid        AwayTeamId,
-    string      AwayTeamName,
+    string?     HomeTeamShortCode,
+    Guid?       AwayTeamId,
+    string?     AwayTeamName,
     string?     AwayTeamLogo,
-    string      AwayTeamShortCode,
-    string?     Notes
+    string?     AwayTeamShortCode,
+    string?     Notes,
+    // The client has always declared these two and the projection never supplied them, so the
+    // division badge on the fixtures list had nothing to render. Required rather than
+    // defaulted: an optional argument cannot be omitted inside an expression tree, and a
+    // projection that tried would not compile — which is how the last one of these was found.
+    Guid?       DivisionId,
+    string?     DivisionName,
+    // Where this fixture sits in its competition.
+    MatchStage  Stage,
+    string?     GroupName,
+    int?        KnockoutRoundSize,
+    string?     RoundName
 );
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -93,9 +106,29 @@ public sealed class GetFixturesQueryHandler
                 m.Status == MatchStatus.Scheduled ? "vs" : $"{m.HomeScore} – {m.AwayScore}",
                 m.HomeScore,
                 m.AwayScore,
-                m.HomeTeamId, m.HomeTeam.Name, m.HomeTeam.LogoUrl, m.HomeTeam.ShortCode,
-                m.AwayTeamId, m.AwayTeam.Name, m.AwayTeam.LogoUrl, m.AwayTeam.ShortCode,
-                m.Notes));
+                m.HomeTeamId,
+                m.HomeTeam != null ? m.HomeTeam.Name : null,
+                m.HomeTeam != null ? m.HomeTeam.LogoUrl : null,
+                m.HomeTeam != null ? m.HomeTeam.ShortCode : null,
+                m.AwayTeamId,
+                m.AwayTeam != null ? m.AwayTeam.Name : null,
+                m.AwayTeam != null ? m.AwayTeam.LogoUrl : null,
+                m.AwayTeam != null ? m.AwayTeam.ShortCode : null,
+                m.Notes,
+                m.DivisionId,
+                m.Division != null ? m.Division.Name : null,
+                m.Stage,
+                m.GroupName,
+                m.KnockoutRoundSize,
+                m.KnockoutRoundSize == null
+                    ? null
+                    : m.KnockoutRoundSize == 2
+                        ? "Final"
+                        : m.KnockoutRoundSize == 4
+                            ? "Semi-final"
+                            : m.KnockoutRoundSize == 8
+                                ? "Quarter-final"
+                                : "Round of " + m.KnockoutRoundSize));
 
         return await PaginatedList<MatchResultDto>.CreateAsync(
             projected, request.PageNumber, request.PageSize, cancellationToken);
@@ -125,9 +158,29 @@ public sealed class GetMatchByIdQueryHandler
                 m.Venue, m.Referee, m.Status,
                 m.Status == MatchStatus.Scheduled ? "vs" : $"{m.HomeScore} – {m.AwayScore}",
                 m.HomeScore, m.AwayScore,
-                m.HomeTeamId, m.HomeTeam.Name, m.HomeTeam.LogoUrl, m.HomeTeam.ShortCode,
-                m.AwayTeamId, m.AwayTeam.Name, m.AwayTeam.LogoUrl, m.AwayTeam.ShortCode,
-                m.Notes))
+                m.HomeTeamId,
+                m.HomeTeam != null ? m.HomeTeam.Name : null,
+                m.HomeTeam != null ? m.HomeTeam.LogoUrl : null,
+                m.HomeTeam != null ? m.HomeTeam.ShortCode : null,
+                m.AwayTeamId,
+                m.AwayTeam != null ? m.AwayTeam.Name : null,
+                m.AwayTeam != null ? m.AwayTeam.LogoUrl : null,
+                m.AwayTeam != null ? m.AwayTeam.ShortCode : null,
+                m.Notes,
+                m.DivisionId,
+                m.Division != null ? m.Division.Name : null,
+                m.Stage,
+                m.GroupName,
+                m.KnockoutRoundSize,
+                m.KnockoutRoundSize == null
+                    ? null
+                    : m.KnockoutRoundSize == 2
+                        ? "Final"
+                        : m.KnockoutRoundSize == 4
+                            ? "Semi-final"
+                            : m.KnockoutRoundSize == 8
+                                ? "Quarter-final"
+                                : "Round of " + m.KnockoutRoundSize)))
             .FirstOrDefaultAsync(cancellationToken);
 
         return match ?? throw new NotFoundException(nameof(MatchResult), request.Id);

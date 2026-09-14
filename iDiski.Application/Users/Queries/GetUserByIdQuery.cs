@@ -27,7 +27,9 @@ public sealed class GetUserByIdQueryHandler : IRequestHandler<GetUserByIdQuery, 
                 u.LastLoginAt,
                 u.CreatedAt,
                 u.UpdatedAt,
-                u.UserRoles.Select(ur => ur.Role).ToList() as IReadOnlyList<int>,
+                // Was `.ToList() as IReadOnlyList<int>` on a List<Role>, which is never that
+                // type and so was null every time — the compiler warned about exactly this.
+                u.UserRoles.Select(ur => (int)ur.Role).ToList(),
                 u.UserTeams.Select(ut => ut.TeamId).ToList(),
                 u.UserDivisions.Select(ud => ud.DivisionId).ToList()
             ))
