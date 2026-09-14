@@ -233,12 +233,18 @@ public sealed class CreateMatchResultCommandHandler
 }
 
 /// <summary>Updates the score and status of a match — used when submitting final results.</summary>
+/// <param name="HomePenalties">
+/// Shootout score, for a knockout tie level after ninety minutes. A league match is happy to
+/// end in a draw; a bracket fixture has to send somebody through.
+/// </param>
 public sealed record UpdateMatchScoreCommand(
     Guid        Id,
     int         HomeScore,
     int         AwayScore,
     MatchStatus Status,
-    string?     Notes
+    string?     Notes,
+    int?        HomePenalties = null,
+    int?        AwayPenalties = null
 ) : IRequest;
 
 public sealed class UpdateMatchScoreCommandValidator
@@ -267,11 +273,66 @@ public sealed class UpdateMatchScoreCommandHandler
         var match = await _db.MatchResults.FindAsync([request.Id], cancellationToken)
             ?? throw new NotFoundException(nameof(MatchResult), request.Id);
 
-        match.HomeScore = request.HomeScore;
-        match.AwayScore = request.AwayScore;
-        match.Status    = request.Status;
-        match.Notes     = request.Notes;
+        match.HomeScore     = request.HomeScore;
+        match.AwayScore     = request.AwayScore;
+        match.Status        = request.Status;
+        match.Notes         = request.Notes;
+        match.HomePenalties = request.HomePenalties;
+        match.AwayPenalties = request.AwayPenalties;
+
+        if (match.Stage == MatchStage.Knockout && request.Status == MatchStatus.Completed)
+        {
+            await AdvanceWinnerAsync(match, cancellationToken);
+        }
 
         await _db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Puts the winner into the fixture they have earned.
+    ///
+    /// Without this a bracket is a list of fixtures rather than a tournament: the semi-final
+    /// would sit empty however many quarter-finals were played. Entering the result is the only
+    /// moment the next round can be filled in, so it happens here rather than being left to
+    /// somebody to do by hand.
+    /// </summary>
+    private async Task AdvanceWinnerAsync(MatchResult match, CancellationToken cancellationToken)
+    {
+        if (match.HomeTeamId is null || match.AwayTeamId is null)
+        {
+            throw new InvalidOperationException(
+                "This fixture is still waiting on the round before it, so it cannot have a "
+                + "result yet.");
+        }
+
+        var winner = WinnerOf(match)
+            ?? throw new InvalidOperationException(
+                "A knockout tie has to produce a winner. Record the shootout score, or the "
+                + "result of extra time, so it is clear who goes through.");
+
+        if (match.NextMatchId is null) return; // The final: nothing beyond it.
+
+        var next = await _db.MatchResults.FindAsync([match.NextMatchId.Value], cancellationToken)
+            ?? throw new NotFoundException(nameof(MatchResult), match.NextMatchId.Value);
+
+        // Re-entering a result replaces the team it put through last time rather than adding
+        // to it, so correcting a mistyped score does not leave the wrong club in the next round.
+        if (match.NextMatchSlot == MatchSlot.Away) next.AwayTeamId = winner;
+        else next.HomeTeamId = winner;
+    }
+
+    /// <summary>
+    /// Who goes through, or null if the tie is still level. Ninety minutes first, then the
+    /// shootout — a side that lost on the day but won on penalties is the one that advances.
+    /// </summary>
+    private static Guid? WinnerOf(MatchResult match)
+    {
+        if (match.HomeScore != match.AwayScore)
+            return match.HomeScore > match.AwayScore ? match.HomeTeamId : match.AwayTeamId;
+
+        if (match.HomePenalties is null || match.AwayPenalties is null) return null;
+        if (match.HomePenalties == match.AwayPenalties) return null;
+
+        return match.HomePenalties > match.AwayPenalties ? match.HomeTeamId : match.AwayTeamId;
     }
 }
