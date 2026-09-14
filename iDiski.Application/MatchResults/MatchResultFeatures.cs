@@ -221,11 +221,53 @@ public sealed class CreateMatchResultCommandHandler
         CreateMatchResultCommand request,
         CancellationToken cancellationToken)
     {
+        var home = await _db.Teams
+            .Include(t => t.Division)
+            .FirstOrDefaultAsync(t => t.Id == request.HomeTeamId, cancellationToken)
+            ?? throw new NotFoundException(nameof(Team), request.HomeTeamId);
+
+        var away = await _db.Teams
+            .Include(t => t.Division)
+            .FirstOrDefaultAsync(t => t.Id == request.AwayTeamId, cancellationToken)
+            ?? throw new NotFoundException(nameof(Team), request.AwayTeamId);
+
+        // A fixture belongs to the competition both clubs play in. Nothing set this before, so
+        // a match made by hand had no division at all: it never appeared in a division's
+        // fixture list and never counted towards its table, while looking perfectly saved.
+        if (home.DivisionId is null || away.DivisionId is null)
+        {
+            throw new InvalidOperationException(
+                "A club that is not in a division has nobody to play. Put both clubs in a "
+                + "division first.");
+        }
+
+        if (home.DivisionId != away.DivisionId)
+        {
+            // Gender is carried by the division, so clubs from different divisions can be of
+            // different genders — and a fixture between them is the one mistake here that
+            // nobody would want to explain afterwards. It gets said plainly.
+            var homeGender = home.Division?.Gender;
+            var awayGender = away.Division?.Gender;
+
+            if (homeGender != awayGender)
+            {
+                throw new InvalidOperationException(
+                    $"{home.Name} plays in a {homeGender?.ToString().ToLowerInvariant()} "
+                    + $"division and {away.Name} in a {awayGender?.ToString().ToLowerInvariant()} "
+                    + "one. They cannot be drawn against each other.");
+            }
+
+            throw new InvalidOperationException(
+                $"{home.Name} and {away.Name} are in different divisions, so there is no "
+                + "competition this fixture belongs to.");
+        }
+
         var match = new MatchResult
         {
             MatchDate       = request.MatchDate,
             MatchweekNumber = request.MatchweekNumber,
             Season          = request.Season,
+            DivisionId      = home.DivisionId,
             HomeTeamId      = request.HomeTeamId,
             AwayTeamId      = request.AwayTeamId,
             Venue           = request.Venue,

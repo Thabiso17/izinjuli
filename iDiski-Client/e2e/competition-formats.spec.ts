@@ -150,6 +150,62 @@ test.describe('competition formats', () => {
     await expect(bracket).toContainText('To be decided');
   });
 
+  test('a group competition generates its groups and shows them on the public page', async ({
+    page,
+  }) => {
+    const name = await createDivision(page, 'GroupAndKnockout');
+
+    // Eight entrants into two groups of four, which is the shape a small cup actually uses.
+    for (let i = 1; i <= 8; i++) {
+      await createTeam(page, name, `Grouped ${i} ${unique()}`);
+    }
+
+    await page.goto('/admin/matches');
+    await page.waitForLoadState('networkidle');
+    await page.locator('button:has-text("Generate Fixtures")').first().click();
+
+    const modal = page.locator('.modal.show');
+    const division = modal.locator('select[name="divisionId"]');
+    await selectDivision(division, name);
+
+    const divisionId = await division.inputValue();
+
+    await modal.locator('input[name="season"]').fill('2035');
+    await modal.locator('input[name="startDate"]').fill('2035-06-01');
+    await modal.locator('[data-testid="group-count"]').fill('2');
+    await modal.locator('[data-testid="teams-advancing"]').fill('2');
+
+    // The dialog should already be describing this shape before anything is written.
+    await expect(modal.locator('[data-testid="group-shape"]')).toContainText('8 teams');
+
+    const generated = page.waitForResponse(
+      (r) => r.url().includes('/api/matchresults/generate') && r.request().method() === 'POST',
+    );
+
+    await modal.locator('button:has-text("Generate Fixtures")').last().click();
+
+    const response = await generated;
+    expect(response.status(), await response.text()).toBe(200);
+
+    const body = await response.json();
+
+    // Two groups of four is six ties each, and four qualifiers make two semi-finals and a
+    // final. Exact, because a group competition of this size is never anything else.
+    expect(body.fixturesGenerated, 'twelve group ties and three bracket ties').toBe(15);
+
+    // The public page shows the groups first and the bracket beside them — which is the whole
+    // difference between this and a straight cup.
+    await page.goto(`/divisions/${divisionId}`);
+    await page.waitForLoadState('networkidle');
+
+    const groups = page.locator('[data-testid="group-heading"]');
+    await expect(groups).toHaveCount(2);
+    await expect(groups.first()).toContainText('Group A');
+    await expect(groups.nth(1)).toContainText('Group B');
+
+    await expect(page.locator('[data-testid="bracket"]')).toBeVisible();
+  });
+
   test('a drawn knockout tie asks for the shootout instead of refusing', async ({ page }) => {
     const name = await createDivision(page, 'Knockout');
 
