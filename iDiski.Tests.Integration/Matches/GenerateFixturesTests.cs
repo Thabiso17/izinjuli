@@ -62,7 +62,8 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
 
         var fixtures = await FixturesFor(divisionId);
         var pairings = fixtures
-            .Select(f => Unordered(f.HomeTeamId, f.AwayTeamId))
+            // A league fixture always names both sides; only a bracket slot can be empty.
+            .Select(f => Unordered(f.HomeTeamId!.Value, f.AwayTeamId!.Value))
             .ToList();
 
         pairings.Should().OnlyHaveUniqueItems("a single round is every pair meeting once");
@@ -79,7 +80,9 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
         var fixtures = await FixturesFor(divisionId);
 
         // Ordered this time: A v B and B v A are different fixtures, and both must exist.
-        var ordered = fixtures.Select(f => (f.HomeTeamId, f.AwayTeamId)).ToList();
+        var ordered = fixtures
+            .Select(f => (Home: f.HomeTeamId!.Value, Away: f.AwayTeamId!.Value))
+            .ToList();
         ordered.Should().OnlyHaveUniqueItems("nobody should host the same opponent twice");
 
         foreach (var (home, away) in ordered)
@@ -104,7 +107,7 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
         foreach (var week in fixtures.GroupBy(f => f.MatchweekNumber))
         {
             var playing = week
-                .SelectMany(f => new[] { f.HomeTeamId, f.AwayTeamId })
+                .SelectMany(f => new[] { f.HomeTeamId!.Value, f.AwayTeamId!.Value })
                 .ToList();
 
             playing.Should().OnlyHaveUniqueItems(
