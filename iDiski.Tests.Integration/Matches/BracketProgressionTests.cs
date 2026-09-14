@@ -133,7 +133,10 @@ public class BracketProgressionTests : IClassFixture<IntegrationTestFixture>
 
         final.HomeTeamId.Should().NotBeNull();
         final.AwayTeamId.Should().NotBeNull();
-        final.HomeTeamId.Should().NotBe(final.AwayTeamId,
+
+        // Unwrapped because NotBe has no nullable overload and silently binds to the string
+        // one instead. Both are known to be present by the two assertions above.
+        final.HomeTeamId!.Value.Should().NotBe(final.AwayTeamId!.Value,
             "two different winners cannot be the same club");
     }
 
