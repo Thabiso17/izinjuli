@@ -1,8 +1,15 @@
+using iDiski.Application.Common.Authorization;
 using MediatR;
 
 namespace iDiski.Application.MatchEvents.Commands;
 
-public record RecordMatchEventsCommand : IRequest<Unit>
+/// <summary>
+/// Scoped to the division the fixture belongs to. The endpoint's CanManageDivisions policy
+/// asks only whether somebody is a division admin, never which divisions — and goals and cards
+/// are the detail of a result, so leaving them unscoped would have handed back most of what
+/// scoping the score itself took away.
+/// </summary>
+public record RecordMatchEventsCommand : IRequest<Unit>, IRequireMatchAccess
 {
     public Guid MatchId { get; init; }
     public List<MatchEventInput> Events { get; init; } = new();
