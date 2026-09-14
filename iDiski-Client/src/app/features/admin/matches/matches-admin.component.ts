@@ -594,6 +594,24 @@ import {
                     </small>
                   </div>
                 </div>
+                <div class="form-check mt-3">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="replaceExisting"
+                    [(ngModel)]="generateFormData.replaceExisting"
+                    name="replaceExisting"
+                  />
+                  <label class="form-check-label" for="replaceExisting">
+                    Replace this division's existing fixtures for the season
+                  </label>
+                  <div class="form-text">
+                    Generating adds to what is already there. Leave this unticked and the league
+                    will refuse rather than give the division a second copy of its season. Ticking
+                    it clears the current fixtures first, and is refused once any of them have
+                    been played.
+                  </div>
+                </div>
               </form>
             </div>
             <div class="modal-footer">
@@ -789,7 +807,8 @@ export class MatchesAdminComponent implements OnInit {
     season: new Date().getFullYear(),
     isHomeAndAway: true,
     startDate: '',
-    daysBetweenMatchweeks: 7
+    daysBetweenMatchweeks: 7,
+    replaceExisting: false
   };
 
   ngOnInit() {
@@ -928,7 +947,10 @@ export class MatchesAdminComponent implements OnInit {
       season: this.filterSeason,
       isHomeAndAway: true,
       startDate: new Date().toISOString().split('T')[0],
-      daysBetweenMatchweeks: 7
+      daysBetweenMatchweeks: 7,
+      // Always reopens unticked: replacing a season is a deliberate choice, never a leftover
+      // from the last time the modal was open.
+      replaceExisting: false
     };
     this.showGenerateFixturesModal.set(true);
   }
@@ -946,7 +968,8 @@ export class MatchesAdminComponent implements OnInit {
       season: this.generateFormData.season,
       isHomeAndAway: this.generateFormData.isHomeAndAway,
       startDate: this.generateFormData.startDate,
-      daysBetweenMatchweeks: this.generateFormData.daysBetweenMatchweeks
+      daysBetweenMatchweeks: this.generateFormData.daysBetweenMatchweeks,
+      replaceExisting: this.generateFormData.replaceExisting
     };
 
     this.matchService.generateFixtures(command).subscribe({

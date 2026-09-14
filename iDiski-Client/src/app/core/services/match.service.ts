@@ -58,6 +58,7 @@ export interface GenerateFixturesCommand {
   isHomeAndAway: boolean;
   startDate: string; // ISO date string
   daysBetweenMatchweeks: number;
+  replaceExisting?: boolean;
 }
 
 export interface GenerateFixturesResult {

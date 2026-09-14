@@ -24,7 +24,8 @@ public sealed class GetAllUsersQueryHandler : IRequestHandler<GetAllUsersQuery, 
                 u.IsActive,
                 u.LastLoginAt,
                 u.CreatedAt,
-                u.UpdatedAt
+                u.UpdatedAt,
+                u.UserRoles.Select(r => (int)r.Role).ToList()
             ))
             .OrderBy(u => u.Email)
             .ToListAsync(cancellationToken);

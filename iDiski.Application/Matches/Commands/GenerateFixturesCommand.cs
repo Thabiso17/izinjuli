@@ -19,12 +19,21 @@ namespace iDiski.Application.Matches.Commands;
 /// <param name="IsHomeAndAway">True for home-and-away (2 rounds), false for single round-robin</param>
 /// <param name="StartDate">Date of first matchweek</param>
 /// <param name="DaysBetweenMatchweeks">Days between each matchweek (default 7)</param>
+/// <param name="ReplaceExisting">
+/// Whether to clear the division's existing fixtures for this season first.
+///
+/// Generating appends, so without this a second click — an impatient double-click included —
+/// leaves the division holding two complete copies of its season, with nothing on screen
+/// saying so. The command now refuses outright when fixtures already exist, and this is the
+/// deliberate way to say "yes, start the season again".
+/// </param>
 public sealed record GenerateFixturesCommand(
     Guid     DivisionId,
     int      Season,
     bool     IsHomeAndAway,
     DateTime StartDate,
-    int      DaysBetweenMatchweeks = 7
+    int      DaysBetweenMatchweeks = 7,
+    bool     ReplaceExisting = false
 ) : IRequest<GenerateFixturesResult>;
 
 public sealed record GenerateFixturesResult(
@@ -75,7 +84,40 @@ public sealed class GenerateFixturesCommandHandler
                 });
         }
 
-        // 3. Generate round-robin fixtures
+        // 3. Refuse to append a second season on top of the first
+        var existing = await _db.MatchResults
+            .Where(m => m.DivisionId == request.DivisionId && m.Season == request.Season)
+            .ToListAsync(cancellationToken);
+
+        if (existing.Count > 0)
+        {
+            if (!request.ReplaceExisting)
+            {
+                throw new InvalidOperationException(
+                    $"{division.Name} already has {existing.Count} fixtures for {request.Season}. "
+                    + "Generating again would add a second copy of the season. "
+                    + "Choose to replace the existing fixtures if you meant to start again.");
+            }
+
+            // Replacing is for a season that has not started. Once results are in, those
+            // fixtures are a record of matches that were actually played, and regenerating
+            // would throw away the scores along with the events and standings built on them.
+            var played = existing
+                .Where(m => m.Status != MatchStatus.Scheduled)
+                .ToList();
+
+            if (played.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"{played.Count} of {division.Name}'s {request.Season} fixtures have already "
+                    + "been played or are in progress, so the season cannot be regenerated. "
+                    + "Remove those results first if the schedule really has to change.");
+            }
+
+            _db.MatchResults.RemoveRange(existing);
+        }
+
+        // 4. Generate round-robin fixtures
         var fixtures = GenerateRoundRobinFixtures(
             teams,
             division.Id,
@@ -84,11 +126,11 @@ public sealed class GenerateFixturesCommandHandler
             request.StartDate,
             request.DaysBetweenMatchweeks);
 
-        // 4. Save to database
+        // 5. Save to database
         _db.MatchResults.AddRange(fixtures);
         await _db.SaveChangesAsync(cancellationToken);
 
-        // 5. Return summary
+        // 6. Return summary
         var matchweeks = fixtures.Select(f => f.MatchweekNumber).Distinct().Count();
         var firstDate = fixtures.Min(f => f.MatchDate);
         var lastDate = fixtures.Max(f => f.MatchDate);

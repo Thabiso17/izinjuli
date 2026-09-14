@@ -191,20 +191,74 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
     }
 
     [Fact]
-    public async Task GeneratingTwice_DoublesTheFixtures_WhichIsWorthKnowing()
+    public async Task GeneratingTwice_IsRefused()
     {
         var divisionId = await CreateDivisionWithTeamsAsync(4);
+        await Generate(divisionId, homeAndAway: false);
 
-        await Generate(divisionId, homeAndAway: false);
-        await Generate(divisionId, homeAndAway: false);
+        var again = async () => await Generate(divisionId, homeAndAway: false);
+
+        // Generating appends, so without this guard an impatient double-click left the
+        // division holding two complete copies of its season, with nothing on screen saying so.
+        await again.Should().ThrowAsync<InvalidOperationException>();
 
         var fixtures = await FixturesFor(divisionId);
+        fixtures.Should().HaveCount(6, "the second attempt must not have added anything");
+    }
 
-        // Documenting rather than endorsing: the command appends, it does not replace, so a
-        // second click leaves the division with two copies of its season. Nothing in the API or
-        // the admin screen warns about that. Worth a guard, but changing it is a decision about
-        // behaviour rather than a bug fix, so this pins what it does today.
-        fixtures.Should().HaveCount(12);
+    [Fact]
+    public async Task Replacing_ClearsTheOldSeasonRatherThanAppendingToIt()
+    {
+        var divisionId = await CreateDivisionWithTeamsAsync(4);
+        await Generate(divisionId, homeAndAway: false);
+
+        var result = await Generate(divisionId, homeAndAway: true, replaceExisting: true);
+
+        result.FixturesGenerated.Should().Be(12);
+
+        var fixtures = await FixturesFor(divisionId);
+        fixtures.Should().HaveCount(12,
+            "replacing means the division is left with one season, the new one");
+    }
+
+    [Fact]
+    public async Task Replacing_IsRefusedOnceAnyResultIsIn()
+    {
+        var divisionId = await CreateDivisionWithTeamsAsync(4);
+        await Generate(divisionId, homeAndAway: false);
+
+        // One fixture gets played.
+        var played = await _fixture.DbContext.MatchResults
+            .FirstAsync(m => m.DivisionId == divisionId);
+        played.Status = MatchStatus.Completed;
+        played.HomeScore = 2;
+        played.AwayScore = 1;
+        await _fixture.DbContext.SaveChangesAsync();
+
+        var regenerate = async () =>
+            await Generate(divisionId, homeAndAway: false, replaceExisting: true);
+
+        // Those fixtures are now a record of matches that happened. Regenerating would throw
+        // away the scores, and the events and standings built on them.
+        await regenerate.Should().ThrowAsync<InvalidOperationException>();
+
+        var fixtures = await FixturesFor(divisionId);
+        fixtures.Should().HaveCount(6);
+        fixtures.Should().Contain(m => m.Id == played.Id && m.HomeScore == 2);
+    }
+
+    [Fact]
+    public async Task AnotherSeasonInTheSameDivision_IsNotBlockedByTheGuard()
+    {
+        var divisionId = await CreateDivisionWithTeamsAsync(4);
+        await Generate(divisionId, homeAndAway: false, season: 2026);
+
+        // The guard is about generating the same season twice, not about a division only ever
+        // having one season.
+        var next = await Generate(divisionId, homeAndAway: false, season: 2027);
+
+        next.FixturesGenerated.Should().Be(6);
+        (await FixturesFor(divisionId)).Should().HaveCount(12);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
@@ -214,14 +268,16 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
         bool homeAndAway,
         DateTime? start = null,
         int daysBetween = 7,
-        int season = 2026) =>
+        int season = 2026,
+        bool replaceExisting = false) =>
         new GenerateFixturesCommandHandler(_fixture.DbContext).Handle(
             new GenerateFixturesCommand(
                 divisionId,
                 season,
                 homeAndAway,
                 start ?? new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc),
-                daysBetween),
+                daysBetween,
+                replaceExisting),
             CancellationToken.None);
 
     private async Task<List<MatchResult>> FixturesFor(Guid divisionId) =>
