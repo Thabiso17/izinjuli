@@ -77,6 +77,10 @@ test.describe('competition formats', () => {
     await expect(modal.locator('[data-testid="group-count"]')).toBeVisible();
     await expect(modal.locator('[data-testid="teams-advancing"]')).toBeVisible();
 
+    // A group stage is easy to ask for and hard to picture, so the dialog says what the
+    // numbers will produce before anything is written.
+    await expect(modal.locator('[data-testid="group-shape"]')).toBeVisible();
+
     // Switching to a league puts the dialog back, rather than leaving group questions on a
     // competition that has no groups.
     await selectDivision(division, league);

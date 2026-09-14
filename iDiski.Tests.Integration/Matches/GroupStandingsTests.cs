@@ -107,6 +107,64 @@ public class GroupStandingsTests : IClassFixture<IntegrationTestFixture>
         bracket.Should().OnlyContain(m => m.GroupName == null);
     }
 
+    [Fact]
+    public async Task ThirtyTwoTeams_MakeEightGroupsOfFourAndARoundOfSixteen()
+    {
+        // The shape an organiser actually asks for, pinned end to end: thirty-two entrants,
+        // eight groups of four named A to H, the top two from each going through to a last
+        // sixteen.
+        var divisionId = await AGroupStageOf(32, groups: 8);
+
+        var groupFixtures = await _fixture.DbContext.MatchResults
+            .AsNoTracking()
+            .Where(m => m.DivisionId == divisionId && m.Stage == MatchStage.Group)
+            .ToListAsync();
+
+        var names = groupFixtures
+            .Where(m => m.GroupName is not null)
+            .Select(m => m.GroupName!)
+            .Distinct()
+            .OrderBy(n => n)
+            .ToList();
+
+        names.Should().Equal("A", "B", "C", "D", "E", "F", "G", "H");
+
+        foreach (var name in names)
+        {
+            var table = await TableFor(divisionId, name);
+            table.Should().HaveCount(4, $"group {name} holds four of the thirty-two");
+        }
+
+        // Four teams playing each other once is six fixtures, eight times over.
+        groupFixtures.Should().HaveCount(48);
+
+        var openingRound = await _fixture.DbContext.MatchResults
+            .AsNoTracking()
+            .Where(m => m.DivisionId == divisionId && m.Stage == MatchStage.Knockout)
+            .ToListAsync();
+
+        // Sixteen qualifiers: a round of sixteen, then eight, four, two.
+        openingRound.Max(m => m.KnockoutRoundSize ?? 0).Should().Be(16);
+        openingRound.Count(m => m.KnockoutRoundSize == 16).Should().Be(8);
+        openingRound.Should().HaveCount(15, "a bracket of sixteen is fifteen ties in all");
+    }
+
+    [Fact]
+    public async Task TheGroupsAreLetteredFromA()
+    {
+        var divisionId = await AGroupStageOf(20, groups: 5);
+
+        var names = await _fixture.DbContext.MatchResults
+            .AsNoTracking()
+            .Where(m => m.DivisionId == divisionId && m.Stage == MatchStage.Group
+                        && m.GroupName != null)
+            .Select(m => m.GroupName!)
+            .Distinct()
+            .ToListAsync();
+
+        names.OrderBy(n => n).Should().Equal("A", "B", "C", "D", "E");
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private async Task<List<StandingDto>> TableFor(Guid divisionId, string? group)

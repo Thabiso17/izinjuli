@@ -548,6 +548,7 @@ import {
                   <select
                     class="form-select"
                     [(ngModel)]="generateFormData.divisionId"
+                    (ngModelChange)="onGenerateDivisionChanged()"
                     name="divisionId"
                     required
                   >
@@ -666,6 +667,12 @@ import {
                       <small class="text-muted">
                         This decides how big the bracket is.
                       </small>
+                    </div>
+
+                    <div class="col-12">
+                      <div class="alert alert-light border mb-0 py-2" data-testid="group-shape">
+                        {{ groupShape() }}
+                      </div>
                     </div>
                   }
                 </div>
@@ -918,6 +925,74 @@ export class MatchesAdminComponent implements OnInit {
    * asks for. A bracket has no home and away leg, and only a group competition needs to know
    * how many groups there are.
    */
+  /**
+   * Groups of four, which is how an organiser thinks about it: thirty-two entrants make eight
+   * groups, not "eight" as a number they worked out themselves. Adjustable afterwards — this
+   * only sets the starting point when a division is chosen.
+   */
+  onGenerateDivisionChanged(): void {
+    if (this.generateFormat() !== 'GroupAndKnockout') return;
+
+    const teams = this.generateDivision()?.teamCount ?? 0;
+    if (teams < 4) return;
+
+    const groups = Math.max(2, Math.min(Math.round(teams / 4), Math.floor(teams / 2)));
+    this.generateFormData.groupCount = groups;
+  }
+
+  private generateDivision(): DivisionDto | undefined {
+    return this.divisions().find((d) => d.id === this.generateFormData.divisionId);
+  }
+
+  /**
+   * What the numbers currently in the form will actually produce. A group stage is easy to
+   * ask for and hard to picture, and the shape is only obvious once it is written out —
+   * getting it wrong means deleting a whole competition's fixtures to try again.
+   */
+  groupShape(): string {
+    const teams = this.generateDivision()?.teamCount ?? 0;
+    const groups = Number(this.generateFormData.groupCount);
+    const advancing = Number(this.generateFormData.teamsAdvancingPerGroup);
+
+    if (!teams) return 'Choose a division to see the shape of the competition.';
+    if (!groups || groups < 2) return 'A group stage needs at least two groups.';
+    if (groups > Math.floor(teams / 2)) {
+      return `${teams} teams cannot fill ${groups} groups — each group needs at least two.`;
+    }
+
+    // Teams are dealt out one at a time, so an uneven entry leaves some groups one larger
+    // rather than loading the last group with everyone left over.
+    const smaller = Math.floor(teams / groups);
+    const larger = smaller + 1;
+    const largerCount = teams % groups;
+
+    const sizes =
+      largerCount === 0
+        ? `${groups} groups of ${smaller}`
+        : `${largerCount} group${largerCount === 1 ? '' : 's'} of ${larger} and ` +
+          `${groups - largerCount} of ${smaller}`;
+
+    if (!advancing || advancing < 1) return `${teams} teams → ${sizes}.`;
+    if (advancing > smaller) {
+      return `${teams} teams → ${sizes}. Cannot advance ${advancing} from every group when the smallest holds ${smaller}.`;
+    }
+
+    const qualifiers = groups * advancing;
+    let bracket = 2;
+    while (bracket < qualifiers) bracket *= 2;
+
+    const round = knockoutRoundName(bracket) ?? `Round of ${bracket}`;
+    const byes = bracket - qualifiers;
+
+    const knockout =
+      byes === 0
+        ? `${qualifiers} qualify for the ${round}`
+        : `${qualifiers} qualify for the ${round}, with ${byes} ` +
+          `bye${byes === 1 ? '' : 's'}`;
+
+    return `${teams} teams → ${sizes}, top ${advancing} from each → ${knockout}.`;
+  }
+
   generateFormat(): CompetitionFormat {
     const chosen = this.divisions().find((d) => d.id === this.generateFormData.divisionId);
     return chosen?.format ?? 'League';

@@ -76,6 +76,52 @@ import { ScopedVideosComponent } from '../../shared/components/scoped-videos.com
         </div>
 
         <div class="row g-4">
+          <!-- Groups first, because that is the order they are played in. Full width: eight
+               groups of four is eight tables, and they do not belong squeezed into a column
+               beside the news. -->
+          @if (division()?.format === 'GroupAndKnockout') {
+            <div class="col-12">
+              <section class="card shadow-sm mb-4">
+                <div class="card-body">
+                  <h2 class="h4 mb-4">
+                    <i class="bi bi-table text-primary me-2"></i>Group Stage
+                  </h2>
+
+                  @if (standingsLoading()) {
+                    <div class="text-center py-4">
+                      <div class="spinner-border spinner-border-sm" role="status"></div>
+                    </div>
+                  } @else {
+                    <!-- One table per group. Merging them would rank teams against opponents
+                         they have never played, which is not a table of anything. -->
+                    <div class="row g-4">
+                      @for (group of groupTables(); track group.name) {
+                        <div class="col-lg-6">
+                          <h3
+                            class="h6 text-uppercase text-muted mb-2"
+                            data-testid="group-heading"
+                          >
+                            Group {{ group.name }}
+                          </h3>
+                          <app-standings-table
+                            [rows]="group.table"
+                            emptyMessage="No matches played in this group yet."
+                          />
+                        </div>
+                      } @empty {
+                        <div class="col-12">
+                          <p class="text-muted text-center py-3 mb-0">
+                            The groups have not been drawn yet.
+                          </p>
+                        </div>
+                      }
+                    </div>
+                  }
+                </div>
+              </section>
+            </div>
+          }
+
           <!-- The bracket, for a competition that has one. A league table says nothing about
                a cup: knockout ties are deliberately kept out of the standings, so this page
                used to tell a knockout division it had no matches however many were played. -->
@@ -101,44 +147,28 @@ import { ScopedVideosComponent } from '../../shared/components/scoped-videos.com
           }
 
           <div class="col-lg-8">
-            <!-- A knockout has no table. Every tie in it is excluded from the standings by
-                 design, so the section would only ever say the division had played nothing. -->
-            @if (division()?.format !== 'Knockout') {
-            <section class="card shadow-sm mb-4">
-              <div class="card-body">
-                <h2 class="h4 mb-4">
-                  <i class="bi bi-table text-primary me-2"></i>
-                  {{ division()?.format === 'GroupAndKnockout' ? 'Group Stage' : 'League Table' }}
-                </h2>
+            <!-- Only a league has a table. A knockout's ties are excluded from the standings
+                 by design, so the section could only ever say it had played nothing, and a
+                 group stage has its own tables above. -->
+            @if (division()?.format === 'League') {
+              <section class="card shadow-sm mb-4">
+                <div class="card-body">
+                  <h2 class="h4 mb-4">
+                    <i class="bi bi-table text-primary me-2"></i>League Table
+                  </h2>
 
-                @if (standingsLoading()) {
-                  <div class="text-center py-4">
-                    <div class="spinner-border spinner-border-sm" role="status"></div>
-                  </div>
-                } @else if (division()?.format === 'GroupAndKnockout') {
-                  <!-- One table per group. Merging them would rank teams against opponents
-                       they have never played, which is not a table of anything. -->
-                  @for (group of groupTables(); track group.name) {
-                    <h3 class="h6 text-uppercase text-muted mt-3 mb-2" data-testid="group-heading">
-                      Group {{ group.name }}
-                    </h3>
+                  @if (standingsLoading()) {
+                    <div class="text-center py-4">
+                      <div class="spinner-border spinner-border-sm" role="status"></div>
+                    </div>
+                  } @else {
                     <app-standings-table
-                      [rows]="group.table"
-                      emptyMessage="No matches played in this group yet."
+                      [rows]="standings()"
+                      emptyMessage="No matches played in this division yet."
                     />
-                  } @empty {
-                    <p class="text-muted text-center py-3 mb-0">
-                      The groups have not been drawn yet.
-                    </p>
                   }
-                } @else {
-                  <app-standings-table
-                    [rows]="standings()"
-                    emptyMessage="No matches played in this division yet."
-                  />
-                }
-              </div>
-            </section>
+                </div>
+              </section>
             }
 
             <!-- Both hide themselves when this division has no content -->
