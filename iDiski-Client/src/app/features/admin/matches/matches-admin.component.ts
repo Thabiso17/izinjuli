@@ -13,6 +13,7 @@ import {
   TeamDto,
   DivisionDto,
   MatchStatus,
+  CompetitionFormat,
 } from '../../../core/models';
 
 @Component({
@@ -511,10 +512,29 @@ import {
             </div>
             <div class="modal-body">
               <form #generateForm="ngForm">
-                <div class="alert alert-info">
+                <div class="alert alert-info" data-testid="generate-explains-format">
                   <i class="bi bi-info-circle me-2"></i>
-                  <strong>Auto-generate all fixtures</strong> for a division using the round-robin algorithm.
-                  Each team will play every other team once (single) or twice (home & away).
+                  @switch (generateFormat()) {
+                    @case ('Knockout') {
+                      <strong>A knockout bracket.</strong> Every round is drawn up now, down to
+                      the final — the later rounds wait with empty slots, and each winner moves
+                      into the fixture they have earned as results come in. Entrants are seeded
+                      so the strongest two can only meet in the final, and if the entry list is
+                      not a power of two the strongest get a bye.
+                    }
+                    @case ('GroupAndKnockout') {
+                      <strong>Groups, then a knockout.</strong> Everyone plays their own group
+                      in full, and the bracket the qualifiers will contest is drawn up at the
+                      same time — empty, because nobody has come through yet.
+                    }
+                    @default {
+                      <strong>A league.</strong> Every team plays every other, once or twice,
+                      and the table decides it.
+                    }
+                  }
+                  <div class="mt-2 small">
+                    This follows the division's format. To change it, change the division.
+                  </div>
                 </div>
 
                 <div class="mb-3">
@@ -576,8 +596,9 @@ import {
                     <small class="text-muted">Typically 7 days (weekly)</small>
                   </div>
 
+                  @if (generateFormat() !== 'Knockout') {
                   <div class="col-md-6">
-                    <label class="form-label">Format *</label>
+                    <label class="form-label">Meetings *</label>
                     <div class="btn-group w-100" role="group">
                       <input
                         type="radio"
@@ -607,6 +628,40 @@ import {
                       {{ generateFormData.isHomeAndAway ? 'Each team plays twice (home/away)' : 'Each team plays once' }}
                     </small>
                   </div>
+                  }
+
+                  @if (generateFormat() === 'GroupAndKnockout') {
+                    <div class="col-md-6">
+                      <label class="form-label">Groups *</label>
+                      <input
+                        type="number"
+                        class="form-control"
+                        [(ngModel)]="generateFormData.groupCount"
+                        name="groupCount"
+                        data-testid="group-count"
+                        min="2"
+                        max="16"
+                        required
+                      />
+                      <small class="text-muted">Each group needs at least two teams.</small>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Advancing from each group *</label>
+                      <input
+                        type="number"
+                        class="form-control"
+                        [(ngModel)]="generateFormData.teamsAdvancingPerGroup"
+                        name="teamsAdvancingPerGroup"
+                        data-testid="teams-advancing"
+                        min="1"
+                        max="8"
+                        required
+                      />
+                      <small class="text-muted">
+                        This decides how big the bracket is.
+                      </small>
+                    </div>
+                  }
                 </div>
                 <div class="form-check mt-3">
                   <input
@@ -816,13 +871,34 @@ export class MatchesAdminComponent implements OnInit {
 
   createFormData: any = this.getEmptyCreateForm();
   scoreFormData: any = { homeScore: 0, awayScore: 0, status: 'Completed', notes: '' };
-  generateFormData = {
+  /**
+   * The format of the division chosen in the generate dialog, which decides what the dialog
+   * asks for. A bracket has no home and away leg, and only a group competition needs to know
+   * how many groups there are.
+   */
+  generateFormat(): CompetitionFormat {
+    const chosen = this.divisions().find((d) => d.id === this.generateFormData.divisionId);
+    return chosen?.format ?? 'League';
+  }
+
+  generateFormData: {
+    divisionId: string;
+    season: number;
+    isHomeAndAway: boolean;
+    startDate: string;
+    daysBetweenMatchweeks: number;
+    replaceExisting: boolean;
+    groupCount: number;
+    teamsAdvancingPerGroup: number;
+  } = {
     divisionId: '',
     season: new Date().getFullYear(),
     isHomeAndAway: true,
     startDate: '',
     daysBetweenMatchweeks: 7,
-    replaceExisting: false
+    replaceExisting: false,
+    groupCount: 2,
+    teamsAdvancingPerGroup: 2
   };
 
   ngOnInit() {
@@ -967,7 +1043,9 @@ export class MatchesAdminComponent implements OnInit {
       daysBetweenMatchweeks: 7,
       // Always reopens unticked: replacing a season is a deliberate choice, never a leftover
       // from the last time the modal was open.
-      replaceExisting: false
+      replaceExisting: false,
+      groupCount: 2,
+      teamsAdvancingPerGroup: 2
     };
     this.showGenerateFixturesModal.set(true);
   }
@@ -986,7 +1064,15 @@ export class MatchesAdminComponent implements OnInit {
       isHomeAndAway: this.generateFormData.isHomeAndAway,
       startDate: this.generateFormData.startDate,
       daysBetweenMatchweeks: this.generateFormData.daysBetweenMatchweeks,
-      replaceExisting: this.generateFormData.replaceExisting
+      replaceExisting: this.generateFormData.replaceExisting,
+      // Only meaningful for a group competition, and sending them otherwise would put numbers
+      // on the request that the format has no use for.
+      ...(this.generateFormat() === 'GroupAndKnockout'
+        ? {
+            groupCount: this.generateFormData.groupCount,
+            teamsAdvancingPerGroup: this.generateFormData.teamsAdvancingPerGroup
+          }
+        : {})
     };
 
     this.matchService.generateFixtures(command).subscribe({

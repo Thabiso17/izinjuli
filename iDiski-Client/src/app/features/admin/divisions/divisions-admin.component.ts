@@ -2,7 +2,14 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DivisionService } from '../../../core/services/division.service';
-import { DivisionDto, CreateDivisionCommand, UpdateDivisionCommand } from '../../../core/models';
+import {
+  DivisionDto,
+  CreateDivisionCommand,
+  UpdateDivisionCommand,
+  CompetitionFormat,
+  COMPETITION_FORMAT_LABEL,
+  COMPETITION_FORMAT_HINT,
+} from '../../../core/models';
 
 @Component({
   selector: 'app-divisions-admin',
@@ -15,7 +22,7 @@ import { DivisionDto, CreateDivisionCommand, UpdateDivisionCommand } from '../..
           <p class="text-muted">Manage league divisions, age groups, and seasons</p>
         </div>
         <div class="col-auto">
-          <button class="btn btn-primary" (click)="showAddModal()">
+          <button class="btn btn-primary" data-testid="add-division" (click)="showAddModal()">
             <i class="bi bi-plus-circle"></i> Add Division
           </button>
         </div>
@@ -75,6 +82,7 @@ import { DivisionDto, CreateDivisionCommand, UpdateDivisionCommand } from '../..
                   <th>Name</th>
                   <th>Code</th>
                   <th>Season</th>
+                  <th>Format</th>
                   <th>Age Group</th>
                   <th>Gender</th>
                   <th>Teams</th>
@@ -91,6 +99,11 @@ import { DivisionDto, CreateDivisionCommand, UpdateDivisionCommand } from '../..
                       <span class="badge bg-secondary">{{ division.shortCode }}</span>
                     </td>
                     <td>{{ division.season }}</td>
+                    <td data-testid="division-format-cell">
+                      <span class="badge bg-light text-dark border">
+                        {{ formatLabel[division.format] }}
+                      </span>
+                    </td>
                     <td>{{ division.ageGroup || '-' }}</td>
                     <td>{{ division.gender || '-' }}</td>
                     <td>{{ division.teamCount }}</td>
@@ -140,7 +153,7 @@ import { DivisionDto, CreateDivisionCommand, UpdateDivisionCommand } from '../..
             <i class="bi bi-inbox display-1 text-muted"></i>
             <h3 class="mt-3">No Divisions Found</h3>
             <p class="text-muted">Create your first division to get started</p>
-            <button class="btn btn-primary" (click)="showAddModal()">
+            <button class="btn btn-primary" data-testid="add-division" (click)="showAddModal()">
               <i class="bi bi-plus-circle"></i> Add Division
             </button>
           </div>
@@ -230,6 +243,29 @@ import { DivisionDto, CreateDivisionCommand, UpdateDivisionCommand } from '../..
                     />
                   </div>
                   <div class="col-md-4">
+                    <label class="form-label">Format *</label>
+                    <select
+                      class="form-select"
+                      [(ngModel)]="formData.format"
+                      name="format"
+                      data-testid="division-format"
+                      [disabled]="!!editingDivision() && editingDivision()!.matchCount > 0"
+                    >
+                      @for (format of formats; track format) {
+                        <option [value]="format">{{ formatLabel[format] }}</option>
+                      }
+                    </select>
+                    <small class="form-text text-muted">
+                      @if (!!editingDivision() && editingDivision()!.matchCount > 0) {
+                        Fixtures have already been generated, so this cannot be changed.
+                        Delete them first.
+                      } @else {
+                        {{ formatHintFor(formData.format) }}
+                      }
+                    </small>
+                  </div>
+
+                  <div class="col-md-4">
                     <label class="form-label">Age Group</label>
                     <input
                       type="text"
@@ -305,6 +341,7 @@ import { DivisionDto, CreateDivisionCommand, UpdateDivisionCommand } from '../..
               <button
                 type="button"
                 class="btn btn-primary"
+                data-testid="save-division"
                 (click)="saveDivision()"
                 [disabled]="divisionForm.invalid || saving()"
               >
@@ -372,6 +409,14 @@ export class DivisionsAdminComponent implements OnInit {
     this.loadDivisions();
   }
 
+  readonly formats: CompetitionFormat[] = ['League', 'Knockout', 'GroupAndKnockout'];
+  readonly formatLabel = COMPETITION_FORMAT_LABEL;
+
+  /** formData is loosely typed, so the lookup goes through here rather than indexing it. */
+  formatHintFor(format: CompetitionFormat): string {
+    return COMPETITION_FORMAT_HINT[format] ?? '';
+  }
+
   showAddModal() {
     this.editingDivision.set(null);
     this.formData = this.getEmptyForm();
@@ -384,6 +429,7 @@ export class DivisionsAdminComponent implements OnInit {
       name: division.name,
       shortCode: division.shortCode,
       season: division.season,
+      format: division.format,
       ageGroup: division.ageGroup || '',
       gender: division.gender || '',
       startDate: division.startDate || '',
@@ -408,6 +454,7 @@ export class DivisionsAdminComponent implements OnInit {
       name: this.formData.name,
       shortCode: this.formData.shortCode,
       season: this.formData.season,
+      format: this.formData.format,
       ageGroup: this.formData.ageGroup || undefined,
       gender: this.formData.gender || undefined,
       startDate: this.formData.startDate || undefined,
@@ -476,6 +523,7 @@ export class DivisionsAdminComponent implements OnInit {
       name: '',
       shortCode: '',
       season: new Date().getFullYear(),
+      format: 'League' as CompetitionFormat,
       ageGroup: '',
       gender: '',
       startDate: '',
