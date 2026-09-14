@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DivisionService, MatchService, StandingsService } from '../../core/services';
 import { DivisionDto, MatchResultDto, StandingDto, TopScorerDto } from '../../core/models';
 import { BracketComponent } from './bracket.component';
+import { StandingsTableComponent } from './standings-table.component';
 import { getImageUrl } from '../../core/utils/image.utils';
 import { ScopedArticlesComponent } from '../../shared/components/scoped-articles.component';
 import { ScopedVideosComponent } from '../../shared/components/scoped-videos.component';
@@ -16,6 +17,7 @@ import { ScopedVideosComponent } from '../../shared/components/scoped-videos.com
     ScopedArticlesComponent,
     ScopedVideosComponent,
     BracketComponent,
+    StandingsTableComponent,
   ],
   template: `
     <div class="container py-5">
@@ -99,6 +101,9 @@ import { ScopedVideosComponent } from '../../shared/components/scoped-videos.com
           }
 
           <div class="col-lg-8">
+            <!-- A knockout has no table. Every tie in it is excluded from the standings by
+                 design, so the section would only ever say the division had played nothing. -->
+            @if (division()?.format !== 'Knockout') {
             <section class="card shadow-sm mb-4">
               <div class="card-body">
                 <h2 class="h4 mb-4">
@@ -110,62 +115,31 @@ import { ScopedVideosComponent } from '../../shared/components/scoped-videos.com
                   <div class="text-center py-4">
                     <div class="spinner-border spinner-border-sm" role="status"></div>
                   </div>
-                }
-
-                @if (!standingsLoading() && standings().length > 0) {
-                  <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                      <thead class="table-light">
-                        <tr>
-                          <th scope="col">#</th>
-                          <th scope="col">Team</th>
-                          <th scope="col" class="text-center">P</th>
-                          <th scope="col" class="text-center">W</th>
-                          <th scope="col" class="text-center">D</th>
-                          <th scope="col" class="text-center">L</th>
-                          <th scope="col" class="text-center">GD</th>
-                          <th scope="col" class="text-center">Pts</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        @for (row of standings(); track row.teamId) {
-                          <tr>
-                            <td class="text-muted">{{ row.position }}</td>
-                            <td>
-                              <a
-                                [routerLink]="['/teams', row.teamId]"
-                                class="text-decoration-none text-dark d-flex align-items-center gap-2"
-                              >
-                                @if (getImageUrl(row.logoUrl)) {
-                                  <img
-                                    [src]="getImageUrl(row.logoUrl)"
-                                    [alt]="row.teamName"
-                                    style="width: 24px; height: 24px; object-fit: contain"
-                                  />
-                                }
-                                <span class="fw-semibold">{{ row.teamName }}</span>
-                              </a>
-                            </td>
-                            <td class="text-center">{{ row.played }}</td>
-                            <td class="text-center">{{ row.won }}</td>
-                            <td class="text-center">{{ row.drawn }}</td>
-                            <td class="text-center">{{ row.lost }}</td>
-                            <td class="text-center">{{ row.goalDifference }}</td>
-                            <td class="text-center fw-bold">{{ row.points }}</td>
-                          </tr>
-                        }
-                      </tbody>
-                    </table>
-                  </div>
-                }
-
-                @if (!standingsLoading() && standings().length === 0) {
-                  <p class="text-muted text-center py-3 mb-0">
-                    No matches played in this division yet.
-                  </p>
+                } @else if (division()?.format === 'GroupAndKnockout') {
+                  <!-- One table per group. Merging them would rank teams against opponents
+                       they have never played, which is not a table of anything. -->
+                  @for (group of groupTables(); track group.name) {
+                    <h3 class="h6 text-uppercase text-muted mt-3 mb-2" data-testid="group-heading">
+                      Group {{ group.name }}
+                    </h3>
+                    <app-standings-table
+                      [rows]="group.table"
+                      emptyMessage="No matches played in this group yet."
+                    />
+                  } @empty {
+                    <p class="text-muted text-center py-3 mb-0">
+                      The groups have not been drawn yet.
+                    </p>
+                  }
+                } @else {
+                  <app-standings-table
+                    [rows]="standings()"
+                    emptyMessage="No matches played in this division yet."
+                  />
                 }
               </div>
             </section>
+            }
 
             <!-- Both hide themselves when this division has no content -->
             <app-scoped-articles
@@ -258,6 +232,7 @@ export class DivisionDetailComponent implements OnInit {
   division = signal<DivisionDto | null>(null);
   standings = signal<StandingDto[]>([]);
   fixtures = signal<MatchResultDto[]>([]);
+  groupTables = signal<{ name: string; table: StandingDto[] }[]>([]);
   topScorers = signal<TopScorerDto[]>([]);
 
   loading = signal(true);
@@ -280,7 +255,10 @@ export class DivisionDetailComponent implements OnInit {
       next: (division) => {
         this.division.set(division);
         this.loading.set(false);
-        this.loadStandings(division);
+        // A knockout has no table, and a group stage builds one per group from its fixtures.
+        if (division.format === 'League') this.loadStandings(division);
+        else this.standingsLoading.set(false);
+
         this.loadTopScorers(division);
 
         if (division.format !== 'League') this.loadBracket(division);
@@ -314,9 +292,54 @@ export class DivisionDetailComponent implements OnInit {
         next: (page) => {
           this.fixtures.set(page.items);
           this.fixturesLoading.set(false);
+
+          if (division.format === 'GroupAndKnockout') this.loadGroupTables(division, page.items);
         },
         error: () => this.fixturesLoading.set(false),
       });
+  }
+
+  /**
+   * A table per group. Which teams are in a group is carried by its fixtures rather than by
+   * the team, so the groups themselves are read off the fixtures already loaded for the
+   * bracket rather than asked for separately.
+   */
+  private loadGroupTables(division: DivisionDto, fixtures: MatchResultDto[]): void {
+    const names = [
+      ...new Set(
+        fixtures
+          .filter((f) => f.stage === 'Group' && f.groupName)
+          .map((f) => f.groupName as string),
+      ),
+    ].sort();
+
+    if (names.length === 0) {
+      this.standingsLoading.set(false);
+      return;
+    }
+
+    let outstanding = names.length;
+    const tables = new Map<string, StandingDto[]>();
+
+    const settle = () => {
+      if (--outstanding > 0) return;
+
+      this.groupTables.set(names.map((name) => ({ name, table: tables.get(name) ?? [] })));
+      this.standingsLoading.set(false);
+    };
+
+    for (const name of names) {
+      this.standingsService
+        .getLeagueTable(division.season, division.id, undefined, name)
+        .subscribe({
+          next: (table) => {
+            tables.set(name, table.table);
+            settle();
+          },
+          // One group failing should not cost the reader the other groups.
+          error: () => settle(),
+        });
+    }
   }
 
   private loadTopScorers(division: DivisionDto): void {
