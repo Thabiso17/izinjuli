@@ -595,7 +595,7 @@ import {
                       [(ngModel)]="generateFormData.daysBetweenMatchweeks"
                       name="daysBetweenMatchweeks"
                       required
-                      min="1"
+                      min="0"
                       max="30"
                       placeholder="7"
                     />
