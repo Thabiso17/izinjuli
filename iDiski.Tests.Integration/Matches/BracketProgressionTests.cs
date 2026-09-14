@@ -183,6 +183,42 @@ public class BracketProgressionTests : IClassFixture<IntegrationTestFixture>
         stored.AwayScore.Should().Be(1);
     }
 
+    [Fact]
+    public async Task TheShootoutIsKeptAndCanBeReadBack()
+    {
+        var (divisionId, _) = await ABracketOf(4);
+        var semiFinal = await AFixtureIn(divisionId, roundSize: 4);
+
+        await Record(semiFinal, home: 1, away: 1, homePenalties: 4, awayPenalties: 5);
+
+        var stored = await Reload(semiFinal.Id);
+
+        // It was being written and never read back, so once entered it was invisible: the
+        // fixtures list could not show it and reopening the fixture lost it.
+        stored.HomePenalties.Should().Be(4);
+        stored.AwayPenalties.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task CorrectingAShootoutToADecisiveScore_ClearsIt()
+    {
+        var (divisionId, _) = await ABracketOf(4);
+        var semiFinal = await AFixtureIn(divisionId, roundSize: 4);
+
+        await Record(semiFinal, home: 1, away: 1, homePenalties: 4, awayPenalties: 5);
+        await Record(semiFinal, home: 2, away: 1);
+
+        var stored = await Reload(semiFinal.Id);
+
+        // Two one is not a tie, so a shootout beside it would be describing a match that was
+        // never level.
+        stored.HomePenalties.Should().BeNull();
+        stored.AwayPenalties.Should().BeNull();
+
+        var final = await Reload(semiFinal.NextMatchId!.Value);
+        new[] { final.HomeTeamId, final.AwayTeamId }.Should().Contain(semiFinal.HomeTeamId);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private Task Record(

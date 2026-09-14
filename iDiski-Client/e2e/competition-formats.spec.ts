@@ -125,6 +125,64 @@ test.describe('competition formats', () => {
       'with no days between rounds the whole thing is played on one day',
     ).toBe(body.lastMatchDate.slice(0, 10));
   });
+
+  test('a drawn knockout tie asks for the shootout instead of refusing', async ({ page }) => {
+    const name = await createDivision(page, 'Knockout');
+
+    for (let i = 1; i <= 4; i++) {
+      await createTeam(page, name, `Shootout ${i} ${unique()}`);
+    }
+
+    await page.goto('/admin/matches');
+    await page.waitForLoadState('networkidle');
+    await page.locator('button:has-text("Generate Fixtures")').first().click();
+
+    const generate = page.locator('.modal.show');
+    await generate.locator('select[name="divisionId"]').selectOption({ label: name });
+    await generate.locator('input[name="season"]').fill('2034');
+    await generate.locator('input[name="startDate"]').fill('2034-06-03');
+    await generate.locator('button:has-text("Generate Fixtures")').last().click();
+    await expect(generate).toBeHidden();
+
+    // The list defaults to this season; the bracket was made for a later one.
+    const filters = page.locator('.card.mb-4').first();
+    await filters.locator('input[type="number"]').first().fill('2034');
+    await page.waitForLoadState('networkidle');
+
+    // Fixtures come back in date order, so the opening round is first and the final — which
+    // has nobody in it yet — is last.
+    await page.locator('button:has-text("Enter Score")').first().click();
+
+    const score = page.locator('.modal.show');
+    await expect(score).toBeVisible();
+    await expect(
+      score,
+      'this should be a semi-final with two teams, not the empty final',
+    ).not.toContainText('To be decided');
+
+    await score.locator('input[name="homeScore"]').fill('1');
+    await score.locator('input[name="awayScore"]').fill('1');
+
+    // Without somewhere to record the shootout, a drawn cup tie is a dead end: the API
+    // refuses it and the admin has no way to answer.
+    await expect(score.locator('[data-testid="shootout-needed"]')).toBeVisible();
+    await expect(score.locator('[data-testid="home-penalties"]')).toBeVisible();
+
+    await score.locator('[data-testid="home-penalties"]').fill('4');
+    await score.locator('[data-testid="away-penalties"]').fill('5');
+
+    await expect(score.locator('[data-testid="who-goes-through"]')).toContainText(
+      /goes through/i,
+    );
+
+    await score.locator('button:has-text("Update Score")').last().click();
+    await expect(score).toBeHidden();
+
+    // And it comes back, rather than vanishing the moment it is saved.
+    await expect(page.locator('[data-testid="shootout-score"]').first()).toContainText(
+      '4-5 on penalties',
+    );
+  });
 });
 
 // ── helpers ──────────────────────────────────────────────────────────────────

@@ -45,7 +45,11 @@ public sealed record MatchResultDto(
     // projection means a CASE plus a string concatenation of an integer, which is the kind of
     // expression that translates on one provider and throws on another — and it would throw
     // while loading the whole fixtures list.
-    int?        KnockoutRoundSize
+    int?        KnockoutRoundSize,
+    // A shootout was already being recorded and never read back, so once entered it was
+    // invisible: the fixtures list could not show it and reopening the fixture lost it.
+    int?        HomePenalties,
+    int?        AwayPenalties
 );
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -122,7 +126,9 @@ public sealed class GetFixturesQueryHandler
                 m.Division != null ? m.Division.Name : null,
                 m.Stage,
                 m.GroupName,
-                m.KnockoutRoundSize));
+                m.KnockoutRoundSize,
+                m.HomePenalties,
+                m.AwayPenalties));
 
         return await PaginatedList<MatchResultDto>.CreateAsync(
             projected, request.PageNumber, request.PageSize, cancellationToken);
@@ -165,7 +171,9 @@ public sealed class GetMatchByIdQueryHandler
                 m.Division != null ? m.Division.Name : null,
                 m.Stage,
                 m.GroupName,
-                m.KnockoutRoundSize))
+                m.KnockoutRoundSize,
+                m.HomePenalties,
+                m.AwayPenalties))
             .FirstOrDefaultAsync(cancellationToken);
 
         return match ?? throw new NotFoundException(nameof(MatchResult), request.Id);

@@ -8,6 +8,7 @@ import { DivisionService } from '../../../core/services/division.service';
 import {
   MatchResultDto,
   knockoutRoundName,
+  shootoutSuffix,
   CreateMatchCommand,
   UpdateMatchScoreCommand,
   TeamDto,
@@ -178,6 +179,11 @@ import {
                         <div class="text-center px-4">
                           <div class="fs-4 fw-bold">
                             {{ match.scoreDisplay }}
+                            @if (shootout(match); as pens) {
+                              <div class="small text-muted" data-testid="shootout-score">
+                                {{ pens }}
+                              </div>
+                            }
                           </div>
                           <span
                             class="badge"
@@ -755,6 +761,42 @@ import {
                     />
                   </div>
 
+                  @if (needsAShootout()) {
+                    <div class="col-12">
+                      <div class="alert alert-warning py-2 mb-0 small" data-testid="shootout-needed">
+                        Level after ninety minutes, and a cup tie has to send somebody through.
+                        Record the shootout, or this result cannot be saved.
+                      </div>
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label">Home Penalties *</label>
+                      <input
+                        type="number"
+                        class="form-control"
+                        [(ngModel)]="scoreFormData.homePenalties"
+                        name="homePenalties"
+                        data-testid="home-penalties"
+                        min="0"
+                      />
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label">Away Penalties *</label>
+                      <input
+                        type="number"
+                        class="form-control"
+                        [(ngModel)]="scoreFormData.awayPenalties"
+                        name="awayPenalties"
+                        data-testid="away-penalties"
+                        min="0"
+                      />
+                    </div>
+                    <div class="col-12">
+                      <small class="text-muted" data-testid="who-goes-through">
+                        {{ whoGoesThrough() }}
+                      </small>
+                    </div>
+                  }
+
                   <div class="col-12">
                     <label class="form-label">Status *</label>
                     <select
@@ -1124,6 +1166,38 @@ export class MatchesAdminComponent implements OnInit {
     });
   }
 
+  /**
+   * A knockout tie that finished level. A league match is perfectly happy to end in a draw;
+   * a bracket fixture has to name somebody to go into the next round, so the shootout is the
+   * only way the result can be recorded at all.
+   */
+  shootout(match: MatchResultDto): string | null {
+    return shootoutSuffix(match.homePenalties, match.awayPenalties);
+  }
+
+  needsAShootout(): boolean {
+    const match = this.selectedMatch();
+    if (!match || match.stage !== 'Knockout') return false;
+
+    return Number(this.scoreFormData.homeScore) === Number(this.scoreFormData.awayScore);
+  }
+
+  /** Says who the shootout has sent through, so the entry can be checked before it is saved. */
+  whoGoesThrough(): string {
+    const match = this.selectedMatch();
+    if (!match) return '';
+
+    const home = this.numberOrUndefined(this.scoreFormData.homePenalties);
+    const away = this.numberOrUndefined(this.scoreFormData.awayPenalties);
+
+    // Nothing to say until both are filled in.
+    if (home === undefined || away === undefined) return '';
+    if (home === away) return 'A shootout cannot be level either — somebody has to win it.';
+
+    const through = home > away ? match.homeTeamName : match.awayTeamName;
+    return `${through} goes through.`;
+  }
+
   showScoreModal(match: MatchResultDto) {
     this.selectedMatch.set(match);
     this.scoreFormData = {
@@ -1131,8 +1205,17 @@ export class MatchesAdminComponent implements OnInit {
       awayScore: match.awayScore,
       status: match.status === 'Scheduled' ? 'Completed' : match.status,
       notes: match.notes || '',
+      homePenalties: match.homePenalties ?? null,
+      awayPenalties: match.awayPenalties ?? null,
     };
     this.showUpdateScoreModal.set(true);
+  }
+
+  private numberOrUndefined(value: unknown): number | undefined {
+    if (value === null || value === undefined || value === '') return undefined;
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
   }
 
   closeScoreModal() {
@@ -1152,6 +1235,14 @@ export class MatchesAdminComponent implements OnInit {
       awayScore: this.scoreFormData.awayScore,
       status: this.scoreFormData.status as MatchStatus,
       notes: this.scoreFormData.notes || undefined,
+      // Sent only when the tie is actually level, so a decisive result that was corrected
+      // from a draw does not keep the shootout that settled the earlier one.
+      ...(this.needsAShootout()
+        ? {
+            homePenalties: this.numberOrUndefined(this.scoreFormData.homePenalties),
+            awayPenalties: this.numberOrUndefined(this.scoreFormData.awayPenalties),
+          }
+        : {}),
     };
 
     this.matchService.updateScore(this.selectedMatch()!.id, command).subscribe({
