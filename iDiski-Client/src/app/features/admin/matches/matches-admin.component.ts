@@ -7,6 +7,7 @@ import { TeamService } from '../../../core/services/team.service';
 import { DivisionService } from '../../../core/services/division.service';
 import {
   MatchResultDto,
+  knockoutRoundName,
   CreateMatchCommand,
   UpdateMatchScoreCommand,
   TeamDto,
@@ -143,9 +144,9 @@ import {
                           {{ match.divisionName }}
                         </div>
                       }
-                      @if (match.roundName) {
+                      @if (roundName(match.knockoutRoundSize); as round) {
                         <div class="badge bg-dark mt-2 ms-1" data-testid="match-round">
-                          {{ match.roundName }}
+                          {{ round }}
                         </div>
                       } @else if (match.groupName) {
                         <div class="badge bg-secondary mt-2 ms-1" data-testid="match-group">
@@ -881,6 +882,9 @@ export class MatchesAdminComponent implements OnInit {
   }
 
   /** Teams of the given division, or every team when none is chosen. */
+  /** What a bracket round of that size is called. */
+  roundName = knockoutRoundName;
+
   getTeamsByDivision(divisionId: string | null | undefined) {
     const all = this.teams();
     return divisionId ? all.filter((t) => t.divisionId === divisionId) : all;

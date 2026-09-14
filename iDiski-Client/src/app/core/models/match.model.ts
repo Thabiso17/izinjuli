@@ -9,6 +9,25 @@ export type MatchStatus =
 
 export type MatchStage = 'League' | 'Group' | 'Knockout';
 
+/**
+ * What a round of that size is called. Derived from the number of teams left rather than sent
+ * down as a label, so the bracket names itself whatever size it is.
+ */
+export function knockoutRoundName(teamsLeft: number | null | undefined): string | null {
+  if (!teamsLeft) return null;
+
+  switch (teamsLeft) {
+    case 2:
+      return 'Final';
+    case 4:
+      return 'Semi-final';
+    case 8:
+      return 'Quarter-final';
+    default:
+      return `Round of ${teamsLeft}`;
+  }
+}
+
 export interface MatchResultDto {
   id: string;
   matchDate: string;
@@ -40,8 +59,6 @@ export interface MatchResultDto {
   groupName: string | null;
   /** Teams left at this point in a bracket: 2 is the final, 4 the semi-finals. */
   knockoutRoundSize: number | null;
-  /** That round's name, worked out server-side so every screen says the same thing. */
-  roundName: string | null;
   events: any[]; // Will be populated with MatchEventDto[]
 }
 

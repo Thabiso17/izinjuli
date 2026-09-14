@@ -41,8 +41,11 @@ public sealed record MatchResultDto(
     // Where this fixture sits in its competition.
     MatchStage  Stage,
     string?     GroupName,
-    int?        KnockoutRoundSize,
-    string?     RoundName
+    // The round's name is left to the reader rather than built here. Naming it in the
+    // projection means a CASE plus a string concatenation of an integer, which is the kind of
+    // expression that translates on one provider and throws on another — and it would throw
+    // while loading the whole fixtures list.
+    int?        KnockoutRoundSize
 );
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -119,16 +122,7 @@ public sealed class GetFixturesQueryHandler
                 m.Division != null ? m.Division.Name : null,
                 m.Stage,
                 m.GroupName,
-                m.KnockoutRoundSize,
-                m.KnockoutRoundSize == null
-                    ? null
-                    : m.KnockoutRoundSize == 2
-                        ? "Final"
-                        : m.KnockoutRoundSize == 4
-                            ? "Semi-final"
-                            : m.KnockoutRoundSize == 8
-                                ? "Quarter-final"
-                                : "Round of " + m.KnockoutRoundSize));
+                m.KnockoutRoundSize));
 
         return await PaginatedList<MatchResultDto>.CreateAsync(
             projected, request.PageNumber, request.PageSize, cancellationToken);
@@ -171,16 +165,7 @@ public sealed class GetMatchByIdQueryHandler
                 m.Division != null ? m.Division.Name : null,
                 m.Stage,
                 m.GroupName,
-                m.KnockoutRoundSize,
-                m.KnockoutRoundSize == null
-                    ? null
-                    : m.KnockoutRoundSize == 2
-                        ? "Final"
-                        : m.KnockoutRoundSize == 4
-                            ? "Semi-final"
-                            : m.KnockoutRoundSize == 8
-                                ? "Quarter-final"
-                                : "Round of " + m.KnockoutRoundSize)))
+                m.KnockoutRoundSize))
             .FirstOrDefaultAsync(cancellationToken);
 
         return match ?? throw new NotFoundException(nameof(MatchResult), request.Id);
