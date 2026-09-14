@@ -175,15 +175,20 @@ test.describe('competition formats', () => {
     await modal.locator('[data-testid="group-count"]').fill('2');
     await modal.locator('[data-testid="teams-advancing"]').fill('2');
 
-    // Groups honour home and away, and the dialog opens on it — which is right for a
-    // Champions League group stage and doubles the fixtures. Said explicitly here so the
-    // count below is about the shape of the competition rather than about a default.
-    // The radio itself is a visually hidden Bootstrap btn-check, so the label is the
-    // clickable part.
+    // A group stage can be played either way — a World Cup group goes once through, the old
+    // Champions League group stage went home and away — and the dialog opens on the latter,
+    // which doubles the ties. Said explicitly here so the count below is about the shape of
+    // the competition rather than about a default. The radio is a visually hidden Bootstrap
+    // btn-check, so the label is the clickable part.
     await modal.locator('label[for="singleRound"]').click();
 
-    // The dialog should already be describing this shape before anything is written.
-    await expect(modal.locator('[data-testid="group-shape"]')).toContainText('8 teams');
+    // The dialog should already be describing this shape before anything is written —
+    // including how often the groups play, which is what decides whether this is twelve
+    // ties or twenty-four.
+    const shape = modal.locator('[data-testid="group-shape"]');
+    await expect(shape).toContainText('8 teams');
+    await expect(shape).toContainText('once through');
+    await expect(shape).toContainText('12 group ties');
 
     const generated = page.waitForResponse(
       (r) => r.url().includes('/api/matchresults/generate') && r.request().method() === 'POST',

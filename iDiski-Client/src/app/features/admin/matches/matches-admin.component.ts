@@ -972,7 +972,23 @@ export class MatchesAdminComponent implements OnInit {
         : `${largerCount} group${largerCount === 1 ? '' : 's'} of ${larger} and ` +
           `${groups - largerCount} of ${smaller}`;
 
-    if (!advancing || advancing < 1) return `${teams} teams → ${sizes}.`;
+    // A group can be played once through or home and away — a World Cup group is single, the
+    // old Champions League group stage was double — and it doubles the fixtures either way.
+    // Leaving it out of a summary that claims to say what will be produced hides a factor of
+    // two from the person about to commit to it.
+    const meetings = this.generateFormData.isHomeAndAway ? 2 : 1;
+    const tiesIn = (size: number) => (size * (size - 1)) / 2;
+
+    const groupTies =
+      meetings *
+      (largerCount * tiesIn(larger) + (groups - largerCount) * tiesIn(smaller));
+
+    const played =
+      meetings === 2
+        ? `played home and away: ${groupTies} group ties`
+        : `played once through: ${groupTies} group ties`;
+
+    if (!advancing || advancing < 1) return `${teams} teams → ${sizes}, ${played}.`;
     if (advancing > smaller) {
       return `${teams} teams → ${sizes}. Cannot advance ${advancing} from every group when the smallest holds ${smaller}.`;
     }
@@ -990,7 +1006,7 @@ export class MatchesAdminComponent implements OnInit {
         : `${qualifiers} qualify for the ${round}, with ${byes} ` +
           `bye${byes === 1 ? '' : 's'}`;
 
-    return `${teams} teams → ${sizes}, top ${advancing} from each → ${knockout}.`;
+    return `${teams} teams → ${sizes}, ${played}. Top ${advancing} from each → ${knockout}.`;
   }
 
   generateFormat(): CompetitionFormat {

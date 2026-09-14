@@ -191,6 +191,50 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
         table.Sum(r => r.Played).Should().Be(2);
     }
 
+    [Fact]
+    public async Task GroupsThenAKnockout_CanBePlayedOnceThroughOrHomeAndAway()
+    {
+        // Both are real competitions: a World Cup group is played once through, the old
+        // Champions League group stage was home and away. The organiser's choice has to reach
+        // the groups, and it doubles them.
+        var once = await Generate(CompetitionFormat.GroupAndKnockout, groups: 4);
+        var twice = await Generate(
+            CompetitionFormat.GroupAndKnockout, groups: 4, homeAndAway: true);
+
+        var onceTies = (await FixturesFor(once)).Count(m => m.Stage == MatchStage.Group);
+        var twiceTies = (await FixturesFor(twice)).Count(m => m.Stage == MatchStage.Group);
+
+        onceTies.Should().Be(24, "four groups of four, each pair meeting once");
+        twiceTies.Should().Be(48, "the same groups with everyone met twice");
+
+        // The bracket is decided by how many qualify, not by how often the groups played, so
+        // it is the same size either way.
+        (await FixturesFor(once)).Count(m => m.Stage == MatchStage.Knockout).Should().Be(7);
+        (await FixturesFor(twice)).Count(m => m.Stage == MatchStage.Knockout).Should().Be(7);
+    }
+
+    [Fact]
+    public async Task AHomeAndAwayGroup_GivesEachPairBothVenues()
+    {
+        var divisionId = await Generate(
+            CompetitionFormat.GroupAndKnockout, groups: 2, homeAndAway: true);
+
+        var group = (await FixturesFor(divisionId))
+            .Where(m => m.Stage == MatchStage.Group)
+            .ToList();
+
+        // Every meeting exists in both directions rather than the same fixture twice.
+        var pairs = group
+            .Select(m => (Home: m.HomeTeamId, Away: m.AwayTeamId))
+            .ToList();
+
+        foreach (var (home, away) in pairs)
+        {
+            pairs.Should().Contain(p => p.Home == away && p.Away == home,
+                "the return fixture swaps the venue");
+        }
+    }
+
     // ── The three, side by side ───────────────────────────────────────────────
 
     [Fact]
