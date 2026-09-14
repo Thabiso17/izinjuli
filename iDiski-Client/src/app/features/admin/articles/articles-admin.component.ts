@@ -34,7 +34,7 @@ interface ArticleFormData {
           <p class="text-muted">Create and manage news articles and announcements</p>
         </div>
         <div class="col-auto">
-          <button class="btn btn-primary" (click)="showAddModal()">
+          <button class="btn btn-primary" data-testid="add-article" (click)="showAddModal()">
             <i class="bi bi-plus-circle"></i> Create Article
           </button>
         </div>
@@ -197,7 +197,7 @@ interface ArticleFormData {
             <i class="bi bi-newspaper display-1 text-muted"></i>
             <h3 class="mt-3">No Articles Found</h3>
             <p class="text-muted">Create your first article to get started</p>
-            <button class="btn btn-primary" (click)="showAddModal()">
+            <button class="btn btn-primary" data-testid="add-article" (click)="showAddModal()">
               <i class="bi bi-plus-circle"></i> Create Article
             </button>
           </div>
@@ -389,6 +389,7 @@ Lebo Molefe has been named Player of the Month for March 2026...
               <button
                 type="button"
                 class="btn btn-primary"
+                data-testid="save-article"
                 (click)="saveArticle()"
                 [disabled]="articleForm.invalid || saving()"
               >

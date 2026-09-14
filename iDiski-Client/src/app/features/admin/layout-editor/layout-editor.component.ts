@@ -60,6 +60,7 @@ import { PageLayoutConfigDto, LayoutZone, PageLayoutConfigEditorItem } from '../
                         }
                       </div>
                       <button
+                        data-testid="toggle-visibility"
                         (click)="toggleVisibility(item)"
                         class="px-3 py-1 text-sm rounded transition-colors"
                         [class.bg-green-100]="item.isVisible"
@@ -113,6 +114,7 @@ import { PageLayoutConfigDto, LayoutZone, PageLayoutConfigEditorItem } from '../
                         }
                       </div>
                       <button
+                        data-testid="toggle-visibility"
                         (click)="toggleVisibility(item)"
                         class="px-3 py-1 text-sm rounded transition-colors"
                         [class.bg-green-100]="item.isVisible"
@@ -153,6 +155,7 @@ import { PageLayoutConfigDto, LayoutZone, PageLayoutConfigEditorItem } from '../
               Reset
             </button>
             <button
+              data-testid="save-layout"
               (click)="saveLayout()"
               [disabled]="!hasUnsavedChanges() || saving()"
               class="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
