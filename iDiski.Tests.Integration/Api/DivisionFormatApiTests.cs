@@ -170,8 +170,10 @@ public class DivisionFormatApiTests : IAsyncLifetime
             gender = "Male",
         });
 
+        // The collection overload, because the params one would read the message as one more
+        // acceptable status code.
         response.StatusCode.Should().BeOneOf(
-            HttpStatusCode.OK, HttpStatusCode.Created,
+            new[] { HttpStatusCode.OK, HttpStatusCode.Created },
             await response.Content.ReadAsStringAsync());
 
         return await IdFrom(response);
