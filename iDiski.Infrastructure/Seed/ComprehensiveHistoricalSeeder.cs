@@ -727,6 +727,14 @@ Alexia Putellas and Lieke Martens also featured on the scoresheet in what was a 
     {
         Console.WriteLine("\n=== Seeding Page Layout Configurations ===");
 
+        // One row per component per page is a unique index, so inserting blindly throws rather
+        // than doing nothing. The caller already skips when its own data is present, but the
+        // layout rows can outlive it — delete the seeded divisions and keep the layout, and
+        // this would be the line that failed.
+        var already = await context.PageLayoutConfigs
+            .Select(p => p.ComponentName)
+            .ToListAsync();
+
         // These component names must match the keys in ComponentRegistryService
         var configs = new List<PageLayoutConfig>
         {
@@ -777,9 +785,19 @@ Alexia Putellas and Lieke Martens also featured on the scoresheet in what was a 
             }
         };
 
-        context.PageLayoutConfigs.AddRange(configs);
+        var missing = configs
+            .Where(c => !already.Contains(c.ComponentName))
+            .ToList();
+
+        if (missing.Count == 0)
+        {
+            Console.WriteLine("✓ Page layout already configured; nothing to add");
+            return;
+        }
+
+        context.PageLayoutConfigs.AddRange(missing);
         await context.SaveChangesAsync();
-        Console.WriteLine($"✓ Created {configs.Count} page layout configurations");
+        Console.WriteLine($"✓ Created {missing.Count} page layout configurations");
     }
 
     #endregion
