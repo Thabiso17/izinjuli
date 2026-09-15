@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
+using iDiski.Application.Competitions;
 using iDiski.Application.Competitions.Commands;
 using iDiski.Application.Matches.Commands;
 using iDiski.Application.MatchResults;

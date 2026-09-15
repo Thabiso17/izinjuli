@@ -315,11 +315,11 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
 
         // A division holds the clubs; the competition is what they play. Everybody is entered
         // here because this file is about the formats differing, not about who is in them.
-        var competitionId = Guid.NewGuid();
+        var divisionId = Guid.NewGuid();
 
         _fixture.DbContext.Divisions.Add(new Division
         {
-            Id = competitionId,
+            Id = divisionId,
             Name = $"{format} of {Entrants}",
             ShortCode = TestIds.Code("FM"),
             Season = 2026,
@@ -333,7 +333,7 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
         _fixture.DbContext.Competitions.Add(new Competition
         {
             Id = competitionId,
-            DivisionId = competitionId,
+            DivisionId = divisionId,
             Name = $"{format} of {Entrants}",
             ShortCode = TestIds.Code("FM"),
             Season = 2026,
@@ -351,7 +351,7 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
                 Id = teamId,
                 Name = $"Club {i + 1}",
                 ShortCode = TestIds.Code("C"),
-                DivisionId = competitionId,
+                DivisionId = divisionId,
                 Founded = 2020,
                 CreatedAt = now,
             });
