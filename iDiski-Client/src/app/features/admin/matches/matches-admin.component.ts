@@ -5,6 +5,7 @@ import { MatchService, GenerateFixturesCommand, GenerateFixturesResult } from '.
 import { MatchEventService } from '../../../core/services/match-event.service';
 import { TeamService } from '../../../core/services/team.service';
 import { DivisionService } from '../../../core/services/division.service';
+import { CompetitionService } from '../../../core/services/competition.service';
 import {
   MatchResultDto,
   knockoutRoundName,
@@ -14,6 +15,8 @@ import {
   TeamDto,
   DivisionDto,
   MatchStatus,
+  CompetitionDto,
+  CompetitionEntrantDto,
   CompetitionFormat,
 } from '../../../core/models';
 
@@ -338,15 +341,29 @@ import {
             <div class="modal-body">
               <form #matchForm="ngForm">
                 <div class="row g-3">
-                  <div class="col-md-4">
-                    <label class="form-label">Season *</label>
-                    <input
-                      type="number"
-                      class="form-control"
-                      [(ngModel)]="createFormData.season"
-                      name="season"
+                  <div class="col-md-8">
+                    <label class="form-label">Competition *</label>
+                    <select
+                      class="form-select"
+                      [(ngModel)]="createFormData.competitionId"
+                      name="competitionId"
                       required
-                    />
+                      (ngModelChange)="onCreateCompetitionChange()"
+                    >
+                      <option [ngValue]="null">Select Competition</option>
+                      @for (competition of competitions(); track competition.id) {
+                        <option [ngValue]="competition.id">
+                          {{ competition.divisionName }} — {{ competition.name }} ({{
+                            competition.season
+                          }})
+                        </option>
+                      }
+                    </select>
+                    <small class="text-muted">
+                      <!-- Both clubs have to be entered in it. The season comes with the
+                           competition rather than being typed, so it cannot disagree. -->
+                      The two clubs are chosen from this competition's entrants.
+                    </small>
                   </div>
                   <div class="col-md-4">
                     <label class="form-label">Matchweek *</label>
@@ -359,22 +376,6 @@ import {
                       min="1"
                     />
                   </div>
-                  <div class="col-md-4">
-                    <label class="form-label">Division</label>
-                    <select
-                      class="form-select"
-                      [(ngModel)]="createFormData.divisionId"
-                      name="divisionId"
-                      (ngModelChange)="onCreateDivisionChange()"
-                    >
-                      <option [ngValue]="null">Select</option>
-                      @for (division of divisions(); track division.id) {
-                        <option [ngValue]="division.id">
-                          {{ division.name }}
-                        </option>
-                      }
-                    </select>
-                  </div>
 
                   <div class="col-md-6">
                     <label class="form-label">Home Team *</label>
@@ -385,12 +386,12 @@ import {
                       required
                     >
                       <option [ngValue]="null">Select Team</option>
-                      @for (team of getTeamsByDivision(createFormData.divisionId); track team.id) {
+                      @for (team of createEntrants(); track team.teamId) {
                         <option
-                          [ngValue]="team.id"
-                          [disabled]="team.id === createFormData.awayTeamId"
+                          [ngValue]="team.teamId"
+                          [disabled]="team.teamId === createFormData.awayTeamId"
                         >
-                          {{ team.name }}
+                          {{ team.teamName }}@if (team.isExternal) { (invited) }
                         </option>
                       }
                     </select>
@@ -404,12 +405,12 @@ import {
                       required
                     >
                       <option [ngValue]="null">Select Team</option>
-                      @for (team of getTeamsByDivision(createFormData.divisionId); track team.id) {
+                      @for (team of createEntrants(); track team.teamId) {
                         <option
-                          [ngValue]="team.id"
-                          [disabled]="team.id === createFormData.homeTeamId"
+                          [ngValue]="team.teamId"
+                          [disabled]="team.teamId === createFormData.homeTeamId"
                         >
-                          {{ team.name }}
+                          {{ team.teamName }}@if (team.isExternal) { (invited) }
                         </option>
                       }
                     </select>
@@ -539,42 +540,36 @@ import {
                     }
                   }
                   <div class="mt-2 small">
-                    This follows the division's format. To change it, change the division.
+                    This follows the competition's format. To change it, change the competition.
                   </div>
                 </div>
 
                 <div class="mb-3">
-                  <label class="form-label">Division *</label>
+                  <label class="form-label">Competition *</label>
                   <select
                     class="form-select"
-                    [(ngModel)]="generateFormData.divisionId"
-                    (ngModelChange)="onGenerateDivisionChanged()"
-                    name="divisionId"
+                    [(ngModel)]="generateFormData.competitionId"
+                    (ngModelChange)="onGenerateCompetitionChanged()"
+                    name="competitionId"
                     required
                   >
-                    <option value="">Select Division</option>
-                    @for (division of divisions(); track division.id) {
-                      <option [value]="division.id">{{ division.name }}</option>
+                    <option value="">Select Competition</option>
+                    @for (competition of competitions(); track competition.id) {
+                      <option [value]="competition.id">
+                        {{ competition.divisionName }} — {{ competition.name }} ({{
+                          competition.season
+                        }})
+                      </option>
                     }
                   </select>
-                  <small class="text-muted">Choose which division to generate fixtures for</small>
+                  <small class="text-muted">
+                    <!-- A division runs several at once, so "which division" is no longer a
+                         question that identifies anything to draw up. -->
+                    Which competition to draw up. Entrants come from its entry list.
+                  </small>
                 </div>
 
                 <div class="row g-3">
-                  <div class="col-md-6">
-                    <label class="form-label">Season *</label>
-                    <input
-                      type="number"
-                      class="form-control"
-                      [(ngModel)]="generateFormData.season"
-                      name="season"
-                      required
-                      min="2020"
-                      max="2100"
-                      placeholder="2025"
-                    />
-                  </div>
-
                   <div class="col-md-6">
                     <label class="form-label">Start Date *</label>
                     <input
@@ -895,10 +890,12 @@ export class MatchesAdminComponent implements OnInit {
   private matchService = inject(MatchService);
   private teamService = inject(TeamService);
   private divisionService = inject(DivisionService);
+  private competitionService = inject(CompetitionService);
 
   matches = signal<MatchResultDto[]>([]);
   teams = signal<TeamDto[]>([]);
   divisions = signal<DivisionDto[]>([]);
+  competitions = signal<CompetitionDto[]>([]);
   loading = signal(false);
   saving = signal(false);
   error = signal<string | null>(null);
@@ -919,6 +916,12 @@ export class MatchesAdminComponent implements OnInit {
   pageSize = 20;
 
   createFormData: any = this.getEmptyCreateForm();
+
+  /**
+   * Who may be picked for a hand-made fixture: the chosen competition's entrants, which is a
+   * different list from "everybody in a division" and deliberately includes invited clubs.
+   */
+  createEntrants = signal<CompetitionEntrantDto[]>([]);
   scoreFormData: any = { homeScore: 0, awayScore: 0, status: 'Completed', notes: '' };
   /**
    * The format of the division chosen in the generate dialog, which decides what the dialog
@@ -926,31 +929,25 @@ export class MatchesAdminComponent implements OnInit {
    * how many groups there are.
    */
   /**
-   * What choosing a division fills in for itself: its season, and groups of four, which is how
-   * an organiser thinks about it — thirty-two entrants make eight groups, not "eight" as a
-   * number they worked out themselves. Both adjustable afterwards; this only sets the starting
-   * point when a division is chosen.
+   * Groups of four, which is how an organiser thinks about it: thirty-two entrants make eight
+   * groups, not "eight" as a number they worked out themselves. Adjustable afterwards — this
+   * only sets the starting point when a competition is chosen.
+   *
+   * The season is no longer filled in here because it is no longer asked for: a competition
+   * carries its own, so a fixture cannot be written into a year nothing reads.
    */
-  onGenerateDivisionChanged(): void {
-    // A division is one season's competition — its season is part of what identifies it — but
-    // this dialog opened on the current year whatever was picked. Generating a 2033 division's
-    // fixtures into 2026 succeeded and then showed nothing: the division's own page reads its
-    // own season, so the whole competition was written somewhere nobody looks. Still editable,
-    // for the organiser who really is building next season early.
-    const season = this.generateDivision()?.season;
-    if (season) this.generateFormData.season = season;
-
+  onGenerateCompetitionChanged(): void {
     if (this.generateFormat() !== 'GroupAndKnockout') return;
 
-    const teams = this.generateDivision()?.teamCount ?? 0;
-    if (teams < 4) return;
+    const entrants = this.generateCompetition()?.entrantCount ?? 0;
+    if (entrants < 4) return;
 
-    const groups = Math.max(2, Math.min(Math.round(teams / 4), Math.floor(teams / 2)));
+    const groups = Math.max(2, Math.min(Math.round(entrants / 4), Math.floor(entrants / 2)));
     this.generateFormData.groupCount = groups;
   }
 
-  private generateDivision(): DivisionDto | undefined {
-    return this.divisions().find((d) => d.id === this.generateFormData.divisionId);
+  private generateCompetition(): CompetitionDto | undefined {
+    return this.competitions().find((c) => c.id === this.generateFormData.competitionId);
   }
 
   /**
@@ -959,11 +956,13 @@ export class MatchesAdminComponent implements OnInit {
    * getting it wrong means deleting a whole competition's fixtures to try again.
    */
   groupShape(): string {
-    const teams = this.generateDivision()?.teamCount ?? 0;
+    // Entrants, not the division's membership: a cup of eight inside a division of twenty is
+    // eight teams' worth of group stage.
+    const teams = this.generateCompetition()?.entrantCount ?? 0;
     const groups = Number(this.generateFormData.groupCount);
     const advancing = Number(this.generateFormData.teamsAdvancingPerGroup);
 
-    if (!teams) return 'Choose a division to see the shape of the competition.';
+    if (!teams) return 'Choose a competition to see the shape it will take.';
     if (!groups || groups < 2) return 'A group stage needs at least two groups.';
     if (groups > Math.floor(teams / 2)) {
       return `${teams} teams cannot fill ${groups} groups — each group needs at least two.`;
@@ -1019,13 +1018,11 @@ export class MatchesAdminComponent implements OnInit {
   }
 
   generateFormat(): CompetitionFormat {
-    const chosen = this.divisions().find((d) => d.id === this.generateFormData.divisionId);
-    return chosen?.format ?? 'League';
+    return this.generateCompetition()?.format ?? 'League';
   }
 
   generateFormData: {
-    divisionId: string;
-    season: number;
+    competitionId: string;
     isHomeAndAway: boolean;
     startDate: string;
     daysBetweenMatchweeks: number;
@@ -1033,8 +1030,7 @@ export class MatchesAdminComponent implements OnInit {
     groupCount: number;
     teamsAdvancingPerGroup: number;
   } = {
-    divisionId: '',
-    season: new Date().getFullYear(),
+    competitionId: '',
     isHomeAndAway: true,
     startDate: '',
     daysBetweenMatchweeks: 7,
@@ -1046,6 +1042,7 @@ export class MatchesAdminComponent implements OnInit {
   ngOnInit() {
     this.loadTeams();
     this.loadDivisions();
+    this.loadCompetitions();
     this.loadMatches();
   }
 
@@ -1085,6 +1082,27 @@ export class MatchesAdminComponent implements OnInit {
     });
   }
 
+  /**
+   * Every competition, newest season first and grouped by the division running it, because the
+   * generate dialog picks one of these rather than a division now.
+   */
+  loadCompetitions() {
+    this.competitionService.getAll().subscribe({
+      next: (data) => {
+        const sorted = [...data].sort((a, b) => {
+          if (b.season !== a.season) return b.season - a.season;
+          if (a.divisionName !== b.divisionName) {
+            return a.divisionName.localeCompare(b.divisionName);
+          }
+          return a.name.localeCompare(b.name);
+        });
+
+        this.competitions.set(sorted);
+      },
+      error: (err) => console.error('Failed to load competitions:', err),
+    });
+  }
+
   loadDivisions() {
     // Load all divisions for admin panel
     this.divisionService.getAll().subscribe({
@@ -1106,23 +1124,6 @@ export class MatchesAdminComponent implements OnInit {
   getTeamsByDivision(divisionId: string | null | undefined) {
     const all = this.teams();
     return divisionId ? all.filter((t) => t.divisionId === divisionId) : all;
-  }
-
-  /**
-   * Changing the division invalidates team choices from the old one. Two clubs from different
-   * divisions should never end up scheduled against each other, and before this the pickers
-   * offered every team in the league regardless of the division selected above them.
-   */
-  onCreateDivisionChange() {
-    const eligible = this.getTeamsByDivision(this.createFormData.divisionId);
-
-    if (!eligible.some((t) => t.id === this.createFormData.homeTeamId)) {
-      this.createFormData.homeTeamId = null;
-    }
-
-    if (!eligible.some((t) => t.id === this.createFormData.awayTeamId)) {
-      this.createFormData.awayTeamId = null;
-    }
   }
 
   /**
@@ -1178,13 +1179,12 @@ export class MatchesAdminComponent implements OnInit {
 
   showGenerateModal() {
     this.generateFormData = {
-      divisionId: this.filterDivisionId || '',
-      season: this.filterSeason,
+      competitionId: '',
       isHomeAndAway: true,
       startDate: new Date().toISOString().split('T')[0],
       daysBetweenMatchweeks: 7,
-      // Always reopens unticked: replacing a season is a deliberate choice, never a leftover
-      // from the last time the modal was open.
+      // Always reopens unticked: replacing a drawn competition is a deliberate choice, never
+      // a leftover from the last time the modal was open.
       replaceExisting: false,
       groupCount: 2,
       teamsAdvancingPerGroup: 2
@@ -1201,8 +1201,7 @@ export class MatchesAdminComponent implements OnInit {
     this.error.set(null);
 
     const command: GenerateFixturesCommand = {
-      divisionId: this.generateFormData.divisionId,
-      season: this.generateFormData.season,
+      competitionId: this.generateFormData.competitionId,
       isHomeAndAway: this.generateFormData.isHomeAndAway,
       startDate: this.generateFormData.startDate,
       daysBetweenMatchweeks: this.generateFormData.daysBetweenMatchweeks,
@@ -1241,14 +1240,14 @@ export class MatchesAdminComponent implements OnInit {
     this.error.set(null);
 
     const command: CreateMatchCommand = {
-      season: this.createFormData.season,
+
       matchweekNumber: this.createFormData.matchweekNumber,
       matchDate: new Date(this.createFormData.matchDate).toISOString(),
       homeTeamId: this.createFormData.homeTeamId,
       awayTeamId: this.createFormData.awayTeamId,
       venue: this.createFormData.venue || undefined,
       referee: this.createFormData.referee || undefined,
-      divisionId: this.createFormData.divisionId || undefined,
+      competitionId: this.createFormData.competitionId,
     };
 
     this.matchService.create(command).subscribe({
@@ -1370,11 +1369,24 @@ export class MatchesAdminComponent implements OnInit {
     this.selectedMatch.set(null);
   }
 
+  onCreateCompetitionChange() {
+    this.createFormData.homeTeamId = null;
+    this.createFormData.awayTeamId = null;
+    this.createEntrants.set([]);
+
+    const id = this.createFormData.competitionId;
+    if (!id) return;
+
+    this.competitionService.getEntrants(id).subscribe({
+      next: (entrants) => this.createEntrants.set(entrants),
+      error: () => this.createEntrants.set([]),
+    });
+  }
+
   private getEmptyCreateForm() {
     return {
-      season: new Date().getFullYear(),
       matchweekNumber: 1,
-      divisionId: null,
+      competitionId: null,
       homeTeamId: null,
       awayTeamId: null,
       matchDate: '',

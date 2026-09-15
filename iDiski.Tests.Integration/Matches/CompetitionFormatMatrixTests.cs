@@ -44,8 +44,8 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
     [Fact]
     public async Task ALeague_IsAllLeagueFixturesAndNoBracketAtAll()
     {
-        var divisionId = await Generate(CompetitionFormat.League);
-        var fixtures = await FixturesFor(divisionId);
+        var competitionId = await Generate(CompetitionFormat.League);
+        var fixtures = await FixturesFor(competitionId);
 
         // Sixteen clubs each playing the other fifteen once.
         fixtures.Should().HaveCount(120);
@@ -64,12 +64,12 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
     [Fact]
     public async Task ALeague_HasATableThatResultsMove()
     {
-        var divisionId = await Generate(CompetitionFormat.League);
+        var competitionId = await Generate(CompetitionFormat.League);
 
-        var fixture = (await FixturesFor(divisionId)).First();
+        var fixture = (await FixturesFor(competitionId)).First();
         await Record(fixture, home: 2, away: 0);
 
-        var table = await TableFor(divisionId);
+        var table = await TableFor(competitionId);
 
         table.Should().HaveCount(Entrants);
         table.Sum(r => r.Played).Should().Be(2, "one match played is two clubs having played");
@@ -81,8 +81,8 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
     [Fact]
     public async Task AKnockout_HasNoGroupStageWhatsoever()
     {
-        var divisionId = await Generate(CompetitionFormat.Knockout);
-        var fixtures = await FixturesFor(divisionId);
+        var competitionId = await Generate(CompetitionFormat.Knockout);
+        var fixtures = await FixturesFor(competitionId);
 
         // The distinction from a group competition, asserted rather than assumed: you are
         // drawn straight into the bracket and there is no group anywhere in it.
@@ -94,8 +94,8 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
     [Fact]
     public async Task AKnockout_IsFifteenTiesEndingInOneFinal()
     {
-        var divisionId = await Generate(CompetitionFormat.Knockout);
-        var fixtures = await FixturesFor(divisionId);
+        var competitionId = await Generate(CompetitionFormat.Knockout);
+        var fixtures = await FixturesFor(competitionId);
 
         // Sixteen entrants: eight, four, two, one.
         fixtures.Should().HaveCount(15);
@@ -116,20 +116,20 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
     {
         // Asked for home and away, which a league would honour and a bracket cannot: you
         // cannot play the losers again.
-        var divisionId = await Generate(CompetitionFormat.Knockout, homeAndAway: true);
+        var competitionId = await Generate(CompetitionFormat.Knockout, homeAndAway: true);
 
-        (await FixturesFor(divisionId)).Should().HaveCount(15);
+        (await FixturesFor(competitionId)).Should().HaveCount(15);
     }
 
     [Fact]
     public async Task AKnockout_KeepsItsTiesOutOfTheTableHoweverManyArePlayed()
     {
-        var divisionId = await Generate(CompetitionFormat.Knockout);
+        var competitionId = await Generate(CompetitionFormat.Knockout);
 
-        var tie = (await FixturesFor(divisionId)).First(m => m.KnockoutRoundSize == 16);
+        var tie = (await FixturesFor(competitionId)).First(m => m.KnockoutRoundSize == 16);
         await Record(tie, home: 4, away: 1);
 
-        var table = await TableFor(divisionId);
+        var table = await TableFor(competitionId);
 
         // Winning a tie takes you to the next round, not up a table. Four goals and a win,
         // and the standings do not move — which is why the division page shows a cup no table
@@ -143,8 +143,8 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
     [Fact]
     public async Task GroupsThenAKnockout_HasBothStages_UnlikeEither()
     {
-        var divisionId = await Generate(CompetitionFormat.GroupAndKnockout, groups: 4);
-        var fixtures = await FixturesFor(divisionId);
+        var competitionId = await Generate(CompetitionFormat.GroupAndKnockout, groups: 4);
+        var fixtures = await FixturesFor(competitionId);
 
         var group = fixtures.Where(m => m.Stage == MatchStage.Group).ToList();
         var bracket = fixtures.Where(m => m.Stage == MatchStage.Knockout).ToList();
@@ -164,8 +164,8 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
     [Fact]
     public async Task GroupsThenAKnockout_KnowsItsGroupTeamsButNotItsQualifiers()
     {
-        var divisionId = await Generate(CompetitionFormat.GroupAndKnockout, groups: 4);
-        var fixtures = await FixturesFor(divisionId);
+        var competitionId = await Generate(CompetitionFormat.GroupAndKnockout, groups: 4);
+        var fixtures = await FixturesFor(competitionId);
 
         // Everyone knows their group opponents on day one.
         fixtures.Where(m => m.Stage == MatchStage.Group)
@@ -180,12 +180,12 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
     [Fact]
     public async Task GroupsThenAKnockout_CountsGroupResultsAndIgnoresBracketOnes()
     {
-        var divisionId = await Generate(CompetitionFormat.GroupAndKnockout, groups: 4);
+        var competitionId = await Generate(CompetitionFormat.GroupAndKnockout, groups: 4);
 
-        var groupTie = (await FixturesFor(divisionId)).First(m => m.Stage == MatchStage.Group);
+        var groupTie = (await FixturesFor(competitionId)).First(m => m.Stage == MatchStage.Group);
         await Record(groupTie, home: 1, away: 0);
 
-        var table = await TableFor(divisionId);
+        var table = await TableFor(competitionId);
 
         // A group is a league in miniature, so its results count. Bracket ties never do.
         table.Sum(r => r.Played).Should().Be(2);
@@ -216,10 +216,10 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
     [Fact]
     public async Task AHomeAndAwayGroup_GivesEachPairBothVenues()
     {
-        var divisionId = await Generate(
+        var competitionId = await Generate(
             CompetitionFormat.GroupAndKnockout, groups: 2, homeAndAway: true);
 
-        var group = (await FixturesFor(divisionId))
+        var group = (await FixturesFor(competitionId))
             .Where(m => m.Stage == MatchStage.Group)
             .ToList();
 
@@ -278,22 +278,22 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
     private static List<MatchStage> Stages(IEnumerable<MatchResult> fixtures) =>
         fixtures.Select(m => m.Stage).Distinct().OrderBy(s => s).ToList();
 
-    private async Task<List<MatchResult>> FixturesFor(Guid divisionId)
+    private async Task<List<MatchResult>> FixturesFor(Guid competitionId)
     {
         _fixture.DbContext.ChangeTracker.Clear();
 
         return await _fixture.DbContext.MatchResults
             .AsNoTracking()
-            .Where(m => m.DivisionId == divisionId)
+            .Where(m => m.CompetitionId == competitionId)
             .ToListAsync();
     }
 
-    private async Task<List<StandingDto>> TableFor(Guid divisionId)
+    private async Task<List<StandingDto>> TableFor(Guid competitionId)
     {
         _fixture.DbContext.ChangeTracker.Clear();
 
         var result = await new GetLeagueStandingsQueryHandler(_fixture.DbContext).Handle(
-            new GetLeagueStandingsQuery(Season: 2026, DivisionId: divisionId),
+            new GetLeagueStandingsQuery(Season: 2026, CompetitionId: competitionId),
             CancellationToken.None);
 
         return result.Table.ToList();
@@ -311,8 +311,11 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
     {
         _fixture.DbContext.ChangeTracker.Clear();
 
-        var divisionId = Guid.NewGuid();
         var now = DateTime.UtcNow;
+
+        // A division holds the clubs; the competition is what they play. Everybody is entered
+        // here because this file is about the formats differing, not about who is in them.
+        var divisionId = Guid.NewGuid();
 
         _fixture.DbContext.Divisions.Add(new Division
         {
@@ -322,19 +325,42 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
             Season = 2026,
             Gender = Gender.Male,
             IsActive = true,
+            CreatedAt = now,
+        });
+
+        var competitionId = Guid.NewGuid();
+
+        _fixture.DbContext.Competitions.Add(new Competition
+        {
+            Id = competitionId,
+            DivisionId = divisionId,
+            Name = $"{format} of {Entrants}",
+            ShortCode = TestIds.Code("FM"),
+            Season = 2026,
             Format = format,
+            IsActive = true,
             CreatedAt = now,
         });
 
         for (var i = 0; i < Entrants; i++)
         {
+            var teamId = Guid.NewGuid();
+
             _fixture.DbContext.Teams.Add(new Team
             {
-                Id = Guid.NewGuid(),
+                Id = teamId,
                 Name = $"Club {i + 1}",
                 ShortCode = TestIds.Code("C"),
                 DivisionId = divisionId,
                 Founded = 2020,
+                CreatedAt = now,
+            });
+
+            _fixture.DbContext.CompetitionEntries.Add(new CompetitionEntry
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = teamId,
                 CreatedAt = now,
             });
         }
@@ -343,14 +369,13 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
 
         await new GenerateFixturesCommandHandler(_fixture.DbContext).Handle(
             new GenerateFixturesCommand(
-                divisionId,
-                Season: 2026,
+                competitionId,
                 IsHomeAndAway: homeAndAway,
                 StartDate: new DateTime(2026, 8, 1, 0, 0, 0, DateTimeKind.Utc),
                 DaysBetweenMatchweeks: 7,
                 GroupCount: groups),
             CancellationToken.None);
 
-        return divisionId;
+        return competitionId;
     }
 }

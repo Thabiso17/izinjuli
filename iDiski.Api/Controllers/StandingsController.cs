@@ -15,6 +15,10 @@ public sealed class StandingsController : BaseApiController
     /// </summary>
     /// <param name="season">Required. Season year, e.g. 2025.</param>
     /// <param name="divisionId">Optional. Filter by division ID.</param>
+    /// <param name="competitionId">
+    /// The competition whose table this is, and the way to ask for a real one: entrants then
+    /// come from its entry list rather than from who shares a division.
+    /// </param>
     /// <param name="upToMatchweek">
     /// Optional. Returns a historical snapshot of the table as it stood after
     /// this matchweek — useful for "Matchweek 10 rewind" features in your Angular app.
@@ -25,11 +29,13 @@ public sealed class StandingsController : BaseApiController
     public async Task<IActionResult> GetTable(
         [FromQuery] int   season,
         [FromQuery] Guid? divisionId = null,
+        [FromQuery] Guid? competitionId = null,
         [FromQuery] int?  upToMatchweek = null,
         [FromQuery] string? group = null,
         CancellationToken ct = default) =>
         Ok(await Sender.Send(
-            new GetLeagueStandingsQuery(season, divisionId, upToMatchweek, group), ct));
+            new GetLeagueStandingsQuery(
+                season, divisionId, upToMatchweek, group, competitionId), ct));
 
     /// <summary>
     /// Returns the top scorers leaderboard for a season.

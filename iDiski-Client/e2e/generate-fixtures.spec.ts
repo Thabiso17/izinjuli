@@ -2,13 +2,16 @@ import { test, expect, type Page } from '@playwright/test';
 import { accounts, signInAndWaitForAdmin } from './helpers';
 
 /**
- * Generating a season's fixtures — the one admin action that writes dozens of rows from a
- * single click, and the one that had no test of any kind.
+ * Drawing a competition up, and refusing to draw it twice.
  *
- * A round-robin that is subtly wrong does not fail loudly. It produces a season that looks
- * plausible, and by the time anyone notices, results have been entered against it. The
- * arithmetic is pinned in GenerateFixturesTests against the database; this checks the screen
- * actually drives it and reports back.
+ * Generating writes dozens of rows from a single click, and doing it twice used to leave a
+ * competition holding two complete copies of itself with nothing on screen saying so. The
+ * arithmetic is pinned against the database in GenerateFixturesTests and the happy path is
+ * driven end to end in competition-formats.spec.ts; what is left here is the guard, which only
+ * exists where somebody can click the button a second time.
+ *
+ * The season is no longer part of this. It belongs to the competition, so there is no year to
+ * type and no year to get wrong.
  */
 test.describe('generating fixtures', () => {
   test.beforeEach(async ({ page }) => {
@@ -17,106 +20,61 @@ test.describe('generating fixtures', () => {
     await page.waitForLoadState('networkidle');
   });
 
-  test('a division with enough teams gets a full round of fixtures', async ({ page }) => {
-    const division = await divisionWithAtLeastTwoTeams(page);
-    if (!division) test.skip(true, 'no division in this environment has two teams');
+  test('a competition that has already been drawn up refuses a second draw', async ({ page }) => {
+    const competition = await aSeededCompetition(page);
+    if (!competition) test.skip(true, 'nothing is seeded to generate against');
 
     await page.locator('button:has-text("Generate Fixtures")').first().click();
 
     const modal = page.locator('.modal.show');
     await expect(modal).toBeVisible();
 
-    await modal.locator('select[name="divisionId"]').selectOption({ label: division! });
-    // A season the seeded league has no fixtures for. Reusing the current one now fails by
-    // design: generating twice would give the division a second copy of its season, and the
-    // guard refuses rather than append.
-    await modal.locator('input[name="season"]').fill('2031');
+    await modal.locator('select[name="competitionId"]').selectOption({ index: competition!.index });
     await modal.locator('input[name="startDate"]').fill('2031-03-01');
-
-    const generated = page.waitForResponse(
-      (r) =>
-        r.url().includes('/api/matchresults/generate') && r.request().method() === 'POST',
-    );
-
-    await modal.locator('button:has-text("Generate Fixtures")').last().click();
-
-    const response = await generated;
-    expect(response.status(), await response.text()).toBe(200);
-
-    // The page reports what it created; a silent success is indistinguishable from nothing
-    // having happened.
-    const success = page.locator('.alert-success');
-    await expect(success).toBeVisible();
-    await expect(success).toContainText(/Generated \d+ fixtures/i);
-
-    const body = await response.json();
-    expect(body.fixturesGenerated, 'a round-robin of two or more clubs is at least one fixture')
-      .toBeGreaterThan(0);
-    expect(body.matchweeksCreated).toBeGreaterThan(0);
-  });
-
-  test('a division without enough teams is refused, and says why', async ({ page }) => {
-    const division = await divisionWithFewerThanTwoTeams(page);
-    if (!division) test.skip(true, 'every division in this environment has two teams');
-
-    await page.locator('button:has-text("Generate Fixtures")').first().click();
-
-    const modal = page.locator('.modal.show');
-    await expect(modal).toBeVisible();
-
-    await modal.locator('select[name="divisionId"]').selectOption({ label: division! });
-    await modal.locator('input[name="season"]').fill('2032');
-    await modal.locator('input[name="startDate"]').fill('2032-03-01');
     await modal.locator('button:has-text("Generate Fixtures")').last().click();
 
     const failure = page.locator('.alert-danger');
     await expect(failure).toBeVisible();
+
+    // Said plainly, and with the count, because the alternative is an admin quietly ending up
+    // with two seasons stacked on each other.
     await expect(
       failure,
-      'the admin needs to be told it is the squad list at fault, not a server error',
-    ).toContainText(/team/i);
+      'the admin needs to be told it is already drawn, not given a server error',
+    ).toContainText(/already has \d+ fixtures/i);
+  });
+
+  test('the dialog asks for a competition rather than a division', async ({ page }) => {
+    // A division runs several at once, so "which division" stopped identifying anything that
+    // could be drawn up.
+    await page.locator('button:has-text("Generate Fixtures")').first().click();
+
+    const modal = page.locator('.modal.show');
+    await expect(modal).toBeVisible();
+
+    await expect(modal.locator('select[name="competitionId"]')).toBeVisible();
+    await expect(modal.locator('select[name="divisionId"]')).toHaveCount(0);
+
+    // And there is no season to type: the competition carries its own.
+    await expect(modal.locator('input[name="season"]')).toHaveCount(0);
   });
 });
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Divisions are read from the filter bar, whose team dropdown is the page's own account of
- * which clubs play where — so the test picks a division that can actually produce a fixture
- * rather than assuming how the data is seeded.
+ * A competition from the seeded league, which by definition already has its fixtures — that is
+ * what makes it the right subject for the double-draw guard.
  */
-async function divisionTeamCounts(page: Page): Promise<Map<string, number>> {
-  const filters = page.locator('.card.mb-4').first();
-  const division = filters.locator('select').first();
-  const team = filters.locator('select').nth(1);
+async function aSeededCompetition(page: Page): Promise<{ index: number } | null> {
+  await page.locator('button:has-text("Generate Fixtures")').first().click();
 
-  const names = (await division.locator('option').allInnerTexts()).map((n) => n.trim());
-  const counts = new Map<string, number>();
+  const modal = page.locator('.modal.show');
+  const options = await modal.locator('select[name="competitionId"] option').allInnerTexts();
 
-  // Index 0 is "All Divisions".
-  for (let i = 1; i < names.length; i++) {
-    await division.selectOption({ index: i });
-    await page.waitForLoadState('networkidle');
-    // Minus one for the "All Teams" placeholder.
-    counts.set(names[i], (await team.locator('option').count()) - 1);
-  }
+  await modal.locator('button:has-text("Cancel")').first().click();
+  await expect(modal).toBeHidden();
 
-  await division.selectOption({ index: 0 });
-  await page.waitForLoadState('networkidle');
-
-  return counts;
-}
-
-async function divisionWithAtLeastTwoTeams(page: Page): Promise<string | null> {
-  for (const [name, count] of await divisionTeamCounts(page)) {
-    if (count >= 2) return name;
-  }
-  return null;
-}
-
-async function divisionWithFewerThanTwoTeams(page: Page): Promise<string | null> {
-  for (const [name, count] of await divisionTeamCounts(page)) {
-    if (count < 2) return name;
-  }
-  return null;
+  // Index 0 is the "Select Competition" placeholder.
+  return options.length > 1 ? { index: 1 } : null;
 }

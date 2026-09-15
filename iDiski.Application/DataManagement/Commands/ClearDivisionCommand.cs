@@ -7,7 +7,9 @@ namespace iDiski.Application.DataManagement.Commands;
 
 // ── Command ───────────────────────────────────────────────────────────────────
 
-/// <summary>Permanently removes a division and everything nested under it: teams, players, suspensions, match events and match history. Returns the number of teams removed. SuperAdmin only.</summary>
+/// <summary>Permanently removes a division and everything nested under it: its competitions and
+/// their entry lists, teams, players, suspensions, match events and match history. Returns the
+/// number of teams removed. SuperAdmin only.</summary>
 public sealed record ClearDivisionCommand(Guid DivisionId) : IRequest<int>;
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -38,6 +40,17 @@ public sealed class ClearDivisionCommandHandler : IRequestHandler<ClearDivisionC
         // division assignment. Clear those before removing the division itself.
         await _db.MatchResults
             .Where(m => m.DivisionId == request.DivisionId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        // The competitions this division runs, and the places clubs held in them. Entries go
+        // first: a club from another division may hold one, and that club is not being
+        // deleted here, but its place in a competition that is disappearing must be.
+        await _db.CompetitionEntries
+            .Where(e => e.Competition.DivisionId == request.DivisionId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        await _db.Competitions
+            .Where(c => c.DivisionId == request.DivisionId)
             .ExecuteDeleteAsync(cancellationToken);
 
         var teamsRemoved = await _db.Teams

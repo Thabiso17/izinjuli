@@ -10,6 +10,7 @@ using iDiski.Application.Suspensions.Queries;
 using iDiski.Domain.Entities;
 using iDiski.Domain.Enums;
 using iDiski.Tests.Integration.Common;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace iDiski.Tests.Integration.Filtering;
@@ -97,6 +98,30 @@ public class AdminFilterTests : IClassFixture<IntegrationTestFixture>
         result.Items.Should().Contain(m => m.Id == inDivisionOne.Id);
         result.Items.Should().NotContain(m => m.Id == elsewhere.Id,
             "the page has offered this filter all along without it doing anything");
+    }
+
+    [Fact]
+    public async Task Matches_NarrowToACompetition_WithinTheSameDivision()
+    {
+        // The filter a division cannot express. Both fixtures are in the same division — its
+        // league and its cup — so narrowing by division returns both and narrowing by
+        // competition is the only thing that separates them.
+        var scenario = await LeagueScenario.CreateAsync(_fixture.DbContext);
+
+        var cup = await AddCompetitionAsync(scenario.DivisionOneId, CompetitionFormat.Knockout);
+
+        var inTheLeague = await AddMatchAsync(
+            scenario.DivisionOneId, scenario.TeamAId, scenario.TeamBId);
+        var inTheCup = await AddMatchAsync(
+            scenario.DivisionOneId, scenario.TeamAId, scenario.TeamBId, competitionId: cup);
+
+        var result = await new GetFixturesQueryHandler(_fixture.DbContext).Handle(
+            new GetFixturesQuery(Season: 2026, PageSize: 100, CompetitionId: cup),
+            CancellationToken.None);
+
+        result.Items.Should().Contain(m => m.Id == inTheCup.Id);
+        result.Items.Should().NotContain(m => m.Id == inTheLeague.Id,
+            "a division runs several competitions at once, and this filter picks one of them");
     }
 
     [Fact]
@@ -217,12 +242,19 @@ public class AdminFilterTests : IClassFixture<IntegrationTestFixture>
         return player;
     }
 
-    private async Task<MatchResult> AddMatchAsync(Guid divisionId, Guid homeTeamId, Guid awayTeamId)
+    /// <summary>
+    /// A fixture in the shape production actually holds: belonging to a competition, which
+    /// belongs to a division. A fixture with no competition cannot exist once the migration
+    /// has run, so seeding one here would have tested a row the app can no longer produce.
+    /// </summary>
+    private async Task<MatchResult> AddMatchAsync(
+        Guid divisionId, Guid homeTeamId, Guid awayTeamId, Guid? competitionId = null)
     {
         var match = new MatchResult
         {
             Id = Guid.NewGuid(),
             DivisionId = divisionId,
+            CompetitionId = competitionId ?? await TheLeagueOfAsync(divisionId),
             HomeTeamId = homeTeamId,
             AwayTeamId = awayTeamId,
             Season = 2026,
@@ -235,6 +267,39 @@ public class AdminFilterTests : IClassFixture<IntegrationTestFixture>
         _fixture.DbContext.MatchResults.Add(match);
         await _fixture.DbContext.SaveChangesAsync();
         return match;
+    }
+
+    /// <summary>The division's league, made once and reused — what its fixtures belong to.</summary>
+    private async Task<Guid> TheLeagueOfAsync(Guid divisionId)
+    {
+        var existing = await _fixture.DbContext.Competitions
+            .Where(c => c.DivisionId == divisionId && c.Format == CompetitionFormat.League)
+            .Select(c => c.Id)
+            .FirstOrDefaultAsync();
+
+        if (existing != Guid.Empty) return existing;
+
+        return await AddCompetitionAsync(divisionId, CompetitionFormat.League);
+    }
+
+    private async Task<Guid> AddCompetitionAsync(Guid divisionId, CompetitionFormat format)
+    {
+        var id = Guid.NewGuid();
+
+        _fixture.DbContext.Competitions.Add(new Competition
+        {
+            Id = id,
+            DivisionId = divisionId,
+            Name = $"{format} {TestIds.Code("N")}",
+            ShortCode = TestIds.Code("AF"),
+            Season = 2026,
+            Format = format,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        await _fixture.DbContext.SaveChangesAsync();
+        return id;
     }
 
     private async Task<Suspension> SuspendAsync(Guid playerId)

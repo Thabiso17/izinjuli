@@ -10,7 +10,17 @@ namespace iDiski.Application.Standings.Queries;
 // ── Query ─────────────────────────────────────────────────────────────────────
 
 /// <param name="Season">The league season year, e.g. 2025.</param>
-/// <param name="DivisionId">Optional division filter. If null, shows all teams (not recommended).</param>
+/// <param name="CompetitionId">
+/// The competition whose table this is, and the way this query should normally be asked.
+///
+/// Entrants then come from the entry list rather than from who happens to share a division,
+/// which is what makes a table of twelve of a division's twenty possible — and what stops a
+/// club invited from another division being left out of a table they are playing in.
+/// </param>
+/// <param name="DivisionId">
+/// Optional division filter, kept for the league-wide view. It spans every competition being
+/// run in the division, so it is a summary rather than any one competition's table.
+/// </param>
 /// <param name="UpToMatchweek">
 /// Optional ceiling. When set, only matches up to and including this matchweek
 /// are counted — useful for historical snapshots ("how did the table look after MW10?").
@@ -24,7 +34,8 @@ public sealed record GetLeagueStandingsQuery(
     int     Season,
     Guid?   DivisionId = null,
     int?    UpToMatchweek = null,
-    string? GroupName = null
+    string? GroupName = null,
+    Guid?   CompetitionId = null
 ) : IRequest<LeagueTableDto>;
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -40,13 +51,31 @@ public sealed class GetLeagueStandingsQueryHandler
         GetLeagueStandingsQuery request,
         CancellationToken cancellationToken)
     {
-        // ── Load all teams (filtered by division if specified) ──────
-        var teamsQuery = _db.Teams.AsNoTracking();
+        // ── Who is in this table ──────────────────────────────────────────────
+        //
+        // A competition's entrants are the clubs entered in it. Division membership is a
+        // different question and cannot answer this one: a cup may be eight of a division's
+        // twenty, and may field clubs from three other divisions besides.
+        List<Team> teams;
 
-        if (request.DivisionId.HasValue)
-            teamsQuery = teamsQuery.Where(t => t.DivisionId == request.DivisionId.Value);
+        if (request.CompetitionId.HasValue)
+        {
+            teams = await _db.CompetitionEntries
+                .AsNoTracking()
+                .Where(e => e.CompetitionId == request.CompetitionId.Value)
+                .Select(e => e.Team)
+                .OrderBy(t => t.Name)
+                .ToListAsync(cancellationToken);
+        }
+        else
+        {
+            var teamsQuery = _db.Teams.AsNoTracking();
 
-        var teams = await teamsQuery.OrderBy(t => t.Name).ToListAsync(cancellationToken);
+            if (request.DivisionId.HasValue)
+                teamsQuery = teamsQuery.Where(t => t.DivisionId == request.DivisionId.Value);
+
+            teams = await teamsQuery.OrderBy(t => t.Name).ToListAsync(cancellationToken);
+        }
 
         // ── Load completed matches for the season/division ─────────────────────────────
         var matchQuery = _db.MatchResults
@@ -58,7 +87,9 @@ public sealed class GetLeagueStandingsQueryHandler
                         // left out of it; group fixtures are a league in miniature and count.
                         m.Stage != MatchStage.Knockout);
 
-        if (request.DivisionId.HasValue)
+        if (request.CompetitionId.HasValue)
+            matchQuery = matchQuery.Where(m => m.CompetitionId == request.CompetitionId.Value);
+        else if (request.DivisionId.HasValue)
             matchQuery = matchQuery.Where(m => m.DivisionId == request.DivisionId.Value);
 
         if (request.UpToMatchweek.HasValue)
@@ -76,8 +107,15 @@ public sealed class GetLeagueStandingsQueryHandler
                 .AsNoTracking()
                 .Where(m => m.Season == request.Season && m.GroupName == request.GroupName);
 
-            if (request.DivisionId.HasValue)
+            if (request.CompetitionId.HasValue)
+            {
+                groupFixtures = groupFixtures
+                    .Where(m => m.CompetitionId == request.CompetitionId.Value);
+            }
+            else if (request.DivisionId.HasValue)
+            {
                 groupFixtures = groupFixtures.Where(m => m.DivisionId == request.DivisionId.Value);
+            }
 
             var drawn = await groupFixtures
                 .Select(m => new { m.HomeTeamId, m.AwayTeamId })

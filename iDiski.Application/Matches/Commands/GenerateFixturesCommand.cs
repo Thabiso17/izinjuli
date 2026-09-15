@@ -13,10 +13,13 @@ namespace iDiski.Application.Matches.Commands;
 // ═════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
-/// Generates fixtures for a division using round-robin algorithm.
+/// Draws up a competition: a round-robin, a bracket, or groups feeding a bracket.
+///
+/// Entrants come from the competition's entry list rather than from a division's membership,
+/// which is what lets twelve of a division's twenty play a cup while all twenty play the
+/// league, and lets clubs invited from elsewhere play alongside them.
 /// </summary>
-/// <param name="DivisionId">The division to generate fixtures for</param>
-/// <param name="Season">Season year (e.g., 2025)</param>
+/// <param name="CompetitionId">The competition to draw up.</param>
 /// <param name="IsHomeAndAway">True for home-and-away (2 rounds), false for single round-robin</param>
 /// <param name="StartDate">Date of first matchweek</param>
 /// <param name="DaysBetweenMatchweeks">
@@ -36,8 +39,7 @@ namespace iDiski.Application.Matches.Commands;
 /// deliberate way to say "yes, start the season again".
 /// </param>
 public sealed record GenerateFixturesCommand(
-    Guid     DivisionId,
-    int      Season,
+    Guid     CompetitionId,
     bool     IsHomeAndAway,
     DateTime StartDate,
     int      DaysBetweenMatchweeks = 7,
@@ -57,8 +59,7 @@ public sealed class GenerateFixturesCommandValidator : AbstractValidator<Generat
 {
     public GenerateFixturesCommandValidator()
     {
-        RuleFor(x => x.DivisionId).NotEmpty();
-        RuleFor(x => x.Season).GreaterThan(2000).LessThan(2100);
+        RuleFor(x => x.CompetitionId).NotEmpty();
         RuleFor(x => x.StartDate).GreaterThan(DateTime.MinValue);
         // Zero is deliberate: a tournament played out over a single weekend puts every round
         // on the same day, which the old minimum of one day made impossible to express.
@@ -88,26 +89,35 @@ public sealed class GenerateFixturesCommandHandler
         GenerateFixturesCommand request,
         CancellationToken cancellationToken)
     {
-        // 1. Validate division exists
-        var division = await _db.Divisions
-            .Include(d => d.Teams)
-            .FirstOrDefaultAsync(d => d.Id == request.DivisionId, cancellationToken)
-            ?? throw new NotFoundException(nameof(Division), request.DivisionId);
+        // 1. The competition, and who is in it
+        var competition = await _db.Competitions
+            .Include(c => c.Entries)
+                .ThenInclude(e => e.Team)
+            .FirstOrDefaultAsync(c => c.Id == request.CompetitionId, cancellationToken)
+            ?? throw new NotFoundException(nameof(Competition), request.CompetitionId);
 
-        // 2. Ensure division has at least 2 teams
-        var teams = division.Teams.ToList();
+        // 2. Entrants are the entry list, not the division's membership. That distinction is
+        //    the whole point: a division of twenty can run a cup for eight of them.
+        var teams = competition.Entries
+            .Select(e => e.Team)
+            .OrderBy(t => t.Name)
+            .ToList();
+
         if (teams.Count < 2)
         {
             throw new Common.Exceptions.ValidationException(
                 new List<FluentValidation.Results.ValidationFailure>
                 {
-                    new("DivisionId", "Division must have at least 2 teams to generate fixtures")
+                    new("CompetitionId",
+                        $"{competition.Name} has {teams.Count} "
+                        + (teams.Count == 1 ? "entrant" : "entrants")
+                        + ". Enter at least two teams before drawing it up.")
                 });
         }
 
-        // 3. Refuse to append a second season on top of the first
+        // 3. Refuse to append a second draw on top of the first
         var existing = await _db.MatchResults
-            .Where(m => m.DivisionId == request.DivisionId && m.Season == request.Season)
+            .Where(m => m.CompetitionId == request.CompetitionId)
             .ToListAsync(cancellationToken);
 
         if (existing.Count > 0)
@@ -115,8 +125,8 @@ public sealed class GenerateFixturesCommandHandler
             if (!request.ReplaceExisting)
             {
                 throw new InvalidOperationException(
-                    $"{division.Name} already has {existing.Count} fixtures for {request.Season}. "
-                    + "Generating again would add a second copy of the season. "
+                    $"{competition.Name} already has {existing.Count} fixtures. "
+                    + "Generating again would add a second copy of it. "
                     + "Choose to replace the existing fixtures if you meant to start again.");
             }
 
@@ -130,35 +140,42 @@ public sealed class GenerateFixturesCommandHandler
             if (played.Count > 0)
             {
                 throw new InvalidOperationException(
-                    $"{played.Count} of {division.Name}'s {request.Season} fixtures have already "
-                    + "been played or are in progress, so the season cannot be regenerated. "
+                    $"{played.Count} of {competition.Name}'s fixtures have already been played "
+                    + "or are in progress, so it cannot be drawn again. "
                     + "Remove those results first if the schedule really has to change.");
             }
 
             _db.MatchResults.RemoveRange(existing);
         }
 
-        // 4. Build the fixtures the way this competition is played
-        var fixtures = division.Format switch
+        // 4. Build the fixtures the way this competition is played. The season is the
+        //    competition's own rather than an argument, so fixtures can no longer be written
+        //    into a year nothing reads.
+        var fixtures = competition.Format switch
         {
             CompetitionFormat.Knockout => KnockoutBracket.Build(
                 teams.Select(t => t.Id).ToList(),
-                division.Id,
-                request.Season,
+                competition.DivisionId,
+                competition.Season,
                 request.StartDate,
                 request.DaysBetweenMatchweeks),
 
             CompetitionFormat.GroupAndKnockout => GenerateGroupsAndBracket(
-                teams, division, request),
+                teams, competition, request),
 
             _ => GenerateRoundRobinFixtures(
                 teams,
-                division.Id,
-                request.Season,
+                competition.DivisionId,
+                competition.Season,
                 request.IsHomeAndAway,
                 request.StartDate,
                 request.DaysBetweenMatchweeks),
         };
+
+        // The builders set the division, which every fixture still carries; the competition is
+        // stamped here in one place so no builder can forget it.
+        foreach (var fixture in fixtures)
+            fixture.CompetitionId = competition.Id;
 
         // 5. Save to database
         _db.MatchResults.AddRange(fixtures);
@@ -186,7 +203,7 @@ public sealed class GenerateFixturesCommandHandler
     /// </summary>
     private static List<MatchResult> GenerateGroupsAndBracket(
         List<Team> teams,
-        Division division,
+        Competition competition,
         GenerateFixturesCommand request)
     {
         var groupCount = request.GroupCount ?? 2;
@@ -228,8 +245,8 @@ public sealed class GenerateFixturesCommandHandler
 
             var groupFixtures = GenerateRoundRobinFixtures(
                 groups[i],
-                division.Id,
-                request.Season,
+                competition.DivisionId,
+                competition.Season,
                 request.IsHomeAndAway,
                 request.StartDate,
                 request.DaysBetweenMatchweeks);
@@ -253,8 +270,8 @@ public sealed class GenerateFixturesCommandHandler
 
         fixtures.AddRange(KnockoutBracket.BuildEmpty(
             qualifiers,
-            division.Id,
-            request.Season,
+            competition.DivisionId,
+            competition.Season,
             bracketStart,
             request.DaysBetweenMatchweeks,
             groupMatchweeks + 1));

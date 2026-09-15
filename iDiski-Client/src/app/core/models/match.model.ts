@@ -71,6 +71,9 @@ export interface MatchResultDto {
   divisionId: string | null;
   divisionName: string | null;
   /** Which part of the competition this belongs to. */
+  /** Which competition this fixture is part of — the league, the cup. */
+  competitionId: string | null;
+  competitionName: string | null;
   stage: MatchStage;
   /** For a group-stage fixture: "A", "B", and so on. */
   groupName: string | null;
@@ -83,14 +86,14 @@ export interface MatchResultDto {
 }
 
 export interface CreateMatchCommand {
+  /** Both clubs must be entered in it, and the fixture takes its season from it. */
+  competitionId: string;
   matchDate: string;
   matchweekNumber: number;
-  season: number;
   homeTeamId: string;
   awayTeamId: string;
   venue?: string;
   referee?: string;
-  divisionId?: string;
 }
 
 export interface UpdateMatchScoreCommand {

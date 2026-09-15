@@ -16,7 +16,9 @@ export class MatchService {
     status?: string,
     divisionId?: string,
     pageNumber: number = 1,
-    pageSize: number = 20
+    pageSize: number = 20,
+    /** One competition — the league, or the cup, rather than everything at once. */
+    competitionId?: string
   ): Observable<PaginatedList<MatchResultDto>> {
     let params = new HttpParams()
       .set('season', season.toString())
@@ -27,6 +29,7 @@ export class MatchService {
     if (teamId) params = params.set('teamId', teamId);
     if (status) params = params.set('status', status);
     if (divisionId) params = params.set('divisionId', divisionId);
+    if (competitionId) params = params.set('competitionId', competitionId);
 
     return this.http.get<PaginatedList<MatchResultDto>>(this.base, { params });
   }
@@ -53,8 +56,11 @@ export class MatchService {
 }
 
 export interface GenerateFixturesCommand {
-  divisionId: string;
-  season: number;
+  /**
+   * The competition to draw up. Entrants come from its entry list, and the season is its own —
+   * neither is an argument, so neither can be wrong.
+   */
+  competitionId: string;
   isHomeAndAway: boolean;
   startDate: string; // ISO date string
   daysBetweenMatchweeks: number;

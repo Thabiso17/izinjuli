@@ -103,7 +103,7 @@ test.describe('admin scope', () => {
 
 /** A team is a card on the teams board; a division is a row in the divisions table. */
 const TEAM_CARD = '[data-testid="team-card"]';
-const DIVISION_ROW = '[data-testid="division-format-cell"]';
+const DIVISION_ROW = '[data-testid="division-competitions-cell"]';
 
 async function asRole(
   browser: Browser,

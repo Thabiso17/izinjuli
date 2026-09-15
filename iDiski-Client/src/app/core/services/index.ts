@@ -4,6 +4,7 @@ export * from './article.service';
 export * from './page-layout.service';
 export * from './sponsor.service';
 export * from './division.service';
+export * from './competition.service';
 export * from './match-event.service';
 export * from './suspension.service';
 export * from './team.service';

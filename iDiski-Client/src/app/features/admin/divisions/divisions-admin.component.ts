@@ -1,22 +1,18 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { DivisionService } from '../../../core/services/division.service';
 import { AuthService } from '../../../core/services/auth.service';
 import {
   DivisionDto,
   CreateDivisionCommand,
   UpdateDivisionCommand,
-  CompetitionFormat,
-  COMPETITION_FORMAT_LABEL,
-  COMPETITION_FORMAT_HINT,
-  COMPETITION_STATUS_LABEL,
-  COMPETITION_STATUS_CLASS,
 } from '../../../core/models';
 
 @Component({
   selector: 'app-divisions-admin',
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   template: `
     <div class="container-fluid py-4">
       <div class="row mb-4">
@@ -87,13 +83,12 @@ import {
                   <th>Name</th>
                   <th>Code</th>
                   <th>Season</th>
-                  <th>Format</th>
                   <th>Age Group</th>
                   <th>Gender</th>
                   <th>Teams</th>
                   <th>Matches</th>
                   <th>Visible</th>
-                  <th>Progress</th>
+                  <th>Competitions</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -105,11 +100,6 @@ import {
                       <span class="badge bg-secondary">{{ division.shortCode }}</span>
                     </td>
                     <td>{{ division.season }}</td>
-                    <td data-testid="division-format-cell">
-                      <span class="badge bg-light text-dark border">
-                        {{ formatLabel[division.format] }}
-                      </span>
-                    </td>
                     <td>{{ division.ageGroup || '-' }}</td>
                     <td>{{ division.gender || '-' }}</td>
                     <td>{{ division.teamCount }}</td>
@@ -123,18 +113,17 @@ import {
                         {{ division.isActive ? 'Active' : 'Inactive' }}
                       </span>
                     </td>
-                    <td data-testid="division-status-cell">
-                      <!-- Derived from the results, unlike the column beside it: that one is
-                           somebody deciding a division should be shown, this one is whether
-                           the competition has actually run its course. -->
-                      <span [class]="'badge ' + statusClass[division.status]">
-                        {{ statusLabel[division.status] }}
-                      </span>
-                      @if (division.playedCount > 0 && division.status !== 'Completed') {
-                        <div class="text-muted small mt-1">
-                          {{ division.playedCount }} of {{ division.matchCount }} played
-                        </div>
-                      }
+                    <td data-testid="division-competitions-cell">
+                      <!-- A division is a pool of teams; what it runs lives one click away.
+                           Each competition carries its own status, and they disagree by
+                           design, so there is nothing honest to put in a single badge here. -->
+                      <a
+                        [routerLink]="['/admin/divisions', division.id, 'competitions']"
+                        class="btn btn-sm btn-outline-secondary"
+                        data-testid="manage-competitions"
+                      >
+                        <i class="bi bi-trophy me-1"></i>{{ division.competitionCount }}
+                      </a>
                     </td>
                     <td>
                       <!-- Editing a division is super-admin only at the API — PUT
@@ -274,28 +263,6 @@ import {
                       required
                       placeholder="2025"
                     />
-                  </div>
-                  <div class="col-md-4">
-                    <label class="form-label">Format *</label>
-                    <select
-                      class="form-select"
-                      [(ngModel)]="formData.format"
-                      name="format"
-                      data-testid="division-format"
-                      [disabled]="!!editingDivision() && editingDivision()!.matchCount > 0"
-                    >
-                      @for (format of formats; track format) {
-                        <option [value]="format">{{ formatLabel[format] }}</option>
-                      }
-                    </select>
-                    <small class="form-text text-muted">
-                      @if (!!editingDivision() && editingDivision()!.matchCount > 0) {
-                        Fixtures have already been generated, so this cannot be changed.
-                        Delete them first.
-                      } @else {
-                        {{ formatHintFor(formData.format) }}
-                      }
-                    </small>
                   </div>
 
                   <div class="col-md-4">
@@ -447,15 +414,8 @@ export class DivisionsAdminComponent implements OnInit {
     this.loadDivisions();
   }
 
-  readonly formats: CompetitionFormat[] = ['League', 'Knockout', 'GroupAndKnockout'];
-  readonly formatLabel = COMPETITION_FORMAT_LABEL;
-  readonly statusLabel = COMPETITION_STATUS_LABEL;
-  readonly statusClass = COMPETITION_STATUS_CLASS;
 
   /** formData is loosely typed, so the lookup goes through here rather than indexing it. */
-  formatHintFor(format: CompetitionFormat): string {
-    return COMPETITION_FORMAT_HINT[format] ?? '';
-  }
 
   showAddModal() {
     this.editingDivision.set(null);
@@ -469,7 +429,6 @@ export class DivisionsAdminComponent implements OnInit {
       name: division.name,
       shortCode: division.shortCode,
       season: division.season,
-      format: division.format,
       ageGroup: division.ageGroup || '',
       gender: division.gender || '',
       startDate: division.startDate || '',
@@ -494,7 +453,6 @@ export class DivisionsAdminComponent implements OnInit {
       name: this.formData.name,
       shortCode: this.formData.shortCode,
       season: this.formData.season,
-      format: this.formData.format,
       ageGroup: this.formData.ageGroup || undefined,
       gender: this.formData.gender || undefined,
       startDate: this.formData.startDate || undefined,
@@ -563,7 +521,6 @@ export class DivisionsAdminComponent implements OnInit {
       name: '',
       shortCode: '',
       season: new Date().getFullYear(),
-      format: 'League' as CompetitionFormat,
       ageGroup: '',
       gender: '',
       startDate: '',

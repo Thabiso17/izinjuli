@@ -31,10 +31,10 @@ public class GroupStandingsTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task AGroupsTable_HoldsOnlyThatGroupsTeams()
     {
-        var divisionId = await AGroupStageOf(8, groups: 2);
+        var competitionId = await AGroupStageOf(8, groups: 2);
 
-        var groupA = await TableFor(divisionId, "A");
-        var groupB = await TableFor(divisionId, "B");
+        var groupA = await TableFor(competitionId, "A");
+        var groupB = await TableFor(competitionId, "B");
 
         groupA.Should().HaveCount(4);
         groupB.Should().HaveCount(4);
@@ -48,9 +48,9 @@ public class GroupStandingsTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task ATeamThatHasNotPlayedYet_StillAppearsInItsGroup()
     {
-        var divisionId = await AGroupStageOf(4, groups: 2);
+        var competitionId = await AGroupStageOf(4, groups: 2);
 
-        var groupA = await TableFor(divisionId, "A");
+        var groupA = await TableFor(competitionId, "A");
 
         // Built from who was drawn rather than from who has played, otherwise a side sits
         // missing from its own group's table instead of bottom of it on nought.
@@ -61,17 +61,17 @@ public class GroupStandingsTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task AResultInOneGroup_DoesNotMoveTheOther()
     {
-        var divisionId = await AGroupStageOf(8, groups: 2);
+        var competitionId = await AGroupStageOf(8, groups: 2);
 
         var fixture = await _fixture.DbContext.MatchResults
             .AsNoTracking()
-            .Where(m => m.DivisionId == divisionId && m.GroupName == "A")
+            .Where(m => m.CompetitionId == competitionId && m.GroupName == "A")
             .FirstAsync();
 
         await Record(fixture, home: 3, away: 0);
 
-        var groupA = await TableFor(divisionId, "A");
-        var groupB = await TableFor(divisionId, "B");
+        var groupA = await TableFor(competitionId, "A");
+        var groupB = await TableFor(competitionId, "B");
 
         groupA.Sum(r => r.Played).Should().Be(2, "one match played is two teams having played");
         groupB.Sum(r => r.Played).Should().Be(0, "group B has not kicked a ball");
@@ -82,9 +82,9 @@ public class GroupStandingsTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task AskingWithoutAGroup_StillGivesTheWholeDivision()
     {
-        var divisionId = await AGroupStageOf(8, groups: 2);
+        var competitionId = await AGroupStageOf(8, groups: 2);
 
-        var everyone = await TableFor(divisionId, group: null);
+        var everyone = await TableFor(competitionId, group: null);
 
         // The existing behaviour, unchanged: a league asks for no group and gets its table.
         everyone.Should().HaveCount(8);
@@ -93,11 +93,11 @@ public class GroupStandingsTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task TheKnockoutTiesAreNeverInAGroupTable()
     {
-        var divisionId = await AGroupStageOf(8, groups: 2);
+        var competitionId = await AGroupStageOf(8, groups: 2);
 
         var bracket = await _fixture.DbContext.MatchResults
             .AsNoTracking()
-            .Where(m => m.DivisionId == divisionId && m.Stage == MatchStage.Knockout)
+            .Where(m => m.CompetitionId == competitionId && m.Stage == MatchStage.Knockout)
             .ToListAsync();
 
         bracket.Should().NotBeEmpty("a group stage feeds a bracket");
@@ -113,11 +113,11 @@ public class GroupStandingsTests : IClassFixture<IntegrationTestFixture>
         // The shape an organiser actually asks for, pinned end to end: thirty-two entrants,
         // eight groups of four named A to H, the top two from each going through to a last
         // sixteen.
-        var divisionId = await AGroupStageOf(32, groups: 8);
+        var competitionId = await AGroupStageOf(32, groups: 8);
 
         var groupFixtures = await _fixture.DbContext.MatchResults
             .AsNoTracking()
-            .Where(m => m.DivisionId == divisionId && m.Stage == MatchStage.Group)
+            .Where(m => m.CompetitionId == competitionId && m.Stage == MatchStage.Group)
             .ToListAsync();
 
         var names = groupFixtures
@@ -131,7 +131,7 @@ public class GroupStandingsTests : IClassFixture<IntegrationTestFixture>
 
         foreach (var name in names)
         {
-            var table = await TableFor(divisionId, name);
+            var table = await TableFor(competitionId, name);
             table.Should().HaveCount(4, $"group {name} holds four of the thirty-two");
         }
 
@@ -140,7 +140,7 @@ public class GroupStandingsTests : IClassFixture<IntegrationTestFixture>
 
         var openingRound = await _fixture.DbContext.MatchResults
             .AsNoTracking()
-            .Where(m => m.DivisionId == divisionId && m.Stage == MatchStage.Knockout)
+            .Where(m => m.CompetitionId == competitionId && m.Stage == MatchStage.Knockout)
             .ToListAsync();
 
         // Sixteen qualifiers: a round of sixteen, then eight, four, two.
@@ -152,11 +152,11 @@ public class GroupStandingsTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task TheGroupsAreLetteredFromA()
     {
-        var divisionId = await AGroupStageOf(20, groups: 5);
+        var competitionId = await AGroupStageOf(20, groups: 5);
 
         var names = await _fixture.DbContext.MatchResults
             .AsNoTracking()
-            .Where(m => m.DivisionId == divisionId && m.Stage == MatchStage.Group
+            .Where(m => m.CompetitionId == competitionId && m.Stage == MatchStage.Group
                         && m.GroupName != null)
             .Select(m => m.GroupName!)
             .Distinct()
@@ -167,12 +167,12 @@ public class GroupStandingsTests : IClassFixture<IntegrationTestFixture>
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    private async Task<List<StandingDto>> TableFor(Guid divisionId, string? group)
+    private async Task<List<StandingDto>> TableFor(Guid competitionId, string? group)
     {
         _fixture.DbContext.ChangeTracker.Clear();
 
         var result = await new GetLeagueStandingsQueryHandler(_fixture.DbContext).Handle(
-            new GetLeagueStandingsQuery(Season: 2026, DivisionId: divisionId, GroupName: group),
+            new GetLeagueStandingsQuery(Season: 2026, CompetitionId: competitionId, GroupName: group),
             CancellationToken.None);
 
         return result.Table.ToList();
@@ -198,19 +198,42 @@ public class GroupStandingsTests : IClassFixture<IntegrationTestFixture>
             Season = 2026,
             Gender = Gender.Male,
             IsActive = true,
+            CreatedAt = now,
+        });
+
+        var competitionId = Guid.NewGuid();
+
+        _fixture.DbContext.Competitions.Add(new Competition
+        {
+            Id = competitionId,
+            DivisionId = divisionId,
+            Name = $"Groups of {teamCount}",
+            ShortCode = TestIds.Code("GS"),
+            Season = 2026,
             Format = CompetitionFormat.GroupAndKnockout,
+            IsActive = true,
             CreatedAt = now,
         });
 
         for (var i = 0; i < teamCount; i++)
         {
+            var teamId = Guid.NewGuid();
+
             _fixture.DbContext.Teams.Add(new Team
             {
-                Id = Guid.NewGuid(),
+                Id = teamId,
                 Name = $"Side {i + 1}",
                 ShortCode = TestIds.Code("G"),
                 DivisionId = divisionId,
                 Founded = 2020,
+                CreatedAt = now,
+            });
+
+            _fixture.DbContext.CompetitionEntries.Add(new CompetitionEntry
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = teamId,
                 CreatedAt = now,
             });
         }
@@ -219,14 +242,13 @@ public class GroupStandingsTests : IClassFixture<IntegrationTestFixture>
 
         await new GenerateFixturesCommandHandler(_fixture.DbContext).Handle(
             new GenerateFixturesCommand(
-                divisionId,
-                Season: 2026,
+                competitionId,
                 IsHomeAndAway: false,
                 StartDate: new DateTime(2026, 7, 4, 0, 0, 0, DateTimeKind.Utc),
                 DaysBetweenMatchweeks: 1,
                 GroupCount: groups),
             CancellationToken.None);
 
-        return divisionId;
+        return competitionId;
     }
 }

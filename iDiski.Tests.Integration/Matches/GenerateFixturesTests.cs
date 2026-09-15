@@ -42,25 +42,25 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
     public async Task TheRightNumberOfFixturesOverTheRightNumberOfMatchweeks(
         int teamCount, bool homeAndAway, int expectedFixtures, int expectedMatchweeks)
     {
-        var divisionId = await CreateDivisionWithTeamsAsync(teamCount);
+        var competitionId = await CreateCompetitionWithTeamsAsync(teamCount);
 
-        var result = await Generate(divisionId, homeAndAway);
+        var result = await Generate(competitionId, homeAndAway);
 
         result.FixturesGenerated.Should().Be(expectedFixtures);
         result.MatchweeksCreated.Should().Be(expectedMatchweeks);
 
-        var stored = await FixturesFor(divisionId);
+        var stored = await FixturesFor(competitionId);
         stored.Should().HaveCount(expectedFixtures, "the summary has to match what was written");
     }
 
     [Fact]
     public async Task EveryPairMeetsExactlyOnce_InASingleRound()
     {
-        var divisionId = await CreateDivisionWithTeamsAsync(6);
+        var competitionId = await CreateCompetitionWithTeamsAsync(6);
 
-        await Generate(divisionId, homeAndAway: false);
+        await Generate(competitionId, homeAndAway: false);
 
-        var fixtures = await FixturesFor(divisionId);
+        var fixtures = await FixturesFor(competitionId);
         var pairings = fixtures
             // A league fixture always names both sides; only a bracket slot can be empty.
             .Select(f => Unordered(f.HomeTeamId!.Value, f.AwayTeamId!.Value))
@@ -73,11 +73,11 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task TheReturnFixtureSwapsTheVenue()
     {
-        var divisionId = await CreateDivisionWithTeamsAsync(4);
+        var competitionId = await CreateCompetitionWithTeamsAsync(4);
 
-        await Generate(divisionId, homeAndAway: true);
+        await Generate(competitionId, homeAndAway: true);
 
-        var fixtures = await FixturesFor(divisionId);
+        var fixtures = await FixturesFor(competitionId);
 
         // Ordered this time: A v B and B v A are different fixtures, and both must exist.
         var ordered = fixtures
@@ -98,11 +98,11 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
     [InlineData(6)]
     public async Task NobodyPlaysTwiceInTheSameMatchweek(int teamCount)
     {
-        var divisionId = await CreateDivisionWithTeamsAsync(teamCount);
+        var competitionId = await CreateCompetitionWithTeamsAsync(teamCount);
 
-        await Generate(divisionId, homeAndAway: true);
+        await Generate(competitionId, homeAndAway: true);
 
-        var fixtures = await FixturesFor(divisionId);
+        var fixtures = await FixturesFor(competitionId);
 
         foreach (var week in fixtures.GroupBy(f => f.MatchweekNumber))
         {
@@ -118,11 +118,11 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task AnOddNumberOfTeams_RestsOneRatherThanInventingAnOpponent()
     {
-        var divisionId = await CreateDivisionWithTeamsAsync(5);
+        var competitionId = await CreateCompetitionWithTeamsAsync(5);
 
-        await Generate(divisionId, homeAndAway: false);
+        await Generate(competitionId, homeAndAway: false);
 
-        var fixtures = await FixturesFor(divisionId);
+        var fixtures = await FixturesFor(competitionId);
 
         // The algorithm pads an odd squad list with Guid.Empty to stand for the bye. If that
         // placeholder ever reached the database it would be a fixture against a team that does
@@ -139,12 +139,12 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task MatchweeksAreSpacedByTheRequestedInterval()
     {
-        var divisionId = await CreateDivisionWithTeamsAsync(4);
+        var competitionId = await CreateCompetitionWithTeamsAsync(4);
         var start = new DateTime(2026, 2, 7, 0, 0, 0, DateTimeKind.Utc);
 
-        await Generate(divisionId, homeAndAway: false, start: start, daysBetween: 14);
+        await Generate(competitionId, homeAndAway: false, start: start, daysBetween: 14);
 
-        var fixtures = await FixturesFor(divisionId);
+        var fixtures = await FixturesFor(competitionId);
         var weeks = fixtures
             .GroupBy(f => f.MatchweekNumber)
             .OrderBy(g => g.Key)
@@ -159,30 +159,33 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
     }
 
     [Fact]
-    public async Task EveryFixtureCarriesTheDivisionAndSeasonItWasAskedFor()
+    public async Task EveryFixtureCarriesTheCompetitionAndTheSeasonItBelongsTo()
     {
-        var divisionId = await CreateDivisionWithTeamsAsync(4);
+        var competitionId = await CreateCompetitionWithTeamsAsync(4);
 
-        await Generate(divisionId, homeAndAway: true, season: 2029);
+        await Generate(competitionId, homeAndAway: true);
 
-        var fixtures = await FixturesFor(divisionId);
+        var fixtures = await FixturesFor(competitionId);
 
-        fixtures.Should().OnlyContain(f => f.DivisionId == divisionId);
-        fixtures.Should().OnlyContain(f => f.Season == 2029);
+        fixtures.Should().OnlyContain(f => f.CompetitionId == competitionId);
+
+        // The season is the competition's own rather than an argument, so a fixture can no
+        // longer be written into a year nothing reads.
+        fixtures.Should().OnlyContain(f => f.Season == 2026);
         fixtures.Should().OnlyContain(f => f.Status == MatchStatus.Scheduled);
         fixtures.Should().OnlyContain(f => f.HomeScore == 0 && f.AwayScore == 0,
             "a generated fixture has not been played yet");
     }
 
     [Fact]
-    public async Task ADivisionWithOneTeam_IsRefused()
+    public async Task ACompetitionWithOneEntrant_IsRefused()
     {
-        var divisionId = await CreateDivisionWithTeamsAsync(1);
+        var competitionId = await CreateCompetitionWithTeamsAsync(1);
 
-        var generate = async () => await Generate(divisionId, homeAndAway: false);
+        var generate = async () => await Generate(competitionId, homeAndAway: false);
 
         await generate.Should().ThrowAsync<ValidationException>(
-            "a division needs two clubs before it has a fixture to play");
+            "a competition needs two entrants before it has a fixture to play");
     }
 
     [Fact]
@@ -196,30 +199,30 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task GeneratingTwice_IsRefused()
     {
-        var divisionId = await CreateDivisionWithTeamsAsync(4);
-        await Generate(divisionId, homeAndAway: false);
+        var competitionId = await CreateCompetitionWithTeamsAsync(4);
+        await Generate(competitionId, homeAndAway: false);
 
-        var again = async () => await Generate(divisionId, homeAndAway: false);
+        var again = async () => await Generate(competitionId, homeAndAway: false);
 
         // Generating appends, so without this guard an impatient double-click left the
         // division holding two complete copies of its season, with nothing on screen saying so.
         await again.Should().ThrowAsync<InvalidOperationException>();
 
-        var fixtures = await FixturesFor(divisionId);
+        var fixtures = await FixturesFor(competitionId);
         fixtures.Should().HaveCount(6, "the second attempt must not have added anything");
     }
 
     [Fact]
     public async Task Replacing_ClearsTheOldSeasonRatherThanAppendingToIt()
     {
-        var divisionId = await CreateDivisionWithTeamsAsync(4);
-        await Generate(divisionId, homeAndAway: false);
+        var competitionId = await CreateCompetitionWithTeamsAsync(4);
+        await Generate(competitionId, homeAndAway: false);
 
-        var result = await Generate(divisionId, homeAndAway: true, replaceExisting: true);
+        var result = await Generate(competitionId, homeAndAway: true, replaceExisting: true);
 
         result.FixturesGenerated.Should().Be(12);
 
-        var fixtures = await FixturesFor(divisionId);
+        var fixtures = await FixturesFor(competitionId);
         fixtures.Should().HaveCount(12,
             "replacing means the division is left with one season, the new one");
     }
@@ -227,69 +230,119 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task Replacing_IsRefusedOnceAnyResultIsIn()
     {
-        var divisionId = await CreateDivisionWithTeamsAsync(4);
-        await Generate(divisionId, homeAndAway: false);
+        var competitionId = await CreateCompetitionWithTeamsAsync(4);
+        await Generate(competitionId, homeAndAway: false);
 
         // One fixture gets played.
         var played = await _fixture.DbContext.MatchResults
-            .FirstAsync(m => m.DivisionId == divisionId);
+            .FirstAsync(m => m.CompetitionId == competitionId);
         played.Status = MatchStatus.Completed;
         played.HomeScore = 2;
         played.AwayScore = 1;
         await _fixture.DbContext.SaveChangesAsync();
 
         var regenerate = async () =>
-            await Generate(divisionId, homeAndAway: false, replaceExisting: true);
+            await Generate(competitionId, homeAndAway: false, replaceExisting: true);
 
         // Those fixtures are now a record of matches that happened. Regenerating would throw
         // away the scores, and the events and standings built on them.
         await regenerate.Should().ThrowAsync<InvalidOperationException>();
 
-        var fixtures = await FixturesFor(divisionId);
+        var fixtures = await FixturesFor(competitionId);
         fixtures.Should().HaveCount(6);
         fixtures.Should().Contain(m => m.Id == played.Id && m.HomeScore == 2);
     }
 
     [Fact]
-    public async Task AnotherSeasonInTheSameDivision_IsNotBlockedByTheGuard()
+    public async Task AnotherCompetitionForTheSameClubs_IsNotBlockedByTheGuard()
     {
-        var divisionId = await CreateDivisionWithTeamsAsync(4);
-        await Generate(divisionId, homeAndAway: false, season: 2026);
+        var league = await CreateCompetitionWithTeamsAsync(4);
+        await Generate(league, homeAndAway: false);
 
-        // The guard is about generating the same season twice, not about a division only ever
-        // having one season.
-        var next = await Generate(divisionId, homeAndAway: false, season: 2027);
+        // The guard is about drawing the same competition twice, not about a set of clubs only
+        // ever playing one thing. They have a league and a cup, which is the point.
+        var cup = await ASecondCompetitionForTheSameClubs(league, CompetitionFormat.League);
+
+        var next = await Generate(cup, homeAndAway: false);
 
         next.FixturesGenerated.Should().Be(6);
-        (await FixturesFor(divisionId)).Should().HaveCount(12);
+        (await FixturesFor(league)).Should().HaveCount(6);
+        (await FixturesFor(cup)).Should().HaveCount(6);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private Task<GenerateFixturesResult> Generate(
-        Guid divisionId,
+        Guid competitionId,
         bool homeAndAway,
         DateTime? start = null,
         int daysBetween = 7,
-        int season = 2026,
         bool replaceExisting = false) =>
         new GenerateFixturesCommandHandler(_fixture.DbContext).Handle(
             new GenerateFixturesCommand(
-                divisionId,
-                season,
+                competitionId,
                 homeAndAway,
                 start ?? new DateTime(2026, 3, 1, 0, 0, 0, DateTimeKind.Utc),
                 daysBetween,
                 replaceExisting),
             CancellationToken.None);
 
-    private async Task<List<MatchResult>> FixturesFor(Guid divisionId) =>
-        await _fixture.DbContext.MatchResults
+    /// <summary>
+    /// A second competition in the same division, with the same clubs entered. What a season
+    /// actually looks like: a league and a cup running side by side.
+    /// </summary>
+    private async Task<Guid> ASecondCompetitionForTheSameClubs(
+        Guid existingCompetitionId, CompetitionFormat format)
+    {
+        _fixture.DbContext.ChangeTracker.Clear();
+
+        var source = await _fixture.DbContext.Competitions
             .AsNoTracking()
-            .Where(m => m.DivisionId == divisionId)
+            .FirstAsync(c => c.Id == existingCompetitionId);
+
+        var entrants = await _fixture.DbContext.CompetitionEntries
+            .AsNoTracking()
+            .Where(e => e.CompetitionId == existingCompetitionId)
+            .Select(e => e.TeamId)
             .ToListAsync();
 
-    private async Task<Guid> CreateDivisionWithTeamsAsync(int teamCount)
+        var id = Guid.NewGuid();
+        var now = DateTime.UtcNow;
+
+        _fixture.DbContext.Competitions.Add(new Competition
+        {
+            Id = id,
+            DivisionId = source.DivisionId,
+            Name = $"Second {TestIds.Code("N")}",
+            ShortCode = TestIds.Code("S"),
+            Season = source.Season,
+            Format = format,
+            IsActive = true,
+            CreatedAt = now,
+        });
+
+        foreach (var teamId in entrants)
+        {
+            _fixture.DbContext.CompetitionEntries.Add(new CompetitionEntry
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = id,
+                TeamId = teamId,
+                CreatedAt = now,
+            });
+        }
+
+        await _fixture.DbContext.SaveChangesAsync();
+        return id;
+    }
+
+    private async Task<List<MatchResult>> FixturesFor(Guid competitionId) =>
+        await _fixture.DbContext.MatchResults
+            .AsNoTracking()
+            .Where(m => m.CompetitionId == competitionId)
+            .ToListAsync();
+
+    private async Task<Guid> CreateCompetitionWithTeamsAsync(int teamCount)
     {
         // Tests in this class share a database, and a previous failure can leave entities
         // tracked as Added that the next save would resubmit.
@@ -309,21 +362,47 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
             CreatedAt = now,
         });
 
+        // The division is the pool; the competition is what gets played. Everybody in the
+        // division is entered, which is what this file assumes throughout.
+        var competitionId = Guid.NewGuid();
+
+        _fixture.DbContext.Competitions.Add(new Competition
+        {
+            Id = competitionId,
+            DivisionId = divisionId,
+            Name = $"Competition {TestIds.Code("N")}",
+            ShortCode = TestIds.Code("GF"),
+            Season = 2026,
+            Format = CompetitionFormat.League,
+            IsActive = true,
+            CreatedAt = now,
+        });
+
         for (var i = 0; i < teamCount; i++)
         {
+            var teamId = Guid.NewGuid();
+
             _fixture.DbContext.Teams.Add(new Team
             {
-                Id = Guid.NewGuid(),
+                Id = teamId,
                 Name = $"Club {i + 1}",
                 ShortCode = TestIds.Code("G"),
                 DivisionId = divisionId,
                 Founded = 2020,
                 CreatedAt = now,
             });
+
+            _fixture.DbContext.CompetitionEntries.Add(new CompetitionEntry
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = teamId,
+                CreatedAt = now,
+            });
         }
 
         await _fixture.DbContext.SaveChangesAsync();
-        return divisionId;
+        return competitionId;
     }
 
     private static (Guid, Guid) Unordered(Guid a, Guid b) =>

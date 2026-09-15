@@ -1,0 +1,456 @@
+using System.Linq.Expressions;
+using iDiski.Application.Common.Exceptions;
+using iDiski.Application.Common.Interfaces;
+using iDiski.Application.Competitions.Queries;
+using iDiski.Domain.Entities;
+using FluentValidation;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+
+namespace iDiski.Application.Competitions;
+
+// ═════════════════════════════════════════════════════════════════════════════
+// VALIDATION
+// ═════════════════════════════════════════════════════════════════════════════
+
+public sealed class CreateCompetitionCommandValidator
+    : AbstractValidator<Commands.CreateCompetitionCommand>
+{
+    public CreateCompetitionCommandValidator()
+    {
+        RuleFor(x => x.DivisionId).NotEmpty();
+        RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.ShortCode).NotEmpty().MaximumLength(20);
+        RuleFor(x => x.Season).InclusiveBetween(2000, 2100);
+        RuleFor(x => x.Description).MaximumLength(1000);
+    }
+}
+
+public sealed class UpdateCompetitionCommandValidator
+    : AbstractValidator<Commands.UpdateCompetitionCommand>
+{
+    public UpdateCompetitionCommandValidator()
+    {
+        RuleFor(x => x.CompetitionId).NotEmpty();
+        RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
+        RuleFor(x => x.ShortCode).NotEmpty().MaximumLength(20);
+        RuleFor(x => x.Description).MaximumLength(1000);
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// CREATE
+// ═════════════════════════════════════════════════════════════════════════════
+
+public sealed class CreateCompetitionCommandHandler
+    : IRequestHandler<Commands.CreateCompetitionCommand, Guid>
+{
+    private readonly ILeagueDbContext _db;
+
+    public CreateCompetitionCommandHandler(ILeagueDbContext db) => _db = db;
+
+    public async Task<Guid> Handle(
+        Commands.CreateCompetitionCommand request,
+        CancellationToken cancellationToken)
+    {
+        var division = await _db.Divisions
+            .Include(d => d.Teams)
+            .FirstOrDefaultAsync(d => d.Id == request.DivisionId, cancellationToken)
+            ?? throw new NotFoundException(nameof(Division), request.DivisionId);
+
+        var shortCode = request.ShortCode.Trim().ToUpperInvariant();
+
+        var clash = await _db.Competitions.AnyAsync(
+            c => c.DivisionId == division.Id
+                 && c.Season == request.Season
+                 && c.ShortCode == shortCode,
+            cancellationToken);
+
+        if (clash)
+        {
+            throw new InvalidOperationException(
+                $"{division.Name} already runs a competition with the short code {shortCode} "
+                + $"in {request.Season}.");
+        }
+
+        var competition = new Competition
+        {
+            Id = Guid.NewGuid(),
+            DivisionId = division.Id,
+            Name = request.Name.Trim(),
+            ShortCode = shortCode,
+            Season = request.Season,
+            Format = request.Format,
+            StartDate = request.StartDate,
+            EndDate = request.EndDate,
+            Description = request.Description,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+        };
+
+        _db.Competitions.Add(competition);
+
+        // A league wants everybody, and a cup is easier to trim down than to build up.
+        if (request.EnterAllDivisionTeams)
+        {
+            foreach (var team in division.Teams)
+            {
+                _db.CompetitionEntries.Add(new CompetitionEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompetitionId = competition.Id,
+                    TeamId = team.Id,
+                    CreatedAt = DateTime.UtcNow,
+                });
+            }
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return competition.Id;
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// UPDATE
+// ═════════════════════════════════════════════════════════════════════════════
+
+public sealed class UpdateCompetitionCommandHandler
+    : IRequestHandler<Commands.UpdateCompetitionCommand, Unit>
+{
+    private readonly ILeagueDbContext _db;
+
+    public UpdateCompetitionCommandHandler(ILeagueDbContext db) => _db = db;
+
+    public async Task<Unit> Handle(
+        Commands.UpdateCompetitionCommand request,
+        CancellationToken cancellationToken)
+    {
+        var competition = await _db.Competitions
+            .FirstOrDefaultAsync(c => c.Id == request.CompetitionId, cancellationToken)
+            ?? throw new NotFoundException(nameof(Competition), request.CompetitionId);
+
+        var shortCode = request.ShortCode.Trim().ToUpperInvariant();
+
+        if (shortCode != competition.ShortCode)
+        {
+            var clash = await _db.Competitions.AnyAsync(
+                c => c.DivisionId == competition.DivisionId
+                     && c.Season == competition.Season
+                     && c.ShortCode == shortCode
+                     && c.Id != competition.Id,
+                cancellationToken);
+
+            if (clash)
+            {
+                throw new InvalidOperationException(
+                    $"Another competition in this division already uses the short code "
+                    + $"{shortCode} in {competition.Season}.");
+            }
+        }
+
+        // Changing the shape of something already drawn would leave the fixtures describing a
+        // competition that no longer exists — a bracket in a league, or a table nothing feeds.
+        if (request.Format != competition.Format)
+        {
+            var drawn = await _db.MatchResults
+                .AnyAsync(m => m.CompetitionId == competition.Id, cancellationToken);
+
+            if (drawn)
+            {
+                throw new InvalidOperationException(
+                    $"{competition.Name} has already been drawn up, so how it is played cannot "
+                    + "change. Delete its fixtures first.");
+            }
+
+            competition.Format = request.Format;
+        }
+
+        competition.Name = request.Name.Trim();
+        competition.ShortCode = shortCode;
+        competition.StartDate = request.StartDate;
+        competition.EndDate = request.EndDate;
+        competition.Description = request.Description;
+        competition.IsActive = request.IsActive;
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Unit.Value;
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// DELETE
+// ═════════════════════════════════════════════════════════════════════════════
+
+public sealed class DeleteCompetitionCommandHandler
+    : IRequestHandler<Commands.DeleteCompetitionCommand, Unit>
+{
+    private readonly ILeagueDbContext _db;
+
+    public DeleteCompetitionCommandHandler(ILeagueDbContext db) => _db = db;
+
+    public async Task<Unit> Handle(
+        Commands.DeleteCompetitionCommand request,
+        CancellationToken cancellationToken)
+    {
+        var competition = await _db.Competitions
+            .FirstOrDefaultAsync(c => c.Id == request.CompetitionId, cancellationToken)
+            ?? throw new NotFoundException(nameof(Competition), request.CompetitionId);
+
+        var fixtures = await _db.MatchResults
+            .CountAsync(m => m.CompetitionId == competition.Id, cancellationToken);
+
+        // Refused here rather than left to the foreign key, so the reason is a sentence rather
+        // than a constraint violation.
+        if (fixtures > 0)
+        {
+            throw new InvalidOperationException(
+                $"{competition.Name} has {fixtures} fixtures. Delete those first if this "
+                + "competition really is being abandoned.");
+        }
+
+        // Entries go with it: they describe a place in this competition and nothing else.
+        var entries = await _db.CompetitionEntries
+            .Where(e => e.CompetitionId == competition.Id)
+            .ToListAsync(cancellationToken);
+
+        _db.CompetitionEntries.RemoveRange(entries);
+        _db.Competitions.Remove(competition);
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Unit.Value;
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ENTERING AND WITHDRAWING
+// ═════════════════════════════════════════════════════════════════════════════
+
+public sealed class EnterTeamCommandHandler : IRequestHandler<Commands.EnterTeamCommand, Unit>
+{
+    private readonly ILeagueDbContext _db;
+
+    public EnterTeamCommandHandler(ILeagueDbContext db) => _db = db;
+
+    public async Task<Unit> Handle(
+        Commands.EnterTeamCommand request,
+        CancellationToken cancellationToken)
+    {
+        var competition = await _db.Competitions
+            .Include(c => c.Division)
+            .FirstOrDefaultAsync(c => c.Id == request.CompetitionId, cancellationToken)
+            ?? throw new NotFoundException(nameof(Competition), request.CompetitionId);
+
+        var team = await _db.Teams
+            .Include(t => t.Division)
+            .FirstOrDefaultAsync(t => t.Id == request.TeamId, cancellationToken)
+            ?? throw new NotFoundException(nameof(Team), request.TeamId);
+
+        // ── The one entry that is never allowed ───────────────────────────────
+        //
+        // A club from another division is welcome — a sponsor's cup is meant to invite them.
+        // A club of another gender is not, and it is refused here rather than later at the
+        // draw, because by the time two sides are staring at a fixture list somebody has
+        // already been told they are playing.
+        //
+        // Compared strictly: a division with no gender recorded cannot be confirmed to match,
+        // and guessing is exactly what must not happen here.
+        if (team.Division?.Gender != competition.Division.Gender)
+        {
+            throw new InvalidOperationException(
+                $"{team.Name} plays in a "
+                + $"{Describe(team.Division?.Gender)} division and {competition.Name} is a "
+                + $"{Describe(competition.Division.Gender)} competition. "
+                + "They cannot be entered into it.");
+        }
+
+        var already = await _db.CompetitionEntries.AnyAsync(
+            e => e.CompetitionId == competition.Id && e.TeamId == team.Id,
+            cancellationToken);
+
+        // Entering twice would give them two places in the draw and two rows in the table.
+        // Saying so beats a unique-index violation.
+        if (already)
+        {
+            throw new InvalidOperationException(
+                $"{team.Name} is already entered in {competition.Name}.");
+        }
+
+        // Adding an entrant to a competition already drawn would leave them with a place and
+        // no fixtures, which reads as a bug to everybody who sees it.
+        var drawn = await _db.MatchResults
+            .AnyAsync(m => m.CompetitionId == competition.Id, cancellationToken);
+
+        if (drawn)
+        {
+            throw new InvalidOperationException(
+                $"{competition.Name} has already been drawn up. Entering {team.Name} now would "
+                + "leave them with a place and no fixtures — delete the fixtures and draw it "
+                + "again if the entry list really has changed.");
+        }
+
+        _db.CompetitionEntries.Add(new CompetitionEntry
+        {
+            Id = Guid.NewGuid(),
+            CompetitionId = competition.Id,
+            TeamId = team.Id,
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return Unit.Value;
+    }
+
+    private static string Describe(Gender? gender) =>
+        gender?.ToString().ToLowerInvariant() ?? "genderless";
+}
+
+public sealed class WithdrawTeamCommandHandler : IRequestHandler<Commands.WithdrawTeamCommand, Unit>
+{
+    private readonly ILeagueDbContext _db;
+
+    public WithdrawTeamCommandHandler(ILeagueDbContext db) => _db = db;
+
+    public async Task<Unit> Handle(
+        Commands.WithdrawTeamCommand request,
+        CancellationToken cancellationToken)
+    {
+        var entry = await _db.CompetitionEntries
+            .FirstOrDefaultAsync(
+                e => e.CompetitionId == request.CompetitionId && e.TeamId == request.TeamId,
+                cancellationToken)
+            ?? throw new NotFoundException(nameof(CompetitionEntry), request.TeamId);
+
+        // Withdrawing after the draw would leave fixtures against a club with no place in the
+        // competition, and a table counting results from somebody who is not in it.
+        var drawn = await _db.MatchResults.AnyAsync(
+            m => m.CompetitionId == request.CompetitionId
+                 && (m.HomeTeamId == request.TeamId || m.AwayTeamId == request.TeamId),
+            cancellationToken);
+
+        if (drawn)
+        {
+            throw new InvalidOperationException(
+                "This club already has fixtures in this competition, so they cannot simply be "
+                + "withdrawn. Delete the fixtures and draw it again.");
+        }
+
+        _db.CompetitionEntries.Remove(entry);
+        await _db.SaveChangesAsync(cancellationToken);
+        return Unit.Value;
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// QUERIES
+// ═════════════════════════════════════════════════════════════════════════════
+
+public sealed class GetCompetitionsQueryHandler
+    : IRequestHandler<GetCompetitionsQuery, IReadOnlyList<CompetitionDto>>
+{
+    private readonly ILeagueDbContext _db;
+
+    public GetCompetitionsQueryHandler(ILeagueDbContext db) => _db = db;
+
+    public async Task<IReadOnlyList<CompetitionDto>> Handle(
+        GetCompetitionsQuery request,
+        CancellationToken cancellationToken)
+    {
+        var query = _db.Competitions.AsNoTracking();
+
+        if (request.DivisionId.HasValue)
+            query = query.Where(c => c.DivisionId == request.DivisionId.Value);
+
+        if (request.Season.HasValue)
+            query = query.Where(c => c.Season == request.Season.Value);
+
+        if (request.IsActive.HasValue)
+            query = query.Where(c => c.IsActive == request.IsActive.Value);
+
+        return await query
+            .OrderBy(c => c.Season)
+            .ThenBy(c => c.Name)
+            .Select(Projection)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Shared with the single-competition query so the list and the detail cannot drift — the
+    /// kind of disagreement that shows one status on a card and another on the page behind it.
+    ///
+    /// An expression rather than a method, because a method call inside a projection is not
+    /// something EF can translate: it would compile and then fail at the first request.
+    /// </summary>
+    internal static readonly Expression<Func<Competition, CompetitionDto>> Projection = c =>
+        new CompetitionDto(
+        c.Id,
+        c.DivisionId,
+        c.Division.Name,
+        c.Name,
+        c.ShortCode,
+        c.Season,
+        c.Format,
+        c.StartDate,
+        c.EndDate,
+        c.Description,
+        c.IsActive,
+        c.Entries.Count,
+        c.Entries.Count(e => e.Team.DivisionId != c.DivisionId),
+        c.Matches.Count,
+        c.Matches.Count(m => m.Status == MatchStatus.Completed),
+        c.Matches.Count(m =>
+            m.Status == MatchStatus.Scheduled ||
+            m.Status == MatchStatus.InProgress ||
+            m.Status == MatchStatus.Postponed),
+        c.Matches.Any(m =>
+            m.Stage == MatchStage.Knockout &&
+            m.NextMatchId == null &&
+            m.Status == MatchStatus.Completed)
+    );
+}
+
+public sealed class GetCompetitionByIdQueryHandler
+    : IRequestHandler<GetCompetitionByIdQuery, CompetitionDto?>
+{
+    private readonly ILeagueDbContext _db;
+
+    public GetCompetitionByIdQueryHandler(ILeagueDbContext db) => _db = db;
+
+    public async Task<CompetitionDto?> Handle(
+        GetCompetitionByIdQuery request,
+        CancellationToken cancellationToken)
+    {
+        return await _db.Competitions
+            .AsNoTracking()
+            .Where(c => c.Id == request.Id)
+            .Select(GetCompetitionsQueryHandler.Projection)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+}
+
+public sealed class GetCompetitionEntrantsQueryHandler
+    : IRequestHandler<GetCompetitionEntrantsQuery, IReadOnlyList<CompetitionEntrantDto>>
+{
+    private readonly ILeagueDbContext _db;
+
+    public GetCompetitionEntrantsQueryHandler(ILeagueDbContext db) => _db = db;
+
+    public async Task<IReadOnlyList<CompetitionEntrantDto>> Handle(
+        GetCompetitionEntrantsQuery request,
+        CancellationToken cancellationToken)
+    {
+        return await _db.CompetitionEntries
+            .AsNoTracking()
+            .Where(e => e.CompetitionId == request.CompetitionId)
+            .OrderBy(e => e.Team.Name)
+            .Select(e => new CompetitionEntrantDto(
+                e.TeamId,
+                e.Team.Name,
+                e.Team.ShortCode,
+                e.Team.LogoUrl,
+                e.Team.DivisionId,
+                e.Team.Division != null ? e.Team.Division.Name : null,
+                e.Team.DivisionId != e.Competition.DivisionId
+            ))
+            .ToListAsync(cancellationToken);
+    }
+}

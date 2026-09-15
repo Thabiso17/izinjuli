@@ -39,6 +39,10 @@ public sealed record MatchResultDto(
     // projection that tried would not compile — which is how the last one of these was found.
     Guid?       DivisionId,
     string?     DivisionName,
+    // Which competition this fixture is part of. A division runs several at once, so "a
+    // fixture in the U17 division" no longer says what anybody is playing for.
+    Guid?       CompetitionId,
+    string?     CompetitionName,
     // Where this fixture sits in its competition.
     MatchStage  Stage,
     string?     GroupName,
@@ -69,7 +73,10 @@ public sealed record GetFixturesQuery(
     MatchStatus? Status = null,
     int     PageNumber  = 1,
     int     PageSize    = 20,
-    Guid?   DivisionId  = null
+    Guid?   DivisionId  = null,
+    // Narrow to one competition — the league, or the cup, rather than everything the division
+    // is playing at once.
+    Guid?   CompetitionId = null
 ) : IRequest<PaginatedList<MatchResultDto>>;
 
 public sealed class GetFixturesQueryHandler
@@ -101,6 +108,9 @@ public sealed class GetFixturesQueryHandler
         if (request.DivisionId.HasValue)
             query = query.Where(m => m.DivisionId == request.DivisionId.Value);
 
+        if (request.CompetitionId.HasValue)
+            query = query.Where(m => m.CompetitionId == request.CompetitionId.Value);
+
         var projected = query
             .OrderBy(m => m.MatchDate)
             .Select(m => new MatchResultDto(
@@ -125,6 +135,8 @@ public sealed class GetFixturesQueryHandler
                 m.Notes,
                 m.DivisionId,
                 m.Division != null ? m.Division.Name : null,
+                m.CompetitionId,
+                m.Competition != null ? m.Competition.Name : null,
                 m.Stage,
                 m.GroupName,
                 m.KnockoutRoundSize,
@@ -170,6 +182,8 @@ public sealed class GetMatchByIdQueryHandler
                 m.Notes,
                 m.DivisionId,
                 m.Division != null ? m.Division.Name : null,
+                m.CompetitionId,
+                m.Competition != null ? m.Competition.Name : null,
                 m.Stage,
                 m.GroupName,
                 m.KnockoutRoundSize,
@@ -186,38 +200,38 @@ public sealed class GetMatchByIdQueryHandler
 // ═════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
-/// Scoped to the home club's division. [Authorize(Policy = "CanManageDivisions")] on the
-/// endpoint only asks whether the requester is a division admin at all — it does not ask
-/// *which* divisions — so without this any division admin could put a fixture into anybody's
-/// competition. Checking the home club is enough: the handler refuses a fixture whose two
-/// clubs are in different divisions, so either the away club is in the same division or there
-/// is no fixture to authorise.
+/// Adds a fixture to a competition by hand.
+///
+/// Scoped to the competition's division. [Authorize(Policy = "CanManageDivisions")] on the
+/// endpoint only asks whether the requester is a division admin at all — never which
+/// divisions — so without this any division admin could put a fixture into anybody's
+/// competition.
+///
+/// The season is the competition's rather than an argument: a fixture cannot belong to a
+/// different year from the competition it is part of.
 /// </summary>
 public sealed record CreateMatchResultCommand(
+    Guid     CompetitionId,
     DateTime MatchDate,
     int      MatchweekNumber,
-    int      Season,
     Guid     HomeTeamId,
     Guid     AwayTeamId,
     string?  Venue,
     string?  Referee
-) : IRequest<Guid>, IRequireTeamAccess
-{
-    Guid IRequireTeamAccess.TeamId => HomeTeamId;
-}
+) : IRequest<Guid>, IRequireCompetitionAccess;
 
 public sealed class CreateMatchResultCommandValidator
     : AbstractValidator<CreateMatchResultCommand>
 {
     public CreateMatchResultCommandValidator()
     {
+        RuleFor(x => x.CompetitionId).NotEmpty();
         RuleFor(x => x.HomeTeamId).NotEmpty();
         RuleFor(x => x.AwayTeamId).NotEmpty();
         RuleFor(x => x.HomeTeamId)
             .NotEqual(x => x.AwayTeamId)
             .WithMessage("Home and away team cannot be the same.");
         RuleFor(x => x.MatchweekNumber).GreaterThan(0);
-        RuleFor(x => x.Season).InclusiveBetween(2000, DateTime.UtcNow.Year + 1);
         RuleFor(x => x.MatchDate).GreaterThan(DateTime.UtcNow.AddYears(-10));
     }
 }
@@ -233,6 +247,10 @@ public sealed class CreateMatchResultCommandHandler
         CreateMatchResultCommand request,
         CancellationToken cancellationToken)
     {
+        var competition = await _db.Competitions
+            .FirstOrDefaultAsync(c => c.Id == request.CompetitionId, cancellationToken)
+            ?? throw new NotFoundException(nameof(Competition), request.CompetitionId);
+
         var home = await _db.Teams
             .Include(t => t.Division)
             .FirstOrDefaultAsync(t => t.Id == request.HomeTeamId, cancellationToken)
@@ -243,43 +261,45 @@ public sealed class CreateMatchResultCommandHandler
             .FirstOrDefaultAsync(t => t.Id == request.AwayTeamId, cancellationToken)
             ?? throw new NotFoundException(nameof(Team), request.AwayTeamId);
 
-        // A fixture belongs to the competition both clubs play in. Nothing set this before, so
-        // a match made by hand had no division at all: it never appeared in a division's
-        // fixture list and never counted towards its table, while looking perfectly saved.
-        if (home.DivisionId is null || away.DivisionId is null)
+        // Both clubs have to be in this competition. That is the rule now, and it is a better
+        // one than "in the same division": a cup invited from elsewhere is a real competition
+        // with real entrants, while two clubs who happen to share a division but were never
+        // entered still have no business being drawn against each other here.
+        var entered = await _db.CompetitionEntries
+            .Where(e => e.CompetitionId == competition.Id)
+            .Select(e => e.TeamId)
+            .ToListAsync(cancellationToken);
+
+        var missing = new[] { home, away }.Where(t => !entered.Contains(t.Id)).ToList();
+
+        if (missing.Count > 0)
         {
+            var names = string.Join(" and ", missing.Select(t => t.Name));
+
             throw new InvalidOperationException(
-                "A club that is not in a division has nobody to play. Put both clubs in a "
-                + "division first.");
+                $"{names} {(missing.Count == 1 ? "is" : "are")} not entered in "
+                + $"{competition.Name}. Enter them before drawing this fixture.");
         }
 
-        if (home.DivisionId != away.DivisionId)
+        // A backstop rather than the main guard: entering a club of the wrong gender is already
+        // refused, so reaching here would mean that check had been got around. This is the one
+        // mistake nobody would want to explain afterwards, so it is worth checking twice.
+        if (home.Division?.Gender != away.Division?.Gender)
         {
-            // Gender is carried by the division, so clubs from different divisions can be of
-            // different genders — and a fixture between them is the one mistake here that
-            // nobody would want to explain afterwards. It gets said plainly.
-            var homeGender = home.Division?.Gender;
-            var awayGender = away.Division?.Gender;
-
-            if (homeGender != awayGender)
-            {
-                throw new InvalidOperationException(
-                    $"{home.Name} plays in a {homeGender?.ToString().ToLowerInvariant()} "
-                    + $"division and {away.Name} in a {awayGender?.ToString().ToLowerInvariant()} "
-                    + "one. They cannot be drawn against each other.");
-            }
-
             throw new InvalidOperationException(
-                $"{home.Name} and {away.Name} are in different divisions, so there is no "
-                + "competition this fixture belongs to.");
+                $"{home.Name} plays in a {home.Division?.Gender?.ToString().ToLowerInvariant()} "
+                + $"division and {away.Name} in a "
+                + $"{away.Division?.Gender?.ToString().ToLowerInvariant()} one. "
+                + "They cannot be drawn against each other.");
         }
 
         var match = new MatchResult
         {
             MatchDate       = request.MatchDate,
             MatchweekNumber = request.MatchweekNumber,
-            Season          = request.Season,
-            DivisionId      = home.DivisionId,
+            Season          = competition.Season,
+            CompetitionId   = competition.Id,
+            DivisionId      = competition.DivisionId,
             HomeTeamId      = request.HomeTeamId,
             AwayTeamId      = request.AwayTeamId,
             Venue           = request.Venue,

@@ -10,7 +10,8 @@ namespace iDiski.Application.Common.Behaviours;
 
 /// <summary>
 /// Enforces resource-scoped authorization for requests implementing IRequireDivisionAccess,
-/// IRequireTeamAccess, IRequirePlayerAccess or IRequireMatchAccess, by running them through the same
+/// IRequireTeamAccess, IRequirePlayerAccess, IRequireMatchAccess or IRequireCompetitionAccess,
+/// by running them through the same
 /// TeamOwnershipHandler / DivisionOwnershipHandler registered for ASP.NET Core authorization.
 /// [Authorize(Policy = "CanManageTeams"/"CanManageDivisions")] on a controller action only
 /// checks role membership (e.g. "is this user a DivisionAdmin at all") — this behaviour is
@@ -46,6 +47,16 @@ public sealed class AuthorizationBehaviour<TRequest, TResponse>
 
         if (request is IRequireTeamAccess teamRequest)
             await EnsureAuthorizedAsync(new TeamOwnershipRequirement(teamRequest.TeamId));
+
+        if (request is IRequireCompetitionAccess competitionRequest)
+        {
+            var owningDivisionId = await _db.Competitions
+                .Where(c => c.Id == competitionRequest.CompetitionId)
+                .Select(c => c.DivisionId)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            await EnsureAuthorizedAsync(new DivisionOwnershipRequirement(owningDivisionId));
+        }
 
         if (request is IRequireMatchAccess matchRequest)
         {

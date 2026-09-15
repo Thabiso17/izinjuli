@@ -18,6 +18,8 @@ public interface ILeagueDbContext
     DbSet<Sponsor>            Sponsors            { get; }
     DbSet<PageLayoutConfig>   PageLayoutConfigs   { get; }
     DbSet<Division>           Divisions           { get; }
+    DbSet<Competition>        Competitions        { get; }
+    DbSet<CompetitionEntry>   CompetitionEntries  { get; }
     DbSet<MatchEvent>         MatchEvents         { get; }
     DbSet<Suspension>         Suspensions         { get; }
     DbSet<User>               Users               { get; }

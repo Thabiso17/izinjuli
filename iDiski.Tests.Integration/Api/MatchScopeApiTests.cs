@@ -35,6 +35,8 @@ public class MatchScopeApiTests : IAsyncLifetime
     private Guid _otherDivision;
     private (Guid Home, Guid Away) _ownClubs;
     private (Guid Home, Guid Away) _otherClubs;
+    private Guid _ownCompetition;
+    private Guid _otherCompetition;
     private Guid _ownFixture;
     private Guid _otherFixture;
     private Guid _ownPlayer;
@@ -53,8 +55,11 @@ public class MatchScopeApiTests : IAsyncLifetime
         _ownClubs = await TwoClubsInAsync(_ownDivision);
         _otherClubs = await TwoClubsInAsync(_otherDivision);
 
-        _ownFixture = await AFixtureInAsync(_ownDivision, _ownClubs);
-        _otherFixture = await AFixtureInAsync(_otherDivision, _otherClubs);
+        _ownCompetition = await ACompetitionInAsync(_ownDivision, _ownClubs);
+        _otherCompetition = await ACompetitionInAsync(_otherDivision, _otherClubs);
+
+        _ownFixture = await AFixtureInAsync(_ownCompetition, _ownDivision, _ownClubs);
+        _otherFixture = await AFixtureInAsync(_otherCompetition, _otherDivision, _otherClubs);
 
         _ownPlayer = await APlayerInAsync(_ownClubs.Home);
         _otherPlayer = await APlayerInAsync(_otherClubs.Home);
@@ -106,9 +111,9 @@ public class MatchScopeApiTests : IAsyncLifetime
 
         var response = await client.PostAsJsonAsync("/api/matchresults", new
         {
+            competitionId = _otherCompetition,
             matchDate = new DateTime(2041, 4, 1, 0, 0, 0, DateTimeKind.Utc),
             matchweekNumber = 2,
-            season = 2041,
             homeTeamId = _otherClubs.Home,
             awayTeamId = _otherClubs.Away,
             venue = (string?)null,
@@ -206,7 +211,6 @@ public class MatchScopeApiTests : IAsyncLifetime
             Season = 2041,
             Gender = Gender.Male,
             IsActive = true,
-            Format = CompetitionFormat.League,
             CreatedAt = DateTime.UtcNow,
         });
 
@@ -261,7 +265,40 @@ public class MatchScopeApiTests : IAsyncLifetime
         return id;
     });
 
-    private Task<Guid> AFixtureInAsync(Guid divisionId, (Guid Home, Guid Away) clubs) =>
+    private Task<Guid> ACompetitionInAsync(Guid divisionId, (Guid Home, Guid Away) clubs) =>
+        _fixture.WithDbAsync(async db =>
+        {
+            var id = Guid.NewGuid();
+
+            db.Competitions.Add(new Competition
+            {
+                Id = id,
+                DivisionId = divisionId,
+                Name = $"Competition {ApiTestFixture.Code("N")}",
+                ShortCode = ApiTestFixture.Code("MC"),
+                Season = 2041,
+                Format = CompetitionFormat.League,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+            });
+
+            foreach (var teamId in new[] { clubs.Home, clubs.Away })
+            {
+                db.CompetitionEntries.Add(new CompetitionEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompetitionId = id,
+                    TeamId = teamId,
+                    CreatedAt = DateTime.UtcNow,
+                });
+            }
+
+            await db.SaveChangesAsync();
+            return id;
+        });
+
+    private Task<Guid> AFixtureInAsync(
+        Guid competitionId, Guid divisionId, (Guid Home, Guid Away) clubs) =>
         _fixture.WithDbAsync(async db =>
         {
             var id = Guid.NewGuid();
@@ -269,6 +306,7 @@ public class MatchScopeApiTests : IAsyncLifetime
             db.MatchResults.Add(new MatchResult
             {
                 Id = id,
+                CompetitionId = competitionId,
                 DivisionId = divisionId,
                 HomeTeamId = clubs.Home,
                 AwayTeamId = clubs.Away,
