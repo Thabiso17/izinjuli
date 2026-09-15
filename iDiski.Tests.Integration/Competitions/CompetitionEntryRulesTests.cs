@@ -189,13 +189,19 @@ public class CompetitionEntryRulesTests : IClassFixture<IntegrationTestFixture>
 
         await Generate(cup);
 
-        var drawn = await _fixture.DbContext.MatchResults
+        // Read the ties first and flatten them here: an array built inside the query has no
+        // SQL to be translated into.
+        var ties = await _fixture.DbContext.MatchResults
             .AsNoTracking()
             .Where(m => m.CompetitionId == cup)
-            .SelectMany(m => new[] { m.HomeTeamId, m.AwayTeamId })
+            .Select(m => new { m.HomeTeamId, m.AwayTeamId })
+            .ToListAsync();
+
+        var drawn = ties
+            .SelectMany(t => new[] { t.HomeTeamId, t.AwayTeamId })
             .Where(id => id != null)
             .Select(id => id!.Value)
-            .ToListAsync();
+            .ToList();
 
         drawn.Should().NotBeEmpty();
         drawn.Should().NotIntersectWith(clubs.Skip(4));
