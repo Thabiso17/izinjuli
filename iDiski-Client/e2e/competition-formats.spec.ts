@@ -2,411 +2,153 @@ import { test, expect, type Locator, type Page } from '@playwright/test';
 import { accounts, signInAndWaitForAdmin } from './helpers';
 
 /**
- * Choosing how a competition is played, and generating it.
+ * Running competitions inside a division.
  *
- * The bracket builder and the group generator are pinned against the database in
- * TournamentGenerationTests. None of that was reachable from the app: a division had no way
- * to say it was anything but a league, so the code could not be run by the person it was
- * written for. These check the path exists from end to end — pick the format, add the
- * entrants, generate, and get a bracket back.
+ * A division used to be the competition, so it could run exactly one thing per season. It is
+ * now a pool of teams, and what they play is a competition: a league all season, a cup for the
+ * top eight, a sponsor's tournament that invites clubs from elsewhere — side by side.
+ *
+ * These drive the path an organiser actually takes: make the division, add the clubs, start a
+ * competition, choose who is in it, draw it up, and find it on the public page.
  */
-test.describe('competition formats', () => {
+test.describe('competitions', () => {
   test.beforeEach(async ({ page }) => {
     await signInAndWaitForAdmin(page, accounts.superAdmin);
   });
 
-  test('a knockout division can be created and says so in the list', async ({ page }) => {
-    const name = await createDivision(page, 'Knockout');
+  test('a competition can be started in a division and appears on its page', async ({ page }) => {
+    const division = await createDivision(page);
+    await createTeam(page, division, `Starter A ${unique()}`);
+    await createTeam(page, division, `Starter B ${unique()}`);
 
-    const row = page.locator('tr', { hasText: name });
-    await expect(row).toBeVisible();
-    await expect(
-      row.locator('[data-testid="division-format-cell"]'),
-      'the list has to say what kind of competition each one is',
-    ).toContainText('Knockout');
-  });
+    const competition = await createCompetition(page, division, 'Knockout');
 
-  test('reopening a division shows the format it was saved with', async ({ page }) => {
-    const name = await createDivision(page, 'GroupAndKnockout');
+    // The admin list for that division shows it.
+    await expect(page.locator('[data-testid="competition-row"]', { hasText: competition }))
+      .toBeVisible();
 
-    await page.locator('tr', { hasText: name }).locator('button').first().click();
-
-    const modal = page.locator('.modal.show');
-    await expect(modal).toBeVisible();
-    await expect(modal.locator('[data-testid="division-format"]')).toHaveValue(
-      'GroupAndKnockout',
-    );
-  });
-
-  test('the generate dialog describes the format it is about to produce', async ({ page }) => {
-    const name = await createDivision(page, 'Knockout');
-
-    await page.goto('/admin/matches');
-    await page.waitForLoadState('networkidle');
-    await page.locator('button:has-text("Generate Fixtures")').first().click();
-
-    const modal = page.locator('.modal.show');
-    await expect(modal).toBeVisible();
-    await selectDivision(modal.locator('select[name="divisionId"]'), name);
-
-    // The dialog used to promise a round-robin whatever it was about to build.
-    await expect(modal.locator('[data-testid="generate-explains-format"]')).toContainText(
-      /bracket/i,
-    );
-
-    // Home and away is meaningless in a knockout — a tie is played once.
-    await expect(modal.locator('input[name="isHomeAndAway"]')).toHaveCount(0);
-    await expect(modal.locator('[data-testid="group-count"]')).toHaveCount(0);
-  });
-
-  test('a group competition asks how many groups, and a league does not', async ({ page }) => {
-    // Both made here rather than borrowing whatever else is in the database: picking "some
-    // other division" can land on a group competition another test created, and then the
-    // comparison proves nothing.
-    const league = await createDivision(page, 'League');
-    const groups = await createDivision(page, 'GroupAndKnockout');
-
-    await page.goto('/admin/matches');
-    await page.waitForLoadState('networkidle');
-    await page.locator('button:has-text("Generate Fixtures")').first().click();
-
-    const modal = page.locator('.modal.show');
-    const division = modal.locator('select[name="divisionId"]');
-
-    await selectDivision(division, groups);
-    await expect(modal.locator('[data-testid="group-count"]')).toBeVisible();
-    await expect(modal.locator('[data-testid="teams-advancing"]')).toBeVisible();
-
-    // A group stage is easy to ask for and hard to picture, so the dialog says what the
-    // numbers will produce before anything is written.
-    await expect(modal.locator('[data-testid="group-shape"]')).toBeVisible();
-
-    // Switching to a league puts the dialog back, rather than leaving group questions on a
-    // competition that has no groups.
-    await selectDivision(division, league);
-    await expect(modal.locator('[data-testid="group-count"]')).toHaveCount(0);
-  });
-
-  test('a knockout division with four teams generates a bracket', async ({ page }) => {
-    const name = await createDivision(page, 'Knockout');
-
-    // Four entrants: two semi-finals and a final, which is the smallest bracket with a round
-    // that has to be filled in by somebody winning rather than by the draw.
-    for (let i = 1; i <= 4; i++) {
-      await createTeam(page, name, `Entrant ${i} ${unique()}`);
-    }
-
-    await page.goto('/admin/matches');
-    await page.waitForLoadState('networkidle');
-    await page.locator('button:has-text("Generate Fixtures")').first().click();
-
-    const modal = page.locator('.modal.show');
-    const division = modal.locator('select[name="divisionId"]');
-    await selectDivision(division, name);
-
-    // Taken from the select rather than from the public list, which filters by season.
-    const divisionId = await division.inputValue();
-
-    await modal.locator('input[name="season"]').fill('2033');
-    await modal.locator('input[name="startDate"]').fill('2033-06-04');
-    // A tournament played out over one weekend: every round on the same day.
-    await modal.locator('input[name="daysBetweenMatchweeks"]').fill('0');
-
-    const generated = page.waitForResponse(
-      (r) => r.url().includes('/api/matchresults/generate') && r.request().method() === 'POST',
-    );
-
-    await modal.locator('button:has-text("Generate Fixtures")').last().click();
-
-    const response = await generated;
-    expect(response.status(), await response.text()).toBe(200);
-
-    const body = await response.json();
-
-    // Two semi-finals and a final. A bracket of four is never anything else, so this is an
-    // exact number rather than "more than nothing".
-    expect(body.fixturesGenerated, 'four entrants make two semi-finals and a final').toBe(3);
-    expect(body.matchweeksCreated).toBe(2);
-    expect(
-      body.firstMatchDate.slice(0, 10),
-      'with no days between rounds the whole thing is played on one day',
-    ).toBe(body.lastMatchDate.slice(0, 10));
-
-    // And the public page draws it as a bracket. A league table says nothing about a cup —
-    // knockout ties are deliberately kept out of the standings, so this page used to tell a
-    // knockout division it had no matches however many were played.
+    // And so does the division's public page, which is now a pool listing what it plays.
+    const divisionId = await divisionIdFor(page, division);
     await page.goto(`/divisions/${divisionId}`);
     await page.waitForLoadState('networkidle');
+
+    await expect(
+      page.locator('[data-testid="competition-card"]', { hasText: competition }),
+      'a division page should list the competitions being run from it',
+    ).toBeVisible();
+  });
+
+  test('a knockout competition draws a bracket on its own page', async ({ page }) => {
+    const division = await createDivision(page);
+
+    for (let i = 1; i <= 4; i++) {
+      await createTeam(page, division, `Entrant ${i} ${unique()}`);
+    }
+
+    const competition = await createCompetition(page, division, 'Knockout');
+
+    const body = await generate(page, competition, { daysBetween: '0' });
+
+    // Four entrants make two semi-finals and a final. A bracket of four is never anything
+    // else, so this is exact rather than "more than nothing".
+    expect(body.fixturesGenerated, 'four entrants make two semi-finals and a final').toBe(3);
+
+    await openCompetition(page, division, competition);
 
     const bracket = page.locator('[data-testid="bracket"]');
     await expect(bracket).toBeVisible();
-
-    // Two rounds, drawn before either was played: the semi-finals and the final.
-    await expect(bracket.locator('[data-testid="bracket-round"]')).toHaveCount(2);
     await expect(bracket.locator('[data-testid="bracket-tie"]')).toHaveCount(3);
-
-    // The final has nobody in it yet, which is the point of drawing the whole thing up front.
-    await expect(bracket).toContainText('Final');
     await expect(bracket).toContainText('To be decided');
   });
 
-  test('a group competition generates its groups and shows them on the public page', async ({
-    page,
-  }) => {
-    const name = await createDivision(page, 'GroupAndKnockout');
+  test('a group competition draws its groups', async ({ page }) => {
+    const division = await createDivision(page);
 
-    // Eight entrants into two groups of four, which is the shape a small cup actually uses.
     for (let i = 1; i <= 8; i++) {
-      await createTeam(page, name, `Grouped ${i} ${unique()}`);
+      await createTeam(page, division, `Grouped ${i} ${unique()}`);
     }
 
-    await page.goto('/admin/matches');
-    await page.waitForLoadState('networkidle');
-    await page.locator('button:has-text("Generate Fixtures")').first().click();
+    const competition = await createCompetition(page, division, 'GroupAndKnockout');
 
-    const modal = page.locator('.modal.show');
-    const division = modal.locator('select[name="divisionId"]');
-    await selectDivision(division, name);
+    const body = await generate(page, competition, { singleRound: true, groups: '2', advancing: '2' });
 
-    const divisionId = await division.inputValue();
-
-    // The dialog fills in the division's own season. Left as it lands rather than typed over:
-    // a division is one season's competition, and fixtures generated into a different year
-    // are written where that division's page will never look for them.
-    await expect(modal.locator('input[name="season"]')).toHaveValue('2033');
-
-    await modal.locator('input[name="startDate"]').fill('2033-06-01');
-    await modal.locator('[data-testid="group-count"]').fill('2');
-    await modal.locator('[data-testid="teams-advancing"]').fill('2');
-
-    // A group stage can be played either way — a World Cup group goes once through, the old
-    // Champions League group stage went home and away — and the dialog opens on the latter,
-    // which doubles the ties. Said explicitly here so the count below is about the shape of
-    // the competition rather than about a default. The radio is a visually hidden Bootstrap
-    // btn-check, so the label is the clickable part.
-    await modal.locator('label[for="singleRound"]').click();
-
-    // The dialog should already be describing this shape before anything is written —
-    // including how often the groups play, which is what decides whether this is twelve
-    // ties or twenty-four.
-    const shape = modal.locator('[data-testid="group-shape"]');
-    await expect(shape).toContainText('8 teams');
-    await expect(shape).toContainText('once through');
-    await expect(shape).toContainText('12 group ties');
-
-    const generated = page.waitForResponse(
-      (r) => r.url().includes('/api/matchresults/generate') && r.request().method() === 'POST',
-    );
-
-    await modal.locator('button:has-text("Generate Fixtures")').last().click();
-
-    const response = await generated;
-    expect(response.status(), await response.text()).toBe(200);
-
-    const body = await response.json();
-
-    // Played once each: two groups of four is six ties a group, and four qualifiers make two
-    // semi-finals and a final. Exact, because a group competition of this size played single
-    // round is never anything else.
+    // Two groups of four played once through is six ties a group, and four qualifiers make two
+    // semi-finals and a final.
     expect(body.fixturesGenerated, 'twelve group ties and three bracket ties').toBe(15);
 
-    // The public page shows the groups first and the bracket beside them — which is the whole
-    // difference between this and a straight cup.
-    await page.goto(`/divisions/${divisionId}`);
-    await page.waitForLoadState('networkidle');
+    await openCompetition(page, division, competition);
 
     const groups = page.locator('[data-testid="group-heading"]');
     await expect(groups).toHaveCount(2);
     await expect(groups.first()).toContainText('Group A');
-    await expect(groups.nth(1)).toContainText('Group B');
-
     await expect(page.locator('[data-testid="bracket"]')).toBeVisible();
   });
 
-  test('a competition that has been played says so, and names its winner', async ({ page }) => {
-    // A league of two is the cheapest competition that can actually be finished: one fixture,
-    // one result, and the whole thing is over. Everything this checks — the status the API
-    // derives, the filter on the public page, the champion — needs a finished competition, and
-    // playing a bracket out would be the same assertions behind twenty more clicks.
-    const name = await createDivision(page, 'League');
+  test('a cup of some of the division draws only those clubs', async ({ page }) => {
+    // The thing the old model could not express at all: a division of six running a cup for
+    // four of them.
+    const division = await createDivision(page);
+    const names: string[] = [];
 
-    await createTeam(page, name, `Finisher A ${unique()}`);
-    await createTeam(page, name, `Finisher B ${unique()}`);
-
-    await page.goto('/admin/matches');
-    await page.waitForLoadState('networkidle');
-    await page.locator('button:has-text("Generate Fixtures")').first().click();
-
-    const modal = page.locator('.modal.show');
-    const division = modal.locator('select[name="divisionId"]');
-    await selectDivision(division, name);
-
-    const divisionId = await division.inputValue();
-
-    await modal.locator('input[name="startDate"]').fill('2033-07-01');
-
-    // Played once through. The dialog opens on home and away, which would make this two
-    // fixtures and leave the league unfinished after one result — the competition would be
-    // correctly reported as still in progress and this test would be testing nothing it meant
-    // to. The radio is a visually hidden Bootstrap btn-check, so the label is the clickable
-    // part.
-    await modal.locator('label[for="singleRound"]').click();
-
-    const generated = page.waitForResponse(
-      (r) => r.url().includes('/api/matchresults/generate') && r.request().method() === 'POST',
-    );
-
-    await modal.locator('button:has-text("Generate Fixtures")').last().click();
-
-    const created = await generated;
-    expect(created.status(), await created.text()).toBe(200);
-
-    // Two clubs playing once is one fixture, so one result finishes the whole competition.
-    // Asserted rather than assumed: this number is the reason the rest of the test works.
-    expect((await created.json()).fixturesGenerated, 'two clubs, played once').toBe(1);
-
-    await expect(modal).toBeHidden();
-
-    // ── Drawn but unplayed is not under way ────────────────────────────────
-    await page.goto(`/divisions/${divisionId}`);
-    await page.waitForLoadState('networkidle');
-
-    await expect(
-      page.locator('[data-testid="champion"]'),
-      'nobody has won anything yet',
-    ).toHaveCount(0);
-
-    // ── Play it ────────────────────────────────────────────────────────────
-    await page.goto('/admin/matches');
-    await page.waitForLoadState('networkidle');
-
-    // Narrowed to this division: several tests in this file generate into 2033, and "the first
-    // fixture on the page" would otherwise be somebody else's.
-    const filters = page.locator('.card.mb-4').first();
-    await selectDivision(filters.locator('select').first(), name);
-    await filters.locator('input[type="number"]').first().fill('2033');
-    await page.waitForLoadState('networkidle');
-
-    await page.locator('button:has-text("Enter Score")').first().click();
-
-    const score = page.locator('.modal.show');
-    await expect(score).toBeVisible();
-
-    await score.locator('input[name="homeScore"]').fill('3');
-    await score.locator('input[name="awayScore"]').fill('0');
-    await score.locator('button:has-text("Update Score")').last().click();
-    await expect(score).toBeHidden();
-
-    // ── Now it is finished, and says who won ───────────────────────────────
-    await page.goto(`/divisions/${divisionId}`);
-    await page.waitForLoadState('networkidle');
-
-    const champion = page.locator('[data-testid="champion"]');
-    await expect(
-      champion,
-      'a finished competition that never names its winner is the one thing every reader wants',
-    ).toBeVisible();
-    await expect(champion).toContainText('Champions');
-
-    // ── And the public list files it under the finished ones ───────────────
-    await page.goto('/divisions');
-    await page.waitForLoadState('networkidle');
-
-    const seasonPicker = page.locator('select').first();
-    if (await seasonPicker.count()) {
-      const labels = (await seasonPicker.locator('option').allInnerTexts()).map((t) => t.trim());
-      const index = labels.findIndex((label) => label.includes('2033'));
-      if (index > -1) await seasonPicker.selectOption({ index });
-      await page.waitForLoadState('networkidle');
+    for (let i = 1; i <= 6; i++) {
+      const team = `Squad ${i} ${unique()}`;
+      names.push(team);
+      await createTeam(page, division, team);
     }
 
-    const card = page.locator('.division-card', { hasText: name });
+    // Started with nobody in it, then four entered by hand.
+    const competition = await createCompetition(page, division, 'Knockout', { enterAll: false });
 
-    // Current is the default, and a competition that has been played is not current.
-    await expect(card).toHaveCount(0);
+    await openEntrants(page, competition);
 
-    await page.locator('[data-testid="scope-completed"]').click();
-    await expect(card).toHaveCount(1);
-    await expect(card.locator('[data-testid="division-status"]')).toContainText('Completed');
+    for (const team of names.slice(0, 4)) {
+      await enterTeam(page, team);
+    }
 
-    // And it is still reachable, rather than filtered out of existence.
-    await page.locator('[data-testid="scope-all"]').click();
-    await expect(card).toHaveCount(1);
+    await expect(page.locator('[data-testid="entrant-row"]')).toHaveCount(4);
+    await page.locator('.modal.show button:has-text("Done")').click();
+
+    const body = await generate(page, competition, {});
+
+    expect(body.fixturesGenerated, 'four entrants make a bracket of three ties').toBe(3);
+
+    await openCompetition(page, division, competition);
+
+    // The two clubs left out are nowhere in the draw.
+    const bracket = page.locator('[data-testid="bracket"]');
+    await expect(bracket).toBeVisible();
+
+    for (const excluded of names.slice(4)) {
+      await expect(bracket).not.toContainText(excluded);
+    }
   });
 
-  test('a drawn knockout tie asks for the shootout instead of refusing', async ({ page }) => {
-    const name = await createDivision(page, 'Knockout');
+  test('two competitions run side by side in one division', async ({ page }) => {
+    // The whole point: a league running all season while a cup inside it is played out.
+    const division = await createDivision(page);
 
     for (let i = 1; i <= 4; i++) {
-      await createTeam(page, name, `Shootout ${i} ${unique()}`);
+      await createTeam(page, division, `Dual ${i} ${unique()}`);
     }
 
-    await page.goto('/admin/matches');
-    await page.waitForLoadState('networkidle');
-    await page.locator('button:has-text("Generate Fixtures")').first().click();
+    const league = await createCompetition(page, division, 'League');
+    const cup = await createCompetition(page, division, 'Knockout');
 
-    const generate = page.locator('.modal.show');
-    await selectDivision(generate.locator('select[name="divisionId"]'), name);
-    await generate.locator('input[name="season"]').fill('2034');
-    await generate.locator('input[name="startDate"]').fill('2034-06-03');
-    await generate.locator('button:has-text("Generate Fixtures")').last().click();
-    await expect(generate).toBeHidden();
+    await generate(page, league, { singleRound: true });
+    await generate(page, cup, { daysBetween: '0' });
 
-    // The list defaults to this season; the bracket was made for a later one.
-    const filters = page.locator('.card.mb-4').first();
-    await filters.locator('input[type="number"]').first().fill('2034');
+    const divisionId = await divisionIdFor(page, division);
+    await page.goto(`/divisions/${divisionId}`);
     await page.waitForLoadState('networkidle');
 
-    // Fixtures come back in date order, so the opening round is first and the final — which
-    // has nobody in it yet — is last.
-    await page.locator('button:has-text("Enter Score")').first().click();
-
-    const score = page.locator('.modal.show');
-    await expect(score).toBeVisible();
-    await expect(
-      score,
-      'this should be a semi-final with two teams, not the empty final',
-    ).not.toContainText('To be decided');
-
-    await score.locator('input[name="homeScore"]').fill('1');
-    await score.locator('input[name="awayScore"]').fill('1');
-
-    // Without somewhere to record the shootout, a drawn cup tie is a dead end: the API
-    // refuses it and the admin has no way to answer.
-    await expect(score.locator('[data-testid="shootout-needed"]')).toBeVisible();
-    await expect(score.locator('[data-testid="home-penalties"]')).toBeVisible();
-
-    await score.locator('[data-testid="home-penalties"]').fill('4');
-    await score.locator('[data-testid="away-penalties"]').fill('5');
-
-    await expect(score.locator('[data-testid="who-goes-through"]')).toContainText(
-      /goes through/i,
-    );
-
-    await score.locator('button:has-text("Update Score")').last().click();
-    await expect(score).toBeHidden();
-
-    // And it comes back, rather than vanishing the moment it is saved.
-    await expect(page.locator('[data-testid="shootout-score"]').first()).toContainText(
-      '4-5 on penalties',
-    );
+    const cards = page.locator('[data-testid="competition-card"]');
+    await expect(cards).toHaveCount(2);
+    await expect(cards.filter({ hasText: league })).toBeVisible();
+    await expect(cards.filter({ hasText: cup })).toBeVisible();
   });
 });
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-
-/**
- * Picks a division by name, whatever the page has wrapped around it — the teams page appends
- * the season, so an exact label match finds nothing there.
- */
-async function selectDivision(select: Locator, divisionName: string) {
-  const labels = (await select.locator('option').allInnerTexts()).map((t) => t.trim());
-  const index = labels.findIndex((label) => label.includes(divisionName));
-
-  expect(index, `no option on this page named ${divisionName}`).toBeGreaterThan(-1);
-
-  await select.selectOption({ index });
-}
 
 function unique() {
   return `${Date.now()}${Math.floor(Math.random() * 1000)}`.slice(-8);
@@ -417,8 +159,22 @@ function shortCode(prefix: string) {
   return `${prefix}${unique()}`.toUpperCase().slice(0, 12);
 }
 
-async function createDivision(page: Page, format: string): Promise<string> {
-  const name = `${format} ${unique()}`;
+/**
+ * Picks an option by name, whatever the page has wrapped around it — several of these selects
+ * append a season or a division, so an exact label match finds nothing.
+ */
+async function selectByName(select: Locator, name: string) {
+  const labels = (await select.locator('option').allInnerTexts()).map((t) => t.trim());
+  const index = labels.findIndex((label) => label.includes(name));
+
+  expect(index, `no option named ${name}`).toBeGreaterThan(-1);
+
+  await select.selectOption({ index });
+}
+
+/** A division is now just a pool of teams: no format, nothing to play until one is added. */
+async function createDivision(page: Page): Promise<string> {
+  const name = `Division ${unique()}`;
 
   await page.goto('/admin/divisions');
   await page.waitForLoadState('networkidle');
@@ -429,14 +185,89 @@ async function createDivision(page: Page, format: string): Promise<string> {
   await expect(modal).toBeVisible();
 
   await modal.locator('input[name="name"]').fill(name);
-  await modal.locator('input[name="shortCode"]').fill(shortCode('K'));
+  await modal.locator('input[name="shortCode"]').fill(shortCode('D'));
   await modal.locator('input[name="season"]').fill('2033');
-  await modal.locator('[data-testid="division-format"]').selectOption(format);
 
   await modal.locator('[data-testid="save-division"]').click();
   await expect(modal).toBeHidden();
 
   return name;
+}
+
+async function divisionIdFor(page: Page, divisionName: string): Promise<string> {
+  await page.goto('/admin/divisions');
+  await page.waitForLoadState('networkidle');
+
+  const link = page
+    .locator('tr', { hasText: divisionName })
+    .locator('[data-testid="manage-competitions"]');
+
+  const href = await link.getAttribute('href');
+  const id = href?.split('/').filter(Boolean).at(-2);
+
+  expect(id, `could not find the id of ${divisionName}`).toBeTruthy();
+  return id!;
+}
+
+/** Opens the competitions screen for a division and leaves the page there. */
+async function openCompetitions(page: Page, divisionName: string) {
+  await page.goto('/admin/divisions');
+  await page.waitForLoadState('networkidle');
+
+  await page
+    .locator('tr', { hasText: divisionName })
+    .locator('[data-testid="manage-competitions"]')
+    .click();
+
+  await page.waitForLoadState('networkidle');
+}
+
+async function createCompetition(
+  page: Page,
+  divisionName: string,
+  format: string,
+  options: { enterAll?: boolean } = {},
+): Promise<string> {
+  const name = `${format} ${unique()}`;
+
+  await openCompetitions(page, divisionName);
+  await page.locator('[data-testid="add-competition"]').click();
+
+  const modal = page.locator('.modal.show');
+  await expect(modal).toBeVisible();
+
+  await modal.locator('input[name="name"]').fill(name);
+  await modal.locator('input[name="shortCode"]').fill(shortCode('C'));
+  await modal.locator('[data-testid="competition-format"]').selectOption(format);
+
+  if (options.enterAll === false) {
+    await modal.locator('[data-testid="enter-all"]').uncheck();
+  }
+
+  await modal.locator('[data-testid="save-competition"]').click();
+  await expect(modal).toBeHidden();
+
+  return name;
+}
+
+async function openEntrants(page: Page, competitionName: string) {
+  await page
+    .locator('[data-testid="competition-row"]', { hasText: competitionName })
+    .locator('[data-testid="manage-entrants"]')
+    .click();
+
+  await expect(page.locator('.modal.show')).toBeVisible();
+}
+
+async function enterTeam(page: Page, teamName: string) {
+  const modal = page.locator('.modal.show');
+
+  await selectByName(modal.locator('select[name="teamToAdd"]'), teamName);
+  await modal.locator('[data-testid="enter-team"]').click();
+
+  await expect(
+    modal.locator('[data-testid="entrant-row"]', { hasText: teamName }),
+  ).toBeVisible();
 }
 
 async function createTeam(page: Page, divisionName: string, teamName: string) {
@@ -450,9 +281,66 @@ async function createTeam(page: Page, divisionName: string, teamName: string) {
 
   await modal.locator('input[name="name"]').fill(teamName);
   await modal.locator('input[name="shortCode"]').fill(shortCode('T'));
-  await selectDivision(modal.locator('select[name="divisionId"]'), divisionName);
+  await selectByName(modal.locator('select[name="divisionId"]'), divisionName);
   await modal.locator('input[name="founded"]').fill('2020');
 
   await modal.locator('[data-testid="save-team"]').click();
   await expect(modal).toBeHidden();
+}
+
+/**
+ * Draws a competition up. No season to fill in: it belongs to the competition, so it cannot
+ * disagree with it.
+ */
+async function generate(
+  page: Page,
+  competitionName: string,
+  options: { singleRound?: boolean; groups?: string; advancing?: string; daysBetween?: string },
+) {
+  await page.goto('/admin/matches');
+  await page.waitForLoadState('networkidle');
+  await page.locator('button:has-text("Generate Fixtures")').first().click();
+
+  const modal = page.locator('.modal.show');
+  await selectByName(modal.locator('select[name="competitionId"]'), competitionName);
+
+  await modal.locator('input[name="startDate"]').fill('2033-06-01');
+
+  if (options.daysBetween) {
+    await modal.locator('input[name="daysBetweenMatchweeks"]').fill(options.daysBetween);
+  }
+
+  if (options.singleRound) {
+    // The radio is a visually hidden Bootstrap btn-check, so the label is the clickable part.
+    await modal.locator('label[for="singleRound"]').click();
+  }
+
+  if (options.groups) await modal.locator('[data-testid="group-count"]').fill(options.groups);
+  if (options.advancing) {
+    await modal.locator('[data-testid="teams-advancing"]').fill(options.advancing);
+  }
+
+  const generated = page.waitForResponse(
+    (r) => r.url().includes('/api/matchresults/generate') && r.request().method() === 'POST',
+  );
+
+  await modal.locator('button:has-text("Generate Fixtures")').last().click();
+
+  const response = await generated;
+  expect(response.status(), await response.text()).toBe(200);
+
+  return response.json();
+}
+
+/** Opens a competition's public page through its division, the way a visitor would. */
+async function openCompetition(page: Page, divisionName: string, competitionName: string) {
+  const divisionId = await divisionIdFor(page, divisionName);
+
+  await page.goto(`/divisions/${divisionId}`);
+  await page.waitForLoadState('networkidle');
+
+  await page.locator('[data-testid="competition-card"]', { hasText: competitionName }).click();
+  await page.waitForLoadState('networkidle');
+
+  await expect(page.locator('[data-testid="competition-name"]')).toContainText(competitionName);
 }

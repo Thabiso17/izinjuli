@@ -159,7 +159,7 @@ test.describe('admin filters', () => {
     ).toBe(true);
   });
 
-  test('the fixture form only offers teams from the division chosen above it', async ({ page }) => {
+  test('the fixture form only offers clubs entered in the chosen competition', async ({ page }) => {
     await page.goto('/admin/matches');
     await settle(page);
 
@@ -168,34 +168,36 @@ test.describe('admin filters', () => {
     const modal = page.locator('.modal.show');
     await expect(modal).toBeVisible();
 
-    const division = modal.locator('select[name="divisionId"]');
+    const competition = modal.locator('select[name="competitionId"]');
     const home = modal.locator('select[name="homeTeamId"]');
     const away = modal.locator('select[name="awayTeamId"]');
 
-    const divisionNames = await labels(division);
-    if (divisionNames.length < 2) test.skip(true, 'no divisions to choose from');
+    const competitionNames = await labels(competition);
+    if (competitionNames.length < 2) test.skip(true, 'no competitions to choose from');
 
-    const everyTeam = await labels(home);
+    // Before a competition is chosen there is nobody to offer: entrants are a property of the
+    // competition, not of the league at large.
+    expect((await labels(home)).length, 'the pickers should start empty').toBeLessThanOrEqual(1);
 
-    // Each division in turn. The pickers must never offer a team from another one, or two
-    // clubs from different divisions can be scheduled against each other, and that result
-    // then feeds the standings.
-    let narrowedAtLeastOnce = false;
+    // Each competition in turn. The pickers must offer exactly its entrants — a club that is
+    // not in it has no business being drawn against one that is, even from the same division.
+    let offeredSomebody = false;
 
-    for (let i = 1; i < divisionNames.length; i++) {
-      await division.selectOption({ index: i });
+    for (let i = 1; i < competitionNames.length; i++) {
+      await competition.selectOption({ index: i });
+      await settle(page);
 
       const homeOptions = await labels(home);
       const awayOptions = await labels(away);
 
-      expect(homeOptions, 'the two pickers should offer the same teams').toEqual(awayOptions);
+      expect(homeOptions, 'the two pickers should offer the same clubs').toEqual(awayOptions);
 
-      if (homeOptions.length < everyTeam.length) narrowedAtLeastOnce = true;
+      if (homeOptions.length > 1) offeredSomebody = true;
     }
 
     expect(
-      narrowedAtLeastOnce,
-      'no division narrowed the team pickers, so they may still be listing the whole league',
+      offeredSomebody,
+      'no competition offered any entrants, so this proved nothing',
     ).toBe(true);
   });
 

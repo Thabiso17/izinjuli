@@ -1,5 +1,12 @@
 namespace iDiski.Domain.Entities;
 
+/// <summary>
+/// A pool of teams — "U17 Boys, 2026" — rather than a competition in its own right.
+///
+/// What those teams play is a <see cref="Competition"/>, and there can be several at once: a
+/// league running all season alongside a cup for eight of them and a sponsor's tournament that
+/// invites clubs from elsewhere.
+/// </summary>
 public class Division : BaseEntity
 {
     public string Name { get; set; } = string.Empty;
@@ -12,33 +19,12 @@ public class Division : BaseEntity
     public DateTime? EndDate { get; set; }
     public string? Description { get; set; }
 
-    /// <summary>
-    /// How this competition is played. A league is a round-robin settled on points; a knockout
-    /// is a bracket settled by winning; a group stage feeds a bracket. It sits on the division
-    /// rather than being chosen when fixtures are generated, so a division cannot end up
-    /// holding a mixture nobody asked for.
-    /// </summary>
-    public CompetitionFormat Format { get; set; } = CompetitionFormat.League;
-
     // Navigation properties
     public ICollection<Team> Teams { get; set; } = new List<Team>();
     public ICollection<MatchResult> Matches { get; set; } = new List<MatchResult>();
-}
 
-/// <summary>
-/// The three shapes a competition takes. Named Format rather than Type to stay clear of
-/// System.Type in a codebase where entities are reflected over.
-/// </summary>
-public enum CompetitionFormat
-{
-    /// <summary>Everyone plays everyone; the table decides it.</summary>
-    League = 0,
-
-    /// <summary>A straight bracket: lose and you are out.</summary>
-    Knockout = 1,
-
-    /// <summary>Round-robin groups, then the qualifiers play a bracket.</summary>
-    GroupAndKnockout = 2
+    /// <summary>The competitions being run from this division.</summary>
+    public ICollection<Competition> Competitions { get; set; } = new List<Competition>();
 }
 
 public enum Gender

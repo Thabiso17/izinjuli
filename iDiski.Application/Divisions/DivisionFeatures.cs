@@ -70,7 +70,6 @@ public sealed class CreateDivisionCommandHandler
             Name = request.Name,
             ShortCode = request.ShortCode.ToUpperInvariant(),
             Season = request.Season,
-            Format = request.Format,
             AgeGroup = request.AgeGroup,
             Gender = gender,
             StartDate = request.StartDate.HasValue ? DateTime.SpecifyKind(request.StartDate.Value, DateTimeKind.Utc) : null,
@@ -137,24 +136,6 @@ public sealed class UpdateDivisionCommandHandler
         // Changing the format once fixtures exist would leave them describing a competition
         // that is no longer being played — league fixtures in a bracket with nothing linking
         // them, or a bracket in a league table. The fixtures have to go first.
-        if (request.Format != division.Format)
-        {
-            var hasFixtures = await _db.MatchResults
-                .AnyAsync(m => m.DivisionId == division.Id, cancellationToken);
-
-            if (hasFixtures)
-            {
-                throw new InvalidOperationException(
-                    "This division already has fixtures, so how it is played cannot be changed "
-                    + "now. Delete the fixtures first, then change the format and generate them "
-                    + "again.");
-            }
-        }
-
-        division.Name = request.Name;
-        division.ShortCode = request.ShortCode.ToUpperInvariant();
-        division.Season = request.Season;
-        division.Format = request.Format;
         division.AgeGroup = request.AgeGroup;
         division.Gender = gender;
         division.IsActive = request.IsActive;
@@ -195,6 +176,19 @@ public sealed class DeleteDivisionCommandHandler
                 "Cannot delete division with assigned teams or matches.");
         }
 
+        // A division running a competition is not empty, even with no teams left in it: the
+        // competition may be fielding clubs invited from elsewhere.
+        var competitions = await _db.Competitions
+            .CountAsync(c => c.DivisionId == division.Id, cancellationToken);
+
+        if (competitions > 0)
+        {
+            throw new InvalidOperationException(
+                $"Cannot delete a division running {competitions} "
+                + (competitions == 1 ? "competition" : "competitions")
+                + ". Delete those first.");
+        }
+
         _db.Divisions.Remove(division);
         await _db.SaveChangesAsync(cancellationToken);
 
@@ -233,7 +227,6 @@ public sealed class GetDivisionsQueryHandler
                 d.Name,
                 d.ShortCode,
                 d.Season,
-                d.Format,
                 d.AgeGroup,
                 d.Gender.HasValue ? d.Gender.Value.ToString() : null,
                 d.IsActive,
@@ -242,19 +235,9 @@ public sealed class GetDivisionsQueryHandler
                 d.Description,
                 d.Teams.Count,
                 d.Matches.Count,
-                // The three signals the competition's status is worked out from. Counted in
-                // the database rather than fetched and counted here: a division's fixture list
-                // is a season's worth of rows, and the page only needs the totals.
-                d.Matches.Count(m => m.Status == MatchStatus.Completed),
-                d.Matches.Count(m =>
-                    m.Status == MatchStatus.Scheduled ||
-                    m.Status == MatchStatus.InProgress ||
-                    m.Status == MatchStatus.Postponed),
-                // The final is the tie nothing follows. A league has none, and does not ask.
-                d.Matches.Any(m =>
-                    m.Stage == MatchStage.Knockout &&
-                    m.NextMatchId == null &&
-                    m.Status == MatchStatus.Completed)
+                // What is being played here. A division no longer has a status of its own —
+                // each competition has one, and they disagree by design.
+                d.Competitions.Count
             ))
             .ToListAsync(cancellationToken);
     }
@@ -282,7 +265,6 @@ public sealed class GetDivisionByIdQueryHandler
                 d.Name,
                 d.ShortCode,
                 d.Season,
-                d.Format,
                 d.AgeGroup,
                 d.Gender.HasValue ? d.Gender.Value.ToString() : null,
                 d.IsActive,
@@ -291,19 +273,9 @@ public sealed class GetDivisionByIdQueryHandler
                 d.Description,
                 d.Teams.Count,
                 d.Matches.Count,
-                // The three signals the competition's status is worked out from. Counted in
-                // the database rather than fetched and counted here: a division's fixture list
-                // is a season's worth of rows, and the page only needs the totals.
-                d.Matches.Count(m => m.Status == MatchStatus.Completed),
-                d.Matches.Count(m =>
-                    m.Status == MatchStatus.Scheduled ||
-                    m.Status == MatchStatus.InProgress ||
-                    m.Status == MatchStatus.Postponed),
-                // The final is the tie nothing follows. A league has none, and does not ask.
-                d.Matches.Any(m =>
-                    m.Stage == MatchStage.Knockout &&
-                    m.NextMatchId == null &&
-                    m.Status == MatchStatus.Completed)
+                // What is being played here. A division no longer has a status of its own —
+                // each competition has one, and they disagree by design.
+                d.Competitions.Count
             ))
             .FirstOrDefaultAsync(cancellationToken);
     }

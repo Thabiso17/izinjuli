@@ -26,6 +26,8 @@ public static class HistoricalDataSeeder
         await SeedWPL2019_20(context);
 
         Console.WriteLine("Historical data seeding completed!");
+
+        await CompetitionBackfill.GiveEveryDivisionItsCompetitionAsync(context);
     }
 
     #region PSL 2015/16

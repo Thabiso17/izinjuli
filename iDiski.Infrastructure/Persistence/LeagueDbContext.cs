@@ -19,6 +19,8 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
     public DbSet<Sponsor> Sponsors => Set<Sponsor>();
     public DbSet<PageLayoutConfig> PageLayoutConfigs => Set<PageLayoutConfig>();
     public DbSet<Division> Divisions => Set<Division>();
+    public DbSet<Competition> Competitions => Set<Competition>();
+    public DbSet<CompetitionEntry> CompetitionEntries => Set<CompetitionEntry>();
     public DbSet<MatchEvent> MatchEvents => Set<MatchEvent>();
     public DbSet<Suspension> Suspensions => Set<Suspension>();
     public DbSet<User> Users => Set<User>();
@@ -282,10 +284,6 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
                   .HasConversion<string>()
                   .HasMaxLength(10);
 
-            entity.Property(d => d.Format)
-                  .HasConversion<string>()
-                  .HasMaxLength(20);
-
             entity.Property(d => d.Description).HasMaxLength(500);
 
             // Composite unique index on Season and ShortCode
@@ -367,6 +365,56 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
             .WithMany(d => d.Matches)
             .HasForeignKey(m => m.DivisionId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<MatchResult>()
+            .HasOne(m => m.Competition)
+            .WithMany(c => c.Matches)
+            .HasForeignKey(m => m.CompetitionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<MatchResult>()
+            .HasIndex(m => new { m.CompetitionId, m.Stage });
+
+        // ── Competition ───────────────────────────────────────────────────────
+        modelBuilder.Entity<Competition>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.Property(c => c.Name).IsRequired().HasMaxLength(100);
+            entity.Property(c => c.ShortCode).IsRequired().HasMaxLength(20);
+            entity.Property(c => c.Description).HasMaxLength(1000);
+            entity.Property(c => c.Format).HasConversion<string>().HasMaxLength(20);
+
+            // Unique within the division that runs it, rather than across the league: two
+            // divisions may each reasonably call their own competition "LGE".
+            entity.HasIndex(c => new { c.DivisionId, c.Season, c.ShortCode }).IsUnique();
+
+            entity.HasOne(c => c.Division)
+                  .WithMany(d => d.Competitions)
+                  .HasForeignKey(c => c.DivisionId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ── Who is in a competition ───────────────────────────────────────────
+        modelBuilder.Entity<CompetitionEntry>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            // A club enters a competition once. Entering twice would give them two places in
+            // the draw and two rows in the table.
+            entity.HasIndex(e => new { e.CompetitionId, e.TeamId }).IsUnique();
+
+            entity.HasOne(e => e.Competition)
+                  .WithMany(c => c.Entries)
+                  .HasForeignKey(e => e.CompetitionId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            // Restrict rather than cascade: a club with a place in a competition should not be
+            // deletable out from under it, the same way a club with match history is not.
+            entity.HasOne(e => e.Team)
+                  .WithMany()
+                  .HasForeignKey(e => e.TeamId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
 
         // ── User ──────────────────────────────────────────────────────────────
         modelBuilder.Entity<User>(entity =>

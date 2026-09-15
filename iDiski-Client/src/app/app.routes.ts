@@ -51,6 +51,15 @@ export const routes: Routes = [
     ],
   },
   {
+    // A competition has its own page: a division runs several, and one page cannot honestly
+    // show a league, a cup and a sponsor's tournament at the same time.
+    path: 'competitions/:id',
+    loadComponent: () =>
+      import('./features/competitions/competition-detail.component').then(
+        (m) => m.CompetitionDetailComponent
+      ),
+  },
+  {
     path: 'teams',
     children: [
       {
@@ -180,6 +189,15 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/admin/layout-editor/layout-editor.component').then(
             (m) => m.LayoutEditorComponent
+          ),
+      },
+      {
+        // A division's competitions. Nested under the division because that is what runs them
+        // and what decides who may administer them.
+        path: 'divisions/:id/competitions',
+        loadComponent: () =>
+          import('./features/admin/competitions/competitions-admin.component').then(
+            (m) => m.CompetitionsAdminComponent
           ),
       },
       {

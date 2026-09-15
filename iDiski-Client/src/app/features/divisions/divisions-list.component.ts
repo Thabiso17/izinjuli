@@ -3,15 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DivisionService } from '../../core/services';
-import {
-  DivisionDto,
-  COMPETITION_STATUS_LABEL,
-  COMPETITION_STATUS_CLASS,
-  isCurrentCompetition,
-} from '../../core/models';
-
-/** Which competitions the page is showing. */
-type Scope = 'current' | 'completed' | 'all';
+import { DivisionDto } from '../../core/models';
 
 @Component({
   selector: 'app-divisions-list',
@@ -39,32 +31,6 @@ type Scope = 'current' | 'completed' | 'all';
         </div>
       }
 
-      <!-- Current by default. A competition that ended two years ago and one starting next
-           week looked identical here, and the one a visitor came for is almost always the one
-           still being played. The other two are a click away rather than gone. -->
-      <div class="d-flex justify-content-center mb-4">
-        <div class="btn-group" role="group" aria-label="Filter competitions">
-          @for (option of scopes; track option.value) {
-            <input
-              type="radio"
-              class="btn-check"
-              name="scope"
-              [id]="'scope-' + option.value"
-              [value]="option.value"
-              [(ngModel)]="scope"
-              (ngModelChange)="applyScope()"
-            />
-            <label
-              class="btn btn-outline-primary"
-              [for]="'scope-' + option.value"
-              [attr.data-testid]="'scope-' + option.value"
-            >
-              {{ option.label }}
-              <span class="badge bg-light text-dark ms-1">{{ countFor(option.value) }}</span>
-            </label>
-          }
-        </div>
-      </div>
 
       @if (loading()) {
         <div class="text-center py-5">
@@ -90,14 +56,6 @@ type Scope = 'current' | 'completed' | 'all';
                       <small class="text-muted">{{ division.season }}</small>
                     </div>
 
-                    <div class="mb-2">
-                      <span
-                        [class]="'badge ' + statusClass[division.status]"
-                        data-testid="division-status"
-                      >
-                        {{ statusLabel[division.status] }}
-                      </span>
-                    </div>
 
                     <h2 class="h5 fw-bold text-dark">{{ division.name }}</h2>
 
@@ -123,13 +81,12 @@ type Scope = 'current' | 'completed' | 'all';
                       </span>
                     </div>
 
-                    <!-- How far through it is, for anything that has started. A bare fixture
-                         count says nothing about whether there is still something to watch. -->
-                    @if (division.playedCount > 0 && division.status !== 'Completed') {
-                      <div class="text-muted small mt-2" data-testid="division-progress">
-                        {{ division.playedCount }} of {{ division.matchCount }} played
-                      </div>
-                    }
+                    <!-- What is actually being played here. A division is a pool of teams;
+                         the league, the cup and the sponsor's tournament are inside it. -->
+                    <div class="text-muted small mt-2" data-testid="division-competitions">
+                      <i class="bi bi-trophy me-1"></i>{{ division.competitionCount }}
+                      {{ division.competitionCount === 1 ? 'competition' : 'competitions' }}
+                    </div>
                   </div>
                 </div>
               </a>
@@ -145,15 +102,8 @@ type Scope = 'current' | 'completed' | 'all';
             <!-- An empty filter and an empty league read very differently, and telling the
                  reader "no divisions yet" when there are four finished ones behind the next
                  tab is simply wrong. -->
-            @if (all().length > 0) {
-              <h2 class="h4 mt-3">Nothing {{ emptyWord() }}</h2>
-              <p class="text-muted mb-0">
-                There are {{ all().length }} competitions in this season under the other tabs.
-              </p>
-            } @else {
               <h2 class="h4 mt-3">No divisions yet</h2>
               <p class="text-muted mb-0">Divisions will appear here once they are set up.</p>
-            }
           </div>
         </div>
       }
@@ -175,9 +125,6 @@ type Scope = 'current' | 'completed' | 'all';
 export class DivisionsListComponent implements OnInit {
   private readonly divisionService = inject(DivisionService);
 
-  /** Everything loaded for the chosen season, before the scope filter. */
-  all = signal<DivisionDto[]>([]);
-  /** What the page actually shows: `all()` narrowed to the chosen scope. */
   divisions = signal<DivisionDto[]>([]);
   seasons = signal<number[]>([]);
   loading = signal(true);
@@ -185,44 +132,8 @@ export class DivisionsListComponent implements OnInit {
 
   selectedSeason: number | undefined;
 
-  // Current first, and selected by default: the competition somebody came to look at is
-  // almost always the one still being played.
-  readonly scopes: { value: Scope; label: string }[] = [
-    { value: 'current', label: 'Current' },
-    { value: 'completed', label: 'Past' },
-    { value: 'all', label: 'All' },
-  ];
 
-  scope: Scope = 'current';
 
-  readonly statusLabel = COMPETITION_STATUS_LABEL;
-  readonly statusClass = COMPETITION_STATUS_CLASS;
-
-  /** How many divisions each tab would show, so the reader can see where the rest are. */
-  countFor(scope: Scope): number {
-    return this.matching(scope).length;
-  }
-
-  applyScope(): void {
-    this.divisions.set(this.matching(this.scope));
-  }
-
-  /** Reads naturally after "Nothing ..." in the empty state. */
-  emptyWord(): string {
-    return this.scope === 'completed' ? 'finished yet' : 'under way';
-  }
-
-  private matching(scope: Scope): DivisionDto[] {
-    const divisions = this.all();
-
-    if (scope === 'all') return divisions;
-
-    // One definition of current, shared with the API, rather than each screen deciding for
-    // itself what counts as finished.
-    return divisions.filter((d) =>
-      scope === 'current' ? isCurrentCompetition(d.status) : !isCurrentCompetition(d.status),
-    );
-  }
 
   ngOnInit(): void {
     this.divisionService.getAvailableSeasons().subscribe({
@@ -242,8 +153,7 @@ export class DivisionsListComponent implements OnInit {
 
     this.divisionService.getAll(this.selectedSeason, true).subscribe({
       next: (divisions) => {
-        this.all.set(divisions);
-        this.applyScope();
+        this.divisions.set(divisions);
         this.loading.set(false);
       },
       error: (err) => {

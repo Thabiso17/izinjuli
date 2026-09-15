@@ -42,6 +42,11 @@ public static class SeedData
         // 5. Create Sample Match Events
         await SeedMatchEvents(context, matches);
 
+        // 6. Each division is running its league. This is what the browser tests seed, so a
+        //    division arriving here without a competition would leave every public page with
+        //    nothing to show.
+        await CompetitionBackfill.GiveEveryDivisionItsCompetitionAsync(context);
+
         Console.WriteLine("Database seeded successfully!");
     }
 

@@ -242,7 +242,7 @@ public class BracketProgressionTests : IClassFixture<IntegrationTestFixture>
     private async Task<List<MatchResult>> FixturesFor(Guid divisionId) =>
         await _fixture.DbContext.MatchResults
             .AsNoTracking()
-            .Where(m => m.DivisionId == divisionId)
+            .Where(m => m.CompetitionId == divisionId)
             .ToListAsync();
 
     private async Task<List<MatchResult>> FixturesIn(Guid divisionId, int roundSize) =>
@@ -253,31 +253,30 @@ public class BracketProgressionTests : IClassFixture<IntegrationTestFixture>
     private async Task<MatchResult> AFixtureIn(Guid divisionId, int roundSize) =>
         (await FixturesIn(divisionId, roundSize)).First();
 
-    private async Task<(Guid DivisionId, List<MatchResult> Fixtures)> ABracketOf(int teamCount)
+    private async Task<(Guid CompetitionId, List<MatchResult> Fixtures)> ABracketOf(int teamCount)
     {
-        var divisionId = await CreateDivisionAsync(CompetitionFormat.Knockout, teamCount);
-        await Generate(divisionId);
-        return (divisionId, await FixturesFor(divisionId));
+        var competitionId = await CreateCompetitionAsync(CompetitionFormat.Knockout, teamCount);
+        await Generate(competitionId);
+        return (competitionId, await FixturesFor(competitionId));
     }
 
     private async Task<Guid> ALeagueOf(int teamCount)
     {
-        var divisionId = await CreateDivisionAsync(CompetitionFormat.League, teamCount);
-        await Generate(divisionId);
-        return divisionId;
+        var competitionId = await CreateCompetitionAsync(CompetitionFormat.League, teamCount);
+        await Generate(competitionId);
+        return competitionId;
     }
 
-    private Task<GenerateFixturesResult> Generate(Guid divisionId) =>
+    private Task<GenerateFixturesResult> Generate(Guid competitionId) =>
         new GenerateFixturesCommandHandler(_fixture.DbContext).Handle(
             new GenerateFixturesCommand(
-                divisionId,
-                Season: 2026,
+                competitionId,
                 IsHomeAndAway: false,
                 StartDate: new DateTime(2026, 6, 6, 0, 0, 0, DateTimeKind.Utc),
                 DaysBetweenMatchweeks: 1),
             CancellationToken.None);
 
-    private async Task<Guid> CreateDivisionAsync(CompetitionFormat format, int teamCount)
+    private async Task<Guid> CreateCompetitionAsync(CompetitionFormat format, int teamCount)
     {
         _fixture.DbContext.ChangeTracker.Clear();
 
@@ -292,24 +291,49 @@ public class BracketProgressionTests : IClassFixture<IntegrationTestFixture>
             Season = 2026,
             Gender = Gender.Male,
             IsActive = true,
+            CreatedAt = now,
+        });
+
+        // The division is the pool; the competition is what gets played. Everybody in the
+        // division is entered, which is what this file assumes throughout.
+        var competitionId = Guid.NewGuid();
+
+        _fixture.DbContext.Competitions.Add(new Competition
+        {
+            Id = competitionId,
+            DivisionId = divisionId,
+            Name = $"Competition {TestIds.Code("N")}",
+            ShortCode = TestIds.Code("BP"),
+            Season = 2026,
             Format = format,
+            IsActive = true,
             CreatedAt = now,
         });
 
         for (var i = 0; i < teamCount; i++)
         {
+            var teamId = Guid.NewGuid();
+
             _fixture.DbContext.Teams.Add(new Team
             {
-                Id = Guid.NewGuid(),
+                Id = teamId,
                 Name = $"Side {i + 1}",
                 ShortCode = TestIds.Code("S"),
                 DivisionId = divisionId,
                 Founded = 2020,
                 CreatedAt = now,
             });
+
+            _fixture.DbContext.CompetitionEntries.Add(new CompetitionEntry
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = teamId,
+                CreatedAt = now,
+            });
         }
 
         await _fixture.DbContext.SaveChangesAsync();
-        return divisionId;
+        return competitionId;
     }
 }

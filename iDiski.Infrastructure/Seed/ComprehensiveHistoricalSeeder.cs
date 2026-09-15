@@ -42,8 +42,14 @@ public static class ComprehensiveHistoricalSeeder
         await SeedArticles(context);
         await SeedPageLayoutConfigs(context);
 
+        // Every division seeded above is a season's league, which is now a competition rather
+        // than a property of the division. Done once at the end rather than threaded through
+        // ten seeding methods: the rule is the same for all of them.
+        await CompetitionBackfill.GiveEveryDivisionItsCompetitionAsync(context);
+
         Console.WriteLine("Comprehensive historical data seeding completed!");
     }
+
 
     #region PSL 2015/16
 

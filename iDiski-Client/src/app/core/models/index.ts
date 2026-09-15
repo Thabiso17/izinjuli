@@ -10,6 +10,7 @@ export * from './match.model';
 export * from './page-layout-config.model';
 export * from './sponsor.model';
 export * from './division.model';
+export * from './competition.model';
 export * from './match-event.model';
 export * from './suspension.model';
 export * from './user.model';

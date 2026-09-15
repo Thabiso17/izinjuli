@@ -44,3 +44,16 @@ public interface IRequireMatchAccess
 {
     Guid MatchId { get; }
 }
+
+/// <summary>
+/// Implemented by commands scoped to a single competition. AuthorizationBehaviour resolves the
+/// competition's owning division and applies DivisionOwnershipRequirement to it.
+///
+/// The owning division decides who administers a competition, not the entrants: a cup may
+/// field clubs invited from three other divisions, and their administrators do not thereby get
+/// a say in running it.
+/// </summary>
+public interface IRequireCompetitionAccess
+{
+    Guid CompetitionId { get; }
+}

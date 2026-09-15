@@ -33,7 +33,7 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task EightTeams_GiveAQuarterFinalSemiFinalAndFinal()
     {
-        var divisionId = await CreateDivisionAsync(CompetitionFormat.Knockout, teamCount: 8);
+        var divisionId = await CreateCompetitionAsync(CompetitionFormat.Knockout, teamCount: 8);
 
         var result = await Generate(divisionId);
 
@@ -51,7 +51,7 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task EveryFixtureFeedsTheNextOne_AndTheFinalFeedsNothing()
     {
-        var divisionId = await CreateDivisionAsync(CompetitionFormat.Knockout, teamCount: 8);
+        var divisionId = await CreateCompetitionAsync(CompetitionFormat.Knockout, teamCount: 8);
 
         await Generate(divisionId);
 
@@ -81,7 +81,7 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
     public async Task AnEntryListThatIsNotAPowerOfTwo_SeatsTheByesInTheNextRound()
     {
         // Six entrants fill a bracket of eight, so two of them sit out the first round.
-        var divisionId = await CreateDivisionAsync(CompetitionFormat.Knockout, teamCount: 6);
+        var divisionId = await CreateCompetitionAsync(CompetitionFormat.Knockout, teamCount: 6);
 
         await Generate(divisionId);
 
@@ -101,7 +101,7 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task LaterRoundsAreScheduledWithNobodyInThemYet()
     {
-        var divisionId = await CreateDivisionAsync(CompetitionFormat.Knockout, teamCount: 8);
+        var divisionId = await CreateCompetitionAsync(CompetitionFormat.Knockout, teamCount: 8);
 
         await Generate(divisionId);
 
@@ -118,7 +118,7 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task AWeekendTournament_PutsEveryRoundOnTheSameDay()
     {
-        var divisionId = await CreateDivisionAsync(CompetitionFormat.Knockout, teamCount: 4);
+        var divisionId = await CreateCompetitionAsync(CompetitionFormat.Knockout, teamCount: 4);
 
         // Nought days between rounds. This could not be expressed at all before: the rule
         // insisted on at least one day, so an amateur tournament run off over a weekend had no
@@ -134,7 +134,7 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task GroupsArePlayedOut_AndTheBracketWaitsForTheirQualifiers()
     {
-        var divisionId = await CreateDivisionAsync(
+        var divisionId = await CreateCompetitionAsync(
             CompetitionFormat.GroupAndKnockout, teamCount: 8);
 
         var result = await Generate(divisionId, groupCount: 2, advancing: 2);
@@ -159,7 +159,7 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task TheBracketStartsAfterTheGroupsHaveFinished()
     {
-        var divisionId = await CreateDivisionAsync(
+        var divisionId = await CreateCompetitionAsync(
             CompetitionFormat.GroupAndKnockout, teamCount: 8);
 
         await Generate(divisionId, groupCount: 2, advancing: 2);
@@ -179,7 +179,7 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
     public async Task AnUnevenEntryList_SpreadsAcrossTheGroupsRatherThanLoadingTheLast()
     {
         // Seven teams over two groups: four and three, not four and three by accident.
-        var divisionId = await CreateDivisionAsync(
+        var divisionId = await CreateCompetitionAsync(
             CompetitionFormat.GroupAndKnockout, teamCount: 7);
 
         await Generate(divisionId, groupCount: 2, advancing: 2);
@@ -201,7 +201,7 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task MoreGroupsThanCanBeFilled_IsRefused()
     {
-        var divisionId = await CreateDivisionAsync(
+        var divisionId = await CreateCompetitionAsync(
             CompetitionFormat.GroupAndKnockout, teamCount: 4);
 
         // Four teams cannot make three groups of two.
@@ -213,7 +213,7 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task AdvancingMoreThanAGroupHolds_IsRefused()
     {
-        var divisionId = await CreateDivisionAsync(
+        var divisionId = await CreateCompetitionAsync(
             CompetitionFormat.GroupAndKnockout, teamCount: 4);
 
         // Two groups of two cannot each send three through.
@@ -225,7 +225,7 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task TheOrganiserChoosesHowManyComeOutOfEachGroup()
     {
-        var divisionId = await CreateDivisionAsync(
+        var divisionId = await CreateCompetitionAsync(
             CompetitionFormat.GroupAndKnockout, teamCount: 8);
 
         // One from each of four groups is four qualifiers: two semi-finals and a final.
@@ -241,7 +241,7 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
 
         // Sending two from each of those groups instead would double the bracket, which is the
         // point of letting the organiser choose.
-        var wider = await CreateDivisionAsync(CompetitionFormat.GroupAndKnockout, teamCount: 8);
+        var wider = await CreateCompetitionAsync(CompetitionFormat.GroupAndKnockout, teamCount: 8);
         await Generate(wider, groupCount: 2, advancing: 2);
 
         (await FixturesFor(wider)).Count(f => f.Stage == MatchStage.Knockout).Should().Be(3);
@@ -250,7 +250,7 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task ALeagueDivision_IsStillARoundRobin()
     {
-        var divisionId = await CreateDivisionAsync(CompetitionFormat.League, teamCount: 4);
+        var divisionId = await CreateCompetitionAsync(CompetitionFormat.League, teamCount: 4);
 
         await Generate(divisionId);
 
@@ -264,14 +264,13 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private Task<GenerateFixturesResult> Generate(
-        Guid divisionId,
+        Guid competitionId,
         int daysBetween = 7,
         int? groupCount = null,
         int advancing = 2) =>
         new GenerateFixturesCommandHandler(_fixture.DbContext).Handle(
             new GenerateFixturesCommand(
-                divisionId,
-                Season: 2026,
+                competitionId,
                 IsHomeAndAway: false,
                 StartDate: new DateTime(2026, 5, 2, 0, 0, 0, DateTimeKind.Utc),
                 DaysBetweenMatchweeks: daysBetween,
@@ -283,10 +282,10 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
     private async Task<List<MatchResult>> FixturesFor(Guid divisionId) =>
         await _fixture.DbContext.MatchResults
             .AsNoTracking()
-            .Where(m => m.DivisionId == divisionId)
+            .Where(m => m.CompetitionId == divisionId)
             .ToListAsync();
 
-    private async Task<Guid> CreateDivisionAsync(CompetitionFormat format, int teamCount)
+    private async Task<Guid> CreateCompetitionAsync(CompetitionFormat format, int teamCount)
     {
         _fixture.DbContext.ChangeTracker.Clear();
 
@@ -301,24 +300,49 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
             Season = 2026,
             Gender = Gender.Male,
             IsActive = true,
+            CreatedAt = now,
+        });
+
+        // The division is the pool; the competition is what gets played. Everybody in the
+        // division is entered, which is what this file assumes throughout.
+        var competitionId = Guid.NewGuid();
+
+        _fixture.DbContext.Competitions.Add(new Competition
+        {
+            Id = competitionId,
+            DivisionId = divisionId,
+            Name = $"Competition {TestIds.Code("N")}",
+            ShortCode = TestIds.Code("TN"),
+            Season = 2026,
             Format = format,
+            IsActive = true,
             CreatedAt = now,
         });
 
         for (var i = 0; i < teamCount; i++)
         {
+            var teamId = Guid.NewGuid();
+
             _fixture.DbContext.Teams.Add(new Team
             {
-                Id = Guid.NewGuid(),
+                Id = teamId,
                 Name = $"Entrant {i + 1}",
                 ShortCode = TestIds.Code("T"),
                 DivisionId = divisionId,
                 Founded = 2020,
                 CreatedAt = now,
             });
+
+            _fixture.DbContext.CompetitionEntries.Add(new CompetitionEntry
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = competitionId,
+                TeamId = teamId,
+                CreatedAt = now,
+            });
         }
 
         await _fixture.DbContext.SaveChangesAsync();
-        return divisionId;
+        return competitionId;
     }
 }

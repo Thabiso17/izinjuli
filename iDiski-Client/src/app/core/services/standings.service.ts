@@ -19,13 +19,20 @@ export class StandingsService {
     season: number,
     divisionId?: string,
     upToMatchweek?: number,
-    /** One group of a group stage. Omitted, the table covers the whole division. */
-    group?: string
+    /** One group of a group stage. Omitted, the table covers the whole competition. */
+    group?: string,
+    /**
+     * The competition whose table this is, and the way to ask for a real one: entrants then
+     * come from its entry list rather than from who happens to share a division, which is what
+     * makes a table of twelve of a division's twenty possible.
+     */
+    competitionId?: string
   ): Observable<LeagueTableDto> {
     let params = new HttpParams().set('season', season.toString());
     if (divisionId) params = params.set('divisionId', divisionId);
     if (upToMatchweek !== undefined) params = params.set('upToMatchweek', upToMatchweek.toString());
     if (group) params = params.set('group', group);
+    if (competitionId) params = params.set('competitionId', competitionId);
     return this.http.get<LeagueTableDto>(`${this.base}/table`, { params });
   }
 

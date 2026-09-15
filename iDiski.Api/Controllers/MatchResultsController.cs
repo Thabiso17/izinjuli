@@ -30,10 +30,12 @@ public sealed class MatchResultsController : BaseApiController
         [FromQuery] int pageNumber       = 1,
         [FromQuery] int pageSize         = 20,
         [FromQuery] Guid? divisionId     = null,
+        [FromQuery] Guid? competitionId  = null,
         CancellationToken ct             = default) =>
         Ok(await Sender.Send(
             new GetFixturesQuery(
-                season, matchweek, teamId, status, pageNumber, pageSize, divisionId), ct));
+                season, matchweek, teamId, status, pageNumber, pageSize, divisionId,
+                competitionId), ct));
 
     /// <summary>Returns a single match by ID.</summary>
     /// <response code="200">Match found.</response>
