@@ -26,6 +26,7 @@ public class UserManagementApiTests : IAsyncLifetime
     private readonly ApiTestFixture _fixture;
 
     private Guid _divisionId;
+    private Guid _competitionId;
     private Guid _teamId;
     private User _superAdmin = null!;
     private User _teamAdmin = null!;
@@ -35,6 +36,7 @@ public class UserManagementApiTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _divisionId = Guid.NewGuid();
+        _competitionId = Guid.NewGuid();
         _teamId = Guid.NewGuid();
 
         await _fixture.WithDbAsync(async db =>
@@ -52,6 +54,14 @@ public class UserManagementApiTests : IAsyncLifetime
             {
                 Id = _teamId, Name = "User Team", ShortCode = ApiTestFixture.Code("UT"),
                 DivisionId = _divisionId, Founded = 2020, CreatedAt = now
+            });
+
+            db.Competitions.Add(new Competition
+            {
+                Id = _competitionId, Name = "User Competition",
+                ShortCode = ApiTestFixture.Code("UC"), Season = 2026,
+                Format = CompetitionFormat.League, Gender = Gender.Male,
+                IsActive = true, CreatedAt = now
             });
 
             await db.SaveChangesAsync();
@@ -113,23 +123,23 @@ public class UserManagementApiTests : IAsyncLifetime
 
         var granted = await client.PostAsJsonAsync(
             $"/api/users/{user.Id}/roles",
-            new { userId = user.Id, role = (int)Role.DivisionAdmin });
+            new { userId = user.Id, role = (int)Role.CompetitionAdmin });
         granted.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NoContent);
 
-        (await RoleIdsOf(client, user.Id)).Should().Contain((int)Role.DivisionAdmin);
+        (await RoleIdsOf(client, user.Id)).Should().Contain((int)Role.CompetitionAdmin);
 
         var removed = await client.DeleteAsync(
-            $"/api/users/{user.Id}/roles/{(int)Role.DivisionAdmin}");
+            $"/api/users/{user.Id}/roles/{(int)Role.CompetitionAdmin}");
         removed.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NoContent);
 
-        (await RoleIdsOf(client, user.Id)).Should().NotContain((int)Role.DivisionAdmin);
+        (await RoleIdsOf(client, user.Id)).Should().NotContain((int)Role.CompetitionAdmin);
     }
 
     [Fact]
     public async Task ADivisionCanBeAssignedAndRemoved()
     {
         var client = await _fixture.CreateClientAsAsync(_superAdmin);
-        var user = await _fixture.SeedUserAsync(Role.DivisionAdmin, divisionId: _divisionId);
+        var user = await _fixture.SeedUserAsync(Role.CompetitionAdmin, competitionId: _competitionId);
 
         var other = Guid.NewGuid();
         await _fixture.WithDbAsync(async db =>
@@ -209,7 +219,7 @@ public class UserManagementApiTests : IAsyncLifetime
         response.EnsureSuccessStatusCode();
 
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        return body.RootElement.GetProperty("assignedDivisionIds")
+        return body.RootElement.GetProperty("assignedCompetitionIds")
             .EnumerateArray().Select(d => d.GetGuid()).ToArray();
     }
 }

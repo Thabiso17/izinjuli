@@ -401,10 +401,10 @@ export class DivisionsAdminComponent implements OnInit {
 
     this.divisionService.getAll(this.filterSeason, this.filterActive).subscribe({
       next: (data) => {
-        // Narrowed to what this administrator actually administers. Creating a division is
-        // super-admin only, so for everybody else this list is exactly the competitions they
-        // were assigned — not the whole league with an Edit button on every row.
-        this.divisions.set(data.filter(d => this.auth.canAdministerDivision(d.id)));
+        // Divisions are super-admin work end to end — creating, editing and deleting them —
+        // so there is nothing to narrow. Everybody else sees the list and can open a division
+        // to look at its clubs; the API refuses the rest.
+        this.divisions.set(data);
         this.loading.set(false);
       },
       error: (err) => {

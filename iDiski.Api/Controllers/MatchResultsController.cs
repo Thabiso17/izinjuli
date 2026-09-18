@@ -52,8 +52,8 @@ public sealed class MatchResultsController : BaseApiController
     /// <response code="403">Not authorized (must be Division Admin assigned to the match's division).</response>
     /// <response code="422">Validation failure (e.g. same home and away team).</response>
     [HttpPost]
-    // Drawing a fixture is running the competition, and a competition belongs to no division.
-    [Authorize(Policy = "SuperAdminOnly")]
+    // Drawing a fixture is running the competition, scoped to it by IRequireCompetitionAccess.
+    [Authorize(Policy = "CanManageCompetitions")]
     [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -76,7 +76,8 @@ public sealed class MatchResultsController : BaseApiController
     /// <response code="404">Match not found.</response>
     /// <response code="422">Validation failure.</response>
     [HttpPut("{id:guid}/score")]
-    [Authorize(Policy = "CanManageDivisions")]
+    // Recording a result is part of running the competition the fixture belongs to.
+    [Authorize(Policy = "CanManageCompetitions")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -105,7 +106,8 @@ public sealed class MatchResultsController : BaseApiController
     /// <response code="404">Division not found.</response>
     /// <response code="422">Validation failure (e.g., not enough teams).</response>
     [HttpPost("generate")]
-    [Authorize(Policy = "SuperAdminOnly")]
+    // Drawing the whole thing up at once, by whoever runs it.
+    [Authorize(Policy = "CanManageCompetitions")]
     [ProducesResponseType(typeof(GenerateFixturesResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]

@@ -124,7 +124,7 @@ public class UserManagementIntegrationTests : IClassFixture<IntegrationTestFixtu
             {
                 Id = Guid.NewGuid(),
                 UserId = userId,
-                Role = Role.DivisionAdmin,
+                Role = Role.CompetitionAdmin,
                 AssignedAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow
             }
@@ -141,7 +141,7 @@ public class UserManagementIntegrationTests : IClassFixture<IntegrationTestFixtu
         // Assert
         roles.Should().HaveCount(2);
         roles.Should().ContainSingle(r => r.Role == Role.TeamAdmin);
-        roles.Should().ContainSingle(r => r.Role == Role.DivisionAdmin);
+        roles.Should().ContainSingle(r => r.Role == Role.CompetitionAdmin);
     }
 
     [Fact]
@@ -327,39 +327,40 @@ public class UserManagementIntegrationTests : IClassFixture<IntegrationTestFixtu
 
         _fixture.DbContext.Users.Add(user);
 
-        var division = new Division
+        var competition = new Competition
         {
             Id = divisionId,
-            Name = "Test Division",
-            ShortCode = "TDC",
+            Name = "Test Competition",
+            ShortCode = TestIds.Code("TC"),
             Season = 2026,
+            Format = CompetitionFormat.League,
             Gender = Gender.Male,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
 
-        _fixture.DbContext.Divisions.Add(division);
+        _fixture.DbContext.Competitions.Add(competition);
 
-        var userDivision = new UserDivision
+        var assignment = new UserCompetition
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            DivisionId = divisionId,
+            CompetitionId = competition.Id,
             AssignedAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow
         };
 
-        _fixture.DbContext.UserDivisions.Add(userDivision);
+        _fixture.DbContext.UserCompetitions.Add(assignment);
         await _fixture.DbContext.SaveChangesAsync();
 
         // Act
-        var assignments = _fixture.DbContext.UserDivisions
-            .Where(ud => ud.UserId == userId)
+        var assignments = _fixture.DbContext.UserCompetitions
+            .Where(uc => uc.UserId == userId)
             .ToList();
 
         // Assert
         assignments.Should().HaveCount(1);
-        assignments.First().DivisionId.Should().Be(divisionId);
+        assignments.First().CompetitionId.Should().Be(competition.Id);
     }
 
     [Fact]

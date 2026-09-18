@@ -28,10 +28,10 @@ public static class TestDataSeeder
         };
 
         // Division Admin User
-        var divisionAdminId = Guid.NewGuid();
-        var divisionAdmin = new User
+        var competitionAdminId = Guid.NewGuid();
+        var competitionAdmin = new User
         {
-            Id = divisionAdminId,
+            Id = competitionAdminId,
             Email = "divadmin@test.com",
             PasswordHash = hasher.HashPassword("Password123!"),
             FirstName = "Division",
@@ -69,7 +69,7 @@ public static class TestDataSeeder
             UpdatedAt = DateTime.UtcNow
         };
 
-        dbContext.Users.AddRange(superAdmin, divisionAdmin, teamAdmin, inactiveUser);
+        dbContext.Users.AddRange(superAdmin, competitionAdmin, teamAdmin, inactiveUser);
 
         // Assign roles
         dbContext.UserRoles.AddRange(
@@ -84,8 +84,8 @@ public static class TestDataSeeder
             new UserRole
             {
                 Id = Guid.NewGuid(),
-                UserId = divisionAdminId,
-                Role = Role.DivisionAdmin,
+                UserId = competitionAdminId,
+                Role = Role.CompetitionAdmin,
                 AssignedAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow
             },
@@ -151,13 +151,27 @@ public static class TestDataSeeder
             CreatedAt = DateTime.UtcNow
         });
 
-        // Assign division to division admin
-        var divisionAdminId = new Guid("00000000-0000-0000-0000-000000000002");
-        dbContext.UserDivisions.Add(new UserDivision
+        // Give the competition admin something to run.
+        var competitionAdminId = new Guid("00000000-0000-0000-0000-000000000002");
+        var competition = new Competition
         {
             Id = Guid.NewGuid(),
-            UserId = divisionAdminId,
-            DivisionId = division.Id,
+            Name = "Seeded League",
+            ShortCode = TestIds.Code("SD"),
+            Season = division.Season,
+            Format = CompetitionFormat.League,
+            Gender = Gender.Male,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        dbContext.Competitions.Add(competition);
+
+        dbContext.UserCompetitions.Add(new UserCompetition
+        {
+            Id = Guid.NewGuid(),
+            UserId = competitionAdminId,
+            CompetitionId = competition.Id,
             AssignedAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow
         });

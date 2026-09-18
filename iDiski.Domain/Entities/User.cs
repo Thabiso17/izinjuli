@@ -15,5 +15,5 @@ public class User : BaseEntity
     // Navigation properties
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
     public ICollection<UserTeam> UserTeams { get; set; } = new List<UserTeam>();
-    public ICollection<UserDivision> UserDivisions { get; set; } = new List<UserDivision>();
+    public ICollection<UserCompetition> UserCompetitions { get; set; } = new List<UserCompetition>();
 }

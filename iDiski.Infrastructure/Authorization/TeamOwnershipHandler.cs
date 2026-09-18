@@ -50,24 +50,10 @@ public class TeamOwnershipHandler : AuthorizationHandler<TeamOwnershipRequiremen
             return;
         }
 
-        // Get the team and its division
-        var team = await _context.Teams.FindAsync([requirement.TeamId]);
-        if (team == null)
-        {
-            context.Fail();
-            return;
-        }
-
-        // Check if user is Division Admin assigned to the team's division
-        var isDivisionAdmin = await _context.UserDivisions
-            .AnyAsync(ud => ud.UserId == userId && ud.DivisionId == team.DivisionId);
-
-        if (isDivisionAdmin)
-        {
-            context.Succeed(requirement);
-            return;
-        }
-
+        // A club answers to its own administrators, and below SuperAdmin to nobody else. It
+        // used to answer to its division's admin too; that role runs competitions now, and
+        // running a cup a club is entered in is no reason to be able to rename the club.
+        //
         // Check if user is Team Admin assigned to this specific team
         var isTeamAdmin = await _context.UserTeams
             .AnyAsync(ut => ut.UserId == userId && ut.TeamId == requirement.TeamId);

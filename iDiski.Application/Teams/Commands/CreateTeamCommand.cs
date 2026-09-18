@@ -19,12 +19,10 @@ public sealed record CreateTeamCommand(
     string? PrimaryColour,
     string? SecondaryColour,
     Guid?   DivisionId = null
-) : IRequest<Guid>, IRequireDivisionAccess
-{
-    // Guid.Empty matches no division assignment, so a team with no division can only be
-    // created by a SuperAdmin; a DivisionAdmin must name a division they are assigned to.
-    Guid IRequireDivisionAccess.DivisionId => DivisionId ?? Guid.Empty;
-}
+) : IRequest<Guid>;
+
+// Creating a club is a SuperAdmin's job. The role that used to do it inside its own division
+// runs competitions now and administers no clubs, so there is nothing to scope this to.
 
 // ── Validator ─────────────────────────────────────────────────────────────────
 

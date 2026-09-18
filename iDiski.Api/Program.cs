@@ -146,25 +146,28 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("AdminOnly", policy =>
         policy.RequireRole(
             Role.SuperAdmin.ToString(),
-            Role.DivisionAdmin.ToString(),
+            Role.CompetitionAdmin.ToString(),
             Role.TeamAdmin.ToString()));
 
+    // A club and its players. A competition admin is not on this list: running a cup a club
+    // is entered in is no reason to be able to edit the club.
     options.AddPolicy("CanManageTeams", policy =>
         policy.RequireRole(
             Role.SuperAdmin.ToString(),
-            Role.DivisionAdmin.ToString(),
             Role.TeamAdmin.ToString()));
 
-    options.AddPolicy("CanManageDivisions", policy =>
+    // Running a competition: entrants, the draw, results. Which competitions is settled by
+    // CompetitionOwnershipHandler, not here — this only asks whether they hold the role.
+    options.AddPolicy("CanManageCompetitions", policy =>
         policy.RequireRole(
             Role.SuperAdmin.ToString(),
-            Role.DivisionAdmin.ToString()));
+            Role.CompetitionAdmin.ToString()));
 });
 
 builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler,
     iDiski.Infrastructure.Authorization.TeamOwnershipHandler>();
 builder.Services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler,
-    iDiski.Infrastructure.Authorization.DivisionOwnershipHandler>();
+    iDiski.Infrastructure.Authorization.CompetitionOwnershipHandler>();
 
 // 5.7. Register File Storage Service
 // Use Cloudinary in production (Railway), local storage in development

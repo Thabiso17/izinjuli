@@ -36,7 +36,8 @@ public class MatchEventsController : BaseApiController
     /// Replaces any existing events for the match
     /// </summary>
     [HttpPost]
-    [Authorize(Policy = "CanManageDivisions")]
+    // Goals and cards belong to a fixture, and so to whoever runs its competition.
+    [Authorize(Policy = "CanManageCompetitions")]
     public async Task<IActionResult> RecordEvents([FromBody] RecordMatchEventsCommand command)
     {
         await Sender.Send(command);

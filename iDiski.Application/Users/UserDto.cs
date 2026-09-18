@@ -29,5 +29,5 @@ public sealed record UserDetailDto(
     DateTime? UpdatedAt,
     IReadOnlyList<int> RoleIds,
     IReadOnlyList<Guid> AssignedTeamIds,
-    IReadOnlyList<Guid> AssignedDivisionIds
+    IReadOnlyList<Guid> AssignedCompetitionIds
 );

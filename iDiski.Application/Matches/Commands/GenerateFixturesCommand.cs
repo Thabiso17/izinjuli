@@ -1,4 +1,5 @@
 using iDiski.Application.Common.Exceptions;
+using iDiski.Application.Common.Authorization;
 using iDiski.Application.Common.Interfaces;
 using iDiski.Domain.Entities;
 using iDiski.Domain.Services;
@@ -46,7 +47,7 @@ public sealed record GenerateFixturesCommand(
     bool     ReplaceExisting = false,
     int?     GroupCount = null,
     int      TeamsAdvancingPerGroup = 2
-) : IRequest<GenerateFixturesResult>;
+) : IRequest<GenerateFixturesResult>, IRequireCompetitionAccess;
 
 public sealed record GenerateFixturesResult(
     int FixturesGenerated,

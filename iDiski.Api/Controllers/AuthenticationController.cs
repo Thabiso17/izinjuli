@@ -71,8 +71,8 @@ public class AuthenticationController : BaseApiController
     /// team(s)/division(s). Division Admin can only create Team Admins, scoped to
     /// team(s) within division(s) they're assigned to.
     /// POST /api/auth/create-user
-    /// Auth: Requires authenticated user with SuperAdmin or DivisionAdmin role
-    /// Body: { email, password, firstName, lastName, roles[], assignedTeamIds?, assignedDivisionIds? }
+    /// Auth: Requires an authenticated SuperAdmin
+    /// Body: { email, password, firstName, lastName, roles[], assignedTeamIds?, assignedCompetitionIds? }
     /// Response: 201 Created with userId
     ///           403 Forbidden if not Super Admin, or if a Division Admin oversteps their scope
     ///           409 Conflict if email already exists

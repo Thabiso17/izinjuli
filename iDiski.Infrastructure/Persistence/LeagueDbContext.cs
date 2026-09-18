@@ -26,7 +26,7 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<UserTeam> UserTeams => Set<UserTeam>();
-    public DbSet<UserDivision> UserDivisions => Set<UserDivision>();
+    public DbSet<UserCompetition> UserCompetitions => Set<UserCompetition>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     // ── Model Configuration ───────────────────────────────────────────────────
@@ -462,21 +462,23 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // ── UserDivision ──────────────────────────────────────────────────────
-        modelBuilder.Entity<UserDivision>(entity =>
+        // ── UserCompetition ───────────────────────────────────────────────────
+        modelBuilder.Entity<UserCompetition>(entity =>
         {
-            entity.HasKey(ud => ud.Id);
+            entity.HasKey(uc => uc.Id);
 
-            entity.HasIndex(ud => new { ud.UserId, ud.DivisionId }).IsUnique();
+            entity.HasIndex(uc => new { uc.UserId, uc.CompetitionId }).IsUnique();
 
-            entity.HasOne(ud => ud.User)
-                  .WithMany(u => u.UserDivisions)
-                  .HasForeignKey(ud => ud.UserId)
+            entity.HasOne(uc => uc.User)
+                  .WithMany(u => u.UserCompetitions)
+                  .HasForeignKey(uc => uc.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasOne(ud => ud.Division)
+            // Deleting a competition takes its assignments with it: they describe a place in
+            // that competition and mean nothing without it.
+            entity.HasOne(uc => uc.Competition)
                   .WithMany()
-                  .HasForeignKey(ud => ud.DivisionId)
+                  .HasForeignKey(uc => uc.CompetitionId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

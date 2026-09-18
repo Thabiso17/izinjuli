@@ -15,16 +15,13 @@ namespace iDiski.Tests.Integration.Api;
 /// <summary>
 /// Who may run a competition.
 ///
-/// Nobody owns one. A division holds clubs; a competition is what clubs go and contest, and a
-/// cup played across three divisions belongs to none of them. There is therefore nothing to
-/// scope these writes to, and no honest way to let a division administrator run something
-/// their clubs merely happen to be in — so setting one up is the organiser's job and these
-/// endpoints are SuperAdmin-only.
+/// Whoever was assigned to it. A competition admin holds a list of the competitions they run,
+/// and that list is the whole of their reach: everything about running one — the entry list,
+/// the draw, the results — is theirs, and the competition next to it is not.
 ///
-/// That is a narrowing, and the point of pinning it: a division admin could previously create
-/// and manage competitions in their own division. What they keep is their clubs — their teams,
-/// their players, and the results of matches their clubs played, which MatchScopeApiTests
-/// covers.
+/// Scoping is deliberately not "one of the entrants is mine": a cup drawing clubs from three
+/// divisions would otherwise answer to three sets of administrators, none of whom was asked to
+/// run it. Creating a competition stays with a SuperAdmin, who then says who runs it.
 ///
 /// Over HTTP rather than against a handler, because the policy is what does the refusing and
 /// calling a handler directly would skip it.
@@ -36,9 +33,14 @@ public class CompetitionScopeApiTests : IAsyncLifetime
 
     private Guid _division;
     private Guid _club;
+
+    /// <summary>The one they were given.</summary>
     private Guid _competition;
 
-    private User _divisionAdmin = null!;
+    /// <summary>One they were not.</summary>
+    private Guid _somebodyElses;
+
+    private User _competitionAdmin = null!;
     private User _superAdmin = null!;
 
     public CompetitionScopeApiTests(ApiTestFixture fixture) => _fixture = fixture;
@@ -48,88 +50,62 @@ public class CompetitionScopeApiTests : IAsyncLifetime
         _division = await ADivisionAsync();
         _club = await AClubInAsync(_division);
         _competition = await ACompetitionAsync();
+        _somebodyElses = await ACompetitionAsync();
 
-        _divisionAdmin = await _fixture.SeedUserAsync(Role.DivisionAdmin, divisionId: _division);
+        _competitionAdmin = await _fixture.SeedUserAsync(
+            Role.CompetitionAdmin, competitionId: _competition);
         _superAdmin = await _fixture.SeedUserAsync(Role.SuperAdmin);
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
 
-    // ── A division admin sets none of this up ─────────────────────────────────
+    // ── Their own ─────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task ADivisionAdminCannotStartACompetition()
+    public async Task ACompetitionAdminRunsTheOneTheyWereGiven()
     {
-        // Not even one their own clubs would play in: which competitions exist is not a
-        // division's business, because a competition is not a division's.
-        var client = await _fixture.CreateClientAsAsync(_divisionAdmin);
-
-        var response = await client.PostAsJsonAsync("/api/competitions", NewCompetition());
-
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-    }
-
-    [Fact]
-    public async Task ADivisionAdminCannotRenameACompetition()
-    {
-        var client = await _fixture.CreateClientAsAsync(_divisionAdmin);
-
-        var response = await client.PutAsJsonAsync(
-            $"/api/competitions/{_competition}",
-            new
-            {
-                competitionId = _competition,
-                name = "Renamed By An Outsider",
-                shortCode = ApiTestFixture.Code("XX"),
-                format = "League",
-                gender = "Male",
-                isActive = true,
-            });
-
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-
-        var after = await _fixture.WithDbAsync(db => db.Competitions
-            .AsNoTracking().FirstAsync(c => c.Id == _competition));
-
-        after.Name.Should().NotBe("Renamed By An Outsider");
-    }
-
-    [Fact]
-    public async Task ADivisionAdminCannotDeleteACompetition()
-    {
-        var client = await _fixture.CreateClientAsAsync(_divisionAdmin);
-
-        var response = await client.DeleteAsync($"/api/competitions/{_competition}");
-
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
-
-        (await _fixture.WithDbAsync(db => db.Competitions.AnyAsync(c => c.Id == _competition)))
-            .Should().BeTrue();
-    }
-
-    [Fact]
-    public async Task ADivisionAdminCannotEnterTheirOwnClubIntoACompetition()
-    {
-        // Who is in a competition is the organiser's decision. A division admin entering their
-        // own club would be picking the field a side at a time.
-        var client = await _fixture.CreateClientAsAsync(_divisionAdmin);
+        var client = await _fixture.CreateClientAsAsync(_competitionAdmin);
 
         var response = await client.PostAsync(
             $"/api/competitions/{_competition}/entrants/{_club}", content: null);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
         (await _fixture.WithDbAsync(db => db.CompetitionEntries
             .AnyAsync(e => e.CompetitionId == _competition && e.TeamId == _club)))
-            .Should().BeFalse();
+            .Should().BeTrue();
     }
 
     [Fact]
-    public async Task ADivisionAdminCannotDrawAFixture()
+    public async Task ACompetitionAdminRenamesTheirOwn()
     {
-        // Deciding who meets whom is running the competition, not administering either club.
-        var client = await _fixture.CreateClientAsAsync(_divisionAdmin);
+        var client = await _fixture.CreateClientAsAsync(_competitionAdmin);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/competitions/{_competition}", Renamed(_competition, "Renamed By Its Organiser"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var after = await _fixture.WithDbAsync(db => db.Competitions
+            .AsNoTracking().FirstAsync(c => c.Id == _competition));
+
+        after.Name.Should().Be("Renamed By Its Organiser");
+    }
+
+    [Fact]
+    public async Task ACompetitionAdminDrawsAFixtureInTheirOwn()
+    {
+        // Deciding who meets whom is running the competition, and running it is what they
+        // were assigned.
         var other = await AClubInAsync(_division);
+        var client = await _fixture.CreateClientAsAsync(_competitionAdmin);
+
+        foreach (var club in new[] { _club, other })
+        {
+            (await client.PostAsync(
+                $"/api/competitions/{_competition}/entrants/{club}", content: null))
+                .StatusCode.Should().Be(HttpStatusCode.NoContent);
+        }
 
         var response = await client.PostAsJsonAsync("/api/matchresults", new
         {
@@ -142,7 +118,98 @@ public class CompetitionScopeApiTests : IAsyncLifetime
             referee = (string?)null,
         });
 
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    // ── Somebody else's ───────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ACompetitionAdminCannotTouchACompetitionTheyWereNotGiven()
+    {
+        // Holding the role is not the point; holding this competition is. The policy on the
+        // endpoint lets them through and the ownership check is what stops them.
+        var client = await _fixture.CreateClientAsAsync(_competitionAdmin);
+
+        var response = await client.PostAsync(
+            $"/api/competitions/{_somebodyElses}/entrants/{_club}", content: null);
+
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        (await _fixture.WithDbAsync(db => db.CompetitionEntries
+            .AnyAsync(e => e.CompetitionId == _somebodyElses && e.TeamId == _club)))
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ACompetitionAdminCannotRenameSomebodyElsesCompetition()
+    {
+        var client = await _fixture.CreateClientAsAsync(_competitionAdmin);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/competitions/{_somebodyElses}", Renamed(_somebodyElses, "Renamed By An Outsider"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var after = await _fixture.WithDbAsync(db => db.Competitions
+            .AsNoTracking().FirstAsync(c => c.Id == _somebodyElses));
+
+        after.Name.Should().NotBe("Renamed By An Outsider");
+    }
+
+    [Fact]
+    public async Task ACompetitionAdminCannotDrawAFixtureIntoSomebodyElsesCompetition()
+    {
+        var client = await _fixture.CreateClientAsAsync(_competitionAdmin);
+        var other = await AClubInAsync(_division);
+
+        var response = await client.PostAsJsonAsync("/api/matchresults", new
+        {
+            competitionId = _somebodyElses,
+            matchDate = new DateTime(2043, 4, 1, 0, 0, 0, DateTimeKind.Utc),
+            matchweekNumber = 1,
+            homeTeamId = _club,
+            awayTeamId = other,
+            venue = (string?)null,
+            referee = (string?)null,
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task ACompetitionAdminCannotStartANewCompetition()
+    {
+        // A SuperAdmin decides what gets played and who runs it. Otherwise the role could
+        // grant itself a competition and then administer it.
+        var client = await _fixture.CreateClientAsAsync(_competitionAdmin);
+
+        var response = await client.PostAsJsonAsync("/api/competitions", NewCompetition());
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task ACompetitionAdminCannotEditAClubInTheirOwnCompetition()
+    {
+        // The line that moved: running a cup a club is entered in is no reason to be able to
+        // rename the club, which is in three other competitions and belongs to none of them.
+        var client = await _fixture.CreateClientAsAsync(_competitionAdmin);
+
+        var response = await client.PutAsJsonAsync($"/api/teams/{_club}", new
+        {
+            id = _club,
+            name = "Renamed By A Competition Admin",
+            shortCode = ApiTestFixture.Code("RN"),
+            founded = 2020,
+        });
+
+        response.StatusCode.Should().BeOneOf(
+            HttpStatusCode.Forbidden, HttpStatusCode.Unauthorized);
+
+        var after = await _fixture.WithDbAsync(db => db.Teams
+            .AsNoTracking().FirstAsync(t => t.Id == _club));
+
+        after.Name.Should().NotBe("Renamed By A Competition Admin");
     }
 
     // ── The organiser does ────────────────────────────────────────────────────
@@ -201,6 +268,16 @@ public class CompetitionScopeApiTests : IAsyncLifetime
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
+
+    private static object Renamed(Guid id, string name) => new
+    {
+        competitionId = id,
+        name,
+        shortCode = ApiTestFixture.Code("XX"),
+        format = "Knockout",
+        gender = "Male",
+        isActive = true,
+    };
 
     private static object NewCompetition() => new
     {

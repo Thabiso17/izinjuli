@@ -36,7 +36,7 @@ export class AuthService {
   hasAnyAdminRole = computed(() => {
     const user = this.currentUser();
     return user?.roles.includes(Role.SuperAdmin) ||
-           user?.roles.includes(Role.DivisionAdmin) ||
+           user?.roles.includes(Role.CompetitionAdmin) ||
            user?.roles.includes(Role.TeamAdmin) ||
            false;
   });
@@ -44,32 +44,33 @@ export class AuthService {
   /**
    * Whether this user's scope is known yet. A freshly signed-in user whose profile request
    * failed has roles but no assignments, and narrowing a screen on that would show them an
-   * empty page rather than their own clubs. Unknown means show everything, exactly as before —
+   * empty page rather than what they run. Unknown means show everything, exactly as before —
    * the API still refuses anything they may not do.
    */
   scopeIsKnown = computed(() => {
     const user = this.currentUser();
-    return !!user && (user.isSuperAdmin || user.administeredDivisionIds !== undefined);
+    return !!user && (user.isSuperAdmin || user.administeredCompetitionIds !== undefined);
   });
 
-  administeredDivisionIds = computed(() => this.currentUser()?.administeredDivisionIds ?? []);
+  administeredCompetitionIds = computed(() => this.currentUser()?.administeredCompetitionIds ?? []);
   administeredTeamIds = computed(() => this.currentUser()?.administeredTeamIds ?? []);
 
-  /** A super admin administers every division; anybody else, the ones they are assigned to. */
-  canAdministerDivision(divisionId: string | null | undefined): boolean {
+  /** A super admin runs every competition; anybody else, the ones they were assigned. */
+  canAdministerCompetition(competitionId: string | null | undefined): boolean {
     if (this.isSuperAdmin()) return true;
     if (!this.scopeIsKnown()) return true;
-    if (!divisionId) return false;
+    if (!competitionId) return false;
 
-    return this.administeredDivisionIds().includes(divisionId);
+    return this.administeredCompetitionIds().includes(competitionId);
   }
 
   /**
-   * Creating or deleting a club is division-admin and above at the API (CanManageDivisions);
-   * a team admin manages the club they were given but cannot add or remove one.
+   * Creating or deleting a club is SuperAdmin work at the API. A competition admin runs
+   * competitions and administers no clubs; a team admin manages the club they were given but
+   * cannot add or remove one.
    */
   canCreateTeam(): boolean {
-    return this.isSuperAdmin() || this.hasRole(Role.DivisionAdmin);
+    return this.isSuperAdmin();
   }
 
   canDeleteTeam(team: { id: string; divisionId?: string | null }): boolean {
@@ -77,18 +78,15 @@ export class AuthService {
   }
 
   /**
-   * A team is administered by its own team admins and by the admins of the division it plays
-   * in — the same hierarchy the API enforces, rather than a second opinion about it. A team
-   * with no division is nobody's but a super admin's.
+   * A club is administered by its own team admins, and below super admin by nobody else —
+   * the same rule the API enforces, rather than a second opinion about it. Running a
+   * competition the club is entered in does not come with the right to edit the club.
    */
   canAdministerTeam(team: { id: string; divisionId?: string | null }): boolean {
     if (this.isSuperAdmin()) return true;
     if (!this.scopeIsKnown()) return true;
 
-    return (
-      this.administeredTeamIds().includes(team.id) ||
-      (!!team.divisionId && this.administeredDivisionIds().includes(team.divisionId))
-    );
+    return this.administeredTeamIds().includes(team.id);
   }
 
 

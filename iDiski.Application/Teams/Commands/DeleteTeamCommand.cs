@@ -8,7 +8,7 @@ namespace iDiski.Application.Teams.Commands;
 
 // ── Command ───────────────────────────────────────────────────────────────────
 
-// The CanManageDivisions policy on the endpoint keeps TeamAdmins out entirely; this scopes
+// The endpoint is SuperAdmin-only, so this marker narrows nothing further; it stays so the
 // a DivisionAdmin to teams that sit inside a division they are assigned to.
 public sealed record DeleteTeamCommand(Guid Id) : IRequest, IRequireTeamAccess
 {

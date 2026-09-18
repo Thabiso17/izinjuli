@@ -896,7 +896,7 @@ namespace iDiski.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("iDiski.Domain.Entities.UserDivision", b =>
+            modelBuilder.Entity("iDiski.Domain.Entities.UserCompetition", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -914,7 +914,7 @@ namespace iDiski.Infrastructure.Migrations
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("DivisionId")
+                    b.Property<Guid>("CompetitionId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -928,12 +928,12 @@ namespace iDiski.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DivisionId");
+                    b.HasIndex("CompetitionId");
 
-                    b.HasIndex("UserId", "DivisionId")
+                    b.HasIndex("UserId", "CompetitionId")
                         .IsUnique();
 
-                    b.ToTable("UserDivisions");
+                    b.ToTable("UserCompetitions");
                 });
 
             modelBuilder.Entity("iDiski.Domain.Entities.UserRole", b =>
@@ -1208,21 +1208,21 @@ namespace iDiski.Infrastructure.Migrations
                     b.Navigation("Division");
                 });
 
-            modelBuilder.Entity("iDiski.Domain.Entities.UserDivision", b =>
+            modelBuilder.Entity("iDiski.Domain.Entities.UserCompetition", b =>
                 {
-                    b.HasOne("iDiski.Domain.Entities.Division", "Division")
+                    b.HasOne("iDiski.Domain.Entities.Competition", "Competition")
                         .WithMany()
-                        .HasForeignKey("DivisionId")
+                        .HasForeignKey("CompetitionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.HasOne("iDiski.Domain.Entities.User", "User")
-                        .WithMany("UserDivisions")
+                        .WithMany("UserCompetitions")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("Division");
+                    b.Navigation("Competition");
 
                     b.Navigation("User");
                 });
@@ -1297,7 +1297,7 @@ namespace iDiski.Infrastructure.Migrations
 
             modelBuilder.Entity("iDiski.Domain.Entities.User", b =>
                 {
-                    b.Navigation("UserDivisions");
+                    b.Navigation("UserCompetitions");
 
                     b.Navigation("UserRoles");
 

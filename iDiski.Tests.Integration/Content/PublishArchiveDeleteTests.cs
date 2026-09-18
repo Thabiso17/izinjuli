@@ -130,7 +130,7 @@ public class PublishArchiveDeleteTests : IClassFixture<IntegrationTestFixture>
         var scenario = await LeagueScenario.CreateAsync(_fixture.DbContext);
         var article = await SeedArticleAsync(
             published: true, archived: true,
-            divisionId: scenario.DivisionOneId, teamId: scenario.TeamAId);
+            competitionId: scenario.CompetitionOneId, teamId: scenario.TeamAId);
 
         var forDivision = await new GetPublishedArticlesQueryHandler(_fixture.DbContext)
             .Handle(new GetPublishedArticlesQuery(

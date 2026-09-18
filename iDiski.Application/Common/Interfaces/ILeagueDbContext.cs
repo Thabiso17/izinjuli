@@ -25,7 +25,7 @@ public interface ILeagueDbContext
     DbSet<User>               Users               { get; }
     DbSet<UserRole>           UserRoles           { get; }
     DbSet<UserTeam>           UserTeams           { get; }
-    DbSet<UserDivision>       UserDivisions       { get; }
+    DbSet<UserCompetition>    UserCompetitions    { get; }
     DbSet<AuditLog>           AuditLogs           { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

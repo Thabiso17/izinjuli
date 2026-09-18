@@ -14,7 +14,7 @@ namespace iDiski.Tests.Integration.Authorization;
 /// The ownership handlers are what actually confine an admin to their own teams and
 /// divisions — a role policy only answers "is this user a DivisionAdmin at all". These run
 /// against a real context because the handlers resolve access by querying UserTeams,
-/// UserDivisions and UserRoles.
+/// UserCompetitions and UserRoles.
 /// </summary>
 public class PermissionHierarchyTests : IClassFixture<IntegrationTestFixture>
 {
@@ -30,10 +30,11 @@ public class PermissionHierarchyTests : IClassFixture<IntegrationTestFixture>
     [InlineData(Role.SuperAdmin, TeamUnderTest.OwnTeam, true)]
     [InlineData(Role.SuperAdmin, TeamUnderTest.SameDivisionOtherTeam, true)]
     [InlineData(Role.SuperAdmin, TeamUnderTest.OtherDivisionTeam, true)]
-    // A division admin reaches every team inside their division, and nothing outside it.
-    [InlineData(Role.DivisionAdmin, TeamUnderTest.OwnTeam, true)]
-    [InlineData(Role.DivisionAdmin, TeamUnderTest.SameDivisionOtherTeam, true)]
-    [InlineData(Role.DivisionAdmin, TeamUnderTest.OtherDivisionTeam, false)]
+    // A competition admin reaches no club at all — not even one entered in the competition
+    // they run. Clubs answer to their own administrators.
+    [InlineData(Role.CompetitionAdmin, TeamUnderTest.OwnTeam, false)]
+    [InlineData(Role.CompetitionAdmin, TeamUnderTest.SameDivisionOtherTeam, false)]
+    [InlineData(Role.CompetitionAdmin, TeamUnderTest.OtherDivisionTeam, false)]
     // A team admin reaches only the team they are assigned to, even within the same division.
     [InlineData(Role.TeamAdmin, TeamUnderTest.OwnTeam, true)]
     [InlineData(Role.TeamAdmin, TeamUnderTest.SameDivisionOtherTeam, false)]
@@ -61,21 +62,24 @@ public class PermissionHierarchyTests : IClassFixture<IntegrationTestFixture>
     [Theory]
     [InlineData(Role.SuperAdmin, true, true)]
     [InlineData(Role.SuperAdmin, false, true)]
-    // A division admin is confined to divisions they are actually assigned to.
-    [InlineData(Role.DivisionAdmin, true, true)]
-    [InlineData(Role.DivisionAdmin, false, false)]
-    // Being a team admin never grants division-level access.
+    // A competition admin is confined to the competitions they were actually given.
+    [InlineData(Role.CompetitionAdmin, true, true)]
+    [InlineData(Role.CompetitionAdmin, false, false)]
+    // Being a team admin never grants authority over a competition.
     [InlineData(Role.TeamAdmin, true, false)]
     [InlineData(Role.TeamAdmin, false, false)]
-    public async Task DivisionOwnership_FollowsTheAssignedHierarchy(
-        Role role, bool ownDivision, bool expectedAllowed)
+    public async Task CompetitionOwnership_FollowsTheAssignment(
+        Role role, bool theirOwn, bool expectedAllowed)
     {
         var scenario = await LeagueScenario.CreateAsync(_fixture.DbContext);
-        var divisionId = ownDivision ? scenario.DivisionOneId : scenario.DivisionTwoId;
+
+        var competitionId = theirOwn
+            ? scenario.CompetitionOneId
+            : await CompetitionScenario.ACompetitionAsync(_fixture.DbContext);
 
         var allowed = await EvaluateAsync(
-            new DivisionOwnershipHandler(_fixture.DbContext, scenario.SignedInAs(role)),
-            new DivisionOwnershipRequirement(divisionId));
+            new CompetitionOwnershipHandler(_fixture.DbContext, scenario.SignedInAs(role)),
+            new CompetitionOwnershipRequirement(competitionId));
 
         allowed.Should().Be(expectedAllowed);
     }
@@ -98,7 +102,7 @@ public class PermissionHierarchyTests : IClassFixture<IntegrationTestFixture>
         var scenario = await LeagueScenario.CreateAsync(_fixture.DbContext);
 
         var allowed = await EvaluateAsync(
-            new TeamOwnershipHandler(_fixture.DbContext, scenario.SignedInAs(Role.DivisionAdmin)),
+            new TeamOwnershipHandler(_fixture.DbContext, scenario.SignedInAs(Role.TeamAdmin)),
             new TeamOwnershipRequirement(Guid.NewGuid()));
 
         allowed.Should().BeFalse();

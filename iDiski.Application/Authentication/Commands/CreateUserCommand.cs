@@ -16,7 +16,7 @@ public sealed record CreateUserCommand(
     string LastName,
     Role[] Roles,
     Guid[]? AssignedTeamIds = null,
-    Guid[]? AssignedDivisionIds = null
+    Guid[]? AssignedCompetitionIds = null
 ) : IRequest<Guid>;
 
 public sealed class CreateUserCommandValidator : AbstractValidator<CreateUserCommand>
@@ -56,14 +56,15 @@ public sealed class CreateUserCommandValidator : AbstractValidator<CreateUserCom
                 return true;
             }).WithMessage("Team Admin role requires at least one assigned team");
 
-        RuleFor(x => x.AssignedDivisionIds)
-            .Must((cmd, divisionIds) =>
+        RuleFor(x => x.AssignedCompetitionIds)
+            .Must((cmd, competitionIds) =>
             {
-                // If DivisionAdmin role is assigned, divisions must be provided
-                if (cmd.Roles.Contains(Role.DivisionAdmin) && (divisionIds == null || divisionIds.Length == 0))
+                // The role is the set: a competition admin assigned to nothing runs nothing.
+                if (cmd.Roles.Contains(Role.CompetitionAdmin)
+                    && (competitionIds == null || competitionIds.Length == 0))
                     return false;
                 return true;
-            }).WithMessage("Division Admin role requires at least one assigned division");
+            }).WithMessage("Competition Admin requires at least one assigned competition");
     }
 }
 
@@ -88,35 +89,11 @@ public sealed class CreateUserCommandHandler : IRequestHandler<CreateUserCommand
 
     public async Task<Guid> Handle(CreateUserCommand request, CancellationToken cancellationToken)
     {
-        // 1. Only Super Admin or Division Admin can create users. A Division Admin may only
-        // create Team Admins, and only for teams within division(s) they're assigned to.
+        // 1. Only a Super Admin creates users. A competition admin used to be able to make
+        // Team Admins for clubs in their division; they run competitions now and administer
+        // no clubs, so there is nobody for them to appoint.
         if (!_currentUserService.IsSuperAdmin)
-        {
-            if (!_currentUserService.HasRole(Role.DivisionAdmin))
-                throw new ForbiddenException("Only Super Admin or Division Admin can create users");
-
-            if (request.Roles.Any(r => r != Role.TeamAdmin))
-                throw new ForbiddenException("Division Admin can only create Team Admin users");
-
-            if (request.AssignedDivisionIds?.Length > 0)
-                throw new ForbiddenException("Division Admin cannot assign division roles");
-
-            var teamIds = request.AssignedTeamIds ?? [];
-            if (teamIds.Length == 0)
-                throw new ForbiddenException("At least one team must be assigned");
-
-            var myDivisionIds = await _db.UserDivisions
-                .Where(ud => ud.UserId == _currentUserService.UserId)
-                .Select(ud => ud.DivisionId)
-                .ToListAsync(cancellationToken);
-
-            var teamsInMyDivisions = await _db.Teams
-                .Where(t => teamIds.Contains(t.Id) && t.DivisionId != null && myDivisionIds.Contains(t.DivisionId.Value))
-                .CountAsync(cancellationToken);
-
-            if (teamsInMyDivisions != teamIds.Length)
-                throw new ForbiddenException("You can only assign Team Admins to teams within your assigned division(s)");
-        }
+            throw new ForbiddenException("Only a Super Admin can create users");
 
         // 2. Check email uniqueness
         var existingUser = await _db.Users
@@ -176,21 +153,22 @@ public sealed class CreateUserCommandHandler : IRequestHandler<CreateUserCommand
             }
         }
 
-        // 7. Assign divisions (for Division Admin)
-        if (request.AssignedDivisionIds?.Length > 0)
+        // 7. Assign competitions (for a Competition Admin)
+        if (request.AssignedCompetitionIds?.Length > 0)
         {
-            var userDivisions = request.AssignedDivisionIds.Select(divisionId => new UserDivision
-            {
-                Id = Guid.NewGuid(),
-                UserId = newUser.Id,
-                DivisionId = divisionId,
-                AssignedAt = DateTime.UtcNow,
-                AssignedByUserId = _currentUserService.UserId
-            }).ToList();
+            var assignments = request.AssignedCompetitionIds.Select(competitionId =>
+                new UserCompetition
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = newUser.Id,
+                    CompetitionId = competitionId,
+                    AssignedAt = DateTime.UtcNow,
+                    AssignedByUserId = _currentUserService.UserId
+                }).ToList();
 
-            foreach (var userDivision in userDivisions)
+            foreach (var assignment in assignments)
             {
-                _db.UserDivisions.Add(userDivision);
+                _db.UserCompetitions.Add(assignment);
             }
         }
 

@@ -199,10 +199,9 @@ public sealed class GetMatchByIdQueryHandler
 /// <summary>
 /// Adds a fixture to a competition by hand — this club plays that one, on this date.
 ///
-/// Drawing a competition up is the organiser's job, so the endpoint is SuperAdmin-only. A
-/// competition belongs to no division, and there is nothing smaller to scope this to:
-/// deciding who meets whom is running the competition, not administering either club.
-/// Recording what happened afterwards is a different question, and stays with the clubs.
+/// Drawing a competition up is the organiser's job, so this is scoped to the competition
+/// itself: whoever was assigned to run it, and a SuperAdmin. Not to either club — deciding
+/// who meets whom is running the competition, not administering the sides.
 ///
 /// The season is the competition's rather than an argument: a fixture cannot belong to a
 /// different year from the competition it is part of.
@@ -215,7 +214,7 @@ public sealed record CreateMatchResultCommand(
     Guid     AwayTeamId,
     string?  Venue,
     string?  Referee
-) : IRequest<Guid>;
+) : IRequest<Guid>, IRequireCompetitionAccess;
 
 public sealed class CreateMatchResultCommandValidator
     : AbstractValidator<CreateMatchResultCommand>

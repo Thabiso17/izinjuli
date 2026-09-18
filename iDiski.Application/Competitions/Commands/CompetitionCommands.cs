@@ -1,11 +1,13 @@
+using iDiski.Application.Common.Authorization;
 using iDiski.Domain.Entities;
 using MediatR;
 
 namespace iDiski.Application.Competitions.Commands;
 
 /// <summary>
-/// Starts a competition: a league, a cup, a sponsor's tournament. It belongs to no division —
-/// divisions hold teams, and teams contest this — so only a SuperAdmin creates one.
+/// Starts a competition: a league, a cup, a sponsor's tournament. Only a SuperAdmin creates
+/// one — there is nothing to scope it to before it exists, and its organisers are assigned
+/// afterwards. Everything else about running it goes through IRequireCompetitionAccess.
 /// </summary>
 public sealed record CreateCompetitionCommand : IRequest<Guid>
 {
@@ -44,7 +46,7 @@ public sealed record CreateCompetitionCommand : IRequest<Guid>
     public Guid? EnterTeamsFromDivisionId { get; init; }
 }
 
-public sealed record UpdateCompetitionCommand : IRequest<Unit>
+public sealed record UpdateCompetitionCommand : IRequest<Unit>, IRequireCompetitionAccess
 {
     public Guid CompetitionId { get; init; }
     public string Name { get; init; } = string.Empty;
@@ -59,12 +61,15 @@ public sealed record UpdateCompetitionCommand : IRequest<Unit>
     public bool IsActive { get; init; } = true;
 }
 
-public sealed record DeleteCompetitionCommand(Guid CompetitionId) : IRequest<Unit>;
+public sealed record DeleteCompetitionCommand(Guid CompetitionId)
+    : IRequest<Unit>, IRequireCompetitionAccess;
 
 /// <summary>
 /// Puts a club in a competition. It may come from any division — that is the point — but not
 /// from one whose gender differs from the competition's.
 /// </summary>
-public sealed record EnterTeamCommand(Guid CompetitionId, Guid TeamId) : IRequest<Unit>;
+public sealed record EnterTeamCommand(Guid CompetitionId, Guid TeamId)
+    : IRequest<Unit>, IRequireCompetitionAccess;
 
-public sealed record WithdrawTeamCommand(Guid CompetitionId, Guid TeamId) : IRequest<Unit>;
+public sealed record WithdrawTeamCommand(Guid CompetitionId, Guid TeamId)
+    : IRequest<Unit>, IRequireCompetitionAccess;
