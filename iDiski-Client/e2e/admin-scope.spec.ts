@@ -1,5 +1,6 @@
 import { test, expect, type Browser, type Page } from '@playwright/test';
 import { accounts, signIn } from './helpers';
+import { createCompetition } from './admin-setup';
 
 /**
  * What an administrator sees, as opposed to what they may do.
@@ -33,6 +34,14 @@ test.describe('admin scope', () => {
   }) => {
     // Their assignment is a list of competitions, so this is the screen it has to narrow.
     // Divisions are no longer assigned to anybody and are not what this role runs.
+    //
+    // A second one has to exist first: the seeded league puts every club in one division, so
+    // the backfill gives it a single competition and "only the ones they run" would be the
+    // whole list by accident. Started by the organiser, assigned to nobody.
+    await asRole(browser, baseURL, accounts.superAdmin, async (page) => {
+      await createCompetition(page, null, 'Knockout');
+    });
+
     const everything = await countIn(
       browser,
       baseURL,
