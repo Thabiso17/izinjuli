@@ -94,7 +94,9 @@ import {
               </thead>
               <tbody>
                 @for (division of divisions(); track division.id) {
-                  <tr>
+                  <!-- The id is on the row so a test can find the division it just made;
+                       there is no longer a per-division link to read it off. -->
+                  <tr [attr.data-division-id]="division.id">
                     <td class="fw-semibold">{{ division.name }}</td>
                     <td>
                       <span class="badge bg-secondary">{{ division.shortCode }}</span>
@@ -118,13 +120,13 @@ import {
                            Each competition carries its own status, and they disagree by
                            design, so there is nothing honest to put in a single badge here. -->
                       <a
-                        [routerLink]="['/admin/divisions', division.id, 'competitions']"
+                        routerLink="/admin/competitions"
                         class="btn btn-sm btn-outline-secondary"
                         data-testid="manage-competitions"
-                        title="The competitions this division runs"
+                        title="What this division's clubs are playing in"
                       >
-                        <!-- Labelled rather than a bare number: a trophy with a 0 beside it
-                             does not read as "start a competition here". -->
+                        <!-- A count, not a possession: a division runs nothing. These are the
+                             competitions its clubs have been entered into. -->
                         <i class="bi bi-trophy me-1"></i>{{ division.competitionCount }}
                         {{ division.competitionCount === 1 ? 'competition' : 'competitions' }}
                       </a>

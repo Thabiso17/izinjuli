@@ -23,7 +23,6 @@ public static class KnockoutBracket
     /// seed. Returns every fixture in every round, linked.
     /// </summary>
     /// <param name="teamIds">Entrants, best first. Two or more.</param>
-    /// <param name="divisionId">The competition these belong to.</param>
     /// <param name="season">Season stamped on every fixture.</param>
     /// <param name="firstRoundDate">When the opening round is played.</param>
     /// <param name="daysBetweenRounds">
@@ -36,7 +35,6 @@ public static class KnockoutBracket
     /// </param>
     public static List<MatchResult> Build(
         IReadOnlyList<Guid> teamIds,
-        Guid divisionId,
         int season,
         DateTime firstRoundDate,
         int daysBetweenRounds,
@@ -66,7 +64,6 @@ public static class KnockoutBracket
                 matches.Add(new MatchResult
                 {
                     Id = Guid.NewGuid(),
-                    DivisionId = divisionId,
                     Season = season,
                     Stage = MatchStage.Knockout,
                     KnockoutRoundSize = size,
@@ -145,7 +142,6 @@ public static class KnockoutBracket
     /// </summary>
     public static List<MatchResult> BuildEmpty(
         int entrantCount,
-        Guid divisionId,
         int season,
         DateTime firstRoundDate,
         int daysBetweenRounds,
@@ -160,7 +156,7 @@ public static class KnockoutBracket
         var placeholders = Enumerable.Range(0, entrantCount).Select(_ => Guid.NewGuid()).ToList();
 
         var bracket = Build(
-            placeholders, divisionId, season, firstRoundDate, daysBetweenRounds, firstMatchweek);
+            placeholders, season, firstRoundDate, daysBetweenRounds, firstMatchweek);
 
         foreach (var match in bracket)
         {

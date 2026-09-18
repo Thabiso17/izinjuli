@@ -310,7 +310,6 @@ public class TournamentGenerationTests : IClassFixture<IntegrationTestFixture>
         _fixture.DbContext.Competitions.Add(new Competition
         {
             Id = competitionId,
-            DivisionId = divisionId,
             Name = $"Competition {TestIds.Code("N")}",
             ShortCode = TestIds.Code("TN"),
             Season = 2026,

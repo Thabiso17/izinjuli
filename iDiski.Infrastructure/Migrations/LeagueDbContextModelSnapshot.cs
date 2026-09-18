@@ -219,6 +219,10 @@ namespace iDiski.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("AgeGroup")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -229,13 +233,15 @@ namespace iDiski.Infrastructure.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<Guid>("DivisionId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime?>("EndDate")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Format")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Gender")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
@@ -270,7 +276,7 @@ namespace iDiski.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("DivisionId", "Season", "ShortCode")
+                    b.HasIndex("Season", "ShortCode")
                         .IsUnique();
 
                     b.ToTable("Competitions");
@@ -441,9 +447,6 @@ namespace iDiski.Infrastructure.Migrations
                     b.Property<Guid?>("CreatedByUserId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("DivisionId")
-                        .HasColumnType("uuid");
-
                     b.Property<int>("HomeScore")
                         .HasColumnType("integer");
 
@@ -509,9 +512,9 @@ namespace iDiski.Infrastructure.Migrations
 
                     b.HasIndex("AwayTeamId");
 
-                    b.HasIndex("DivisionId");
-
                     b.HasIndex("CompetitionId", "Stage");
+
+                    b.HasIndex("CompetitionId", "Season", "Stage");
 
                     b.HasIndex("HomeTeamId");
 
@@ -1160,11 +1163,6 @@ namespace iDiski.Infrastructure.Migrations
                         .HasForeignKey("CompetitionId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("iDiski.Domain.Entities.Division", "Division")
-                        .WithMany("Matches")
-                        .HasForeignKey("DivisionId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("iDiski.Domain.Entities.Team", "HomeTeam")
                         .WithMany("HomeMatches")
                         .HasForeignKey("HomeTeamId")
@@ -1174,8 +1172,6 @@ namespace iDiski.Infrastructure.Migrations
                     b.Navigation("AwayTeam");
 
                     b.Navigation("Competition");
-
-                    b.Navigation("Division");
 
                     b.Navigation("HomeTeam");
                 });
@@ -1275,10 +1271,6 @@ namespace iDiski.Infrastructure.Migrations
 
             modelBuilder.Entity("iDiski.Domain.Entities.Division", b =>
                 {
-                    b.Navigation("Competitions");
-
-                    b.Navigation("Matches");
-
                     b.Navigation("Teams");
                 });
 

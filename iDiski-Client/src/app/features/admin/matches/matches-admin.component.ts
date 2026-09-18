@@ -144,9 +144,9 @@ import {
                       <div class="text-muted small">
                         {{ match.matchDate | date: 'HH:mm' }}
                       </div>
-                      @if (match.divisionName) {
-                        <div class="badge bg-info text-dark mt-2" data-testid="match-division">
-                          {{ match.divisionName }}
+                      @if (match.competitionName) {
+                        <div class="badge bg-info text-dark mt-2" data-testid="match-competition">
+                          {{ match.competitionName }}
                         </div>
                       }
                       @if (roundName(match.knockoutRoundSize); as round) {
@@ -353,9 +353,7 @@ import {
                       <option [ngValue]="null">Select Competition</option>
                       @for (competition of competitions(); track competition.id) {
                         <option [ngValue]="competition.id">
-                          {{ competition.divisionName }} — {{ competition.name }} ({{
-                            competition.season
-                          }})
+                          {{ competition.name }} ({{ competition.season }})
                         </option>
                       }
                     </select>
@@ -391,7 +389,9 @@ import {
                           [ngValue]="team.teamId"
                           [disabled]="team.teamId === createFormData.awayTeamId"
                         >
-                          {{ team.teamName }}@if (team.isExternal) { (invited) }
+                          {{ team.teamName }}@if (team.divisionName) {
+                            <span> — {{ team.divisionName }}</span>
+                          }
                         </option>
                       }
                     </select>
@@ -410,7 +410,9 @@ import {
                           [ngValue]="team.teamId"
                           [disabled]="team.teamId === createFormData.homeTeamId"
                         >
-                          {{ team.teamName }}@if (team.isExternal) { (invited) }
+                          {{ team.teamName }}@if (team.divisionName) {
+                            <span> — {{ team.divisionName }}</span>
+                          }
                         </option>
                       }
                     </select>
@@ -556,9 +558,7 @@ import {
                     <option value="">Select Competition</option>
                     @for (competition of competitions(); track competition.id) {
                       <option [value]="competition.id">
-                        {{ competition.divisionName }} — {{ competition.name }} ({{
-                          competition.season
-                        }})
+                        {{ competition.name }} ({{ competition.season }})
                       </option>
                     }
                   </select>
@@ -1091,9 +1091,6 @@ export class MatchesAdminComponent implements OnInit {
       next: (data) => {
         const sorted = [...data].sort((a, b) => {
           if (b.season !== a.season) return b.season - a.season;
-          if (a.divisionName !== b.divisionName) {
-            return a.divisionName.localeCompare(b.divisionName);
-          }
           return a.name.localeCompare(b.name);
         });
 

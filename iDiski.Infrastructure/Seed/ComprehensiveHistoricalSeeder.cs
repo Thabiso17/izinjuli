@@ -137,7 +137,7 @@ public static class ComprehensiveHistoricalSeeder
                 HomeTeamId = sundowns.Id, AwayTeamId = chiefs.Id, HomeScore = 3, AwayScore = 1,
                 MatchDate = DateTime.SpecifyKind(new DateTime(2015, 11, 7), DateTimeKind.Utc),
                 MatchweekNumber = 10, Season = 2015, Status = MatchStatus.Completed,
-                DivisionId = division.Id, Venue = sundowns.HomeGround
+                Venue = sundowns.HomeGround
             },
             // Pirates vs Sundowns
             new MatchResult
@@ -145,7 +145,7 @@ public static class ComprehensiveHistoricalSeeder
                 HomeTeamId = pirates.Id, AwayTeamId = sundowns.Id, HomeScore = 1, AwayScore = 2,
                 MatchDate = DateTime.SpecifyKind(new DateTime(2016, 2, 13), DateTimeKind.Utc),
                 MatchweekNumber = 18, Season = 2015, Status = MatchStatus.Completed,
-                DivisionId = division.Id, Venue = pirates.HomeGround
+                Venue = pirates.HomeGround
             },
             // Chiefs vs Pirates (Soweto Derby)
             new MatchResult
@@ -153,7 +153,7 @@ public static class ComprehensiveHistoricalSeeder
                 HomeTeamId = chiefs.Id, AwayTeamId = pirates.Id, HomeScore = 1, AwayScore = 1,
                 MatchDate = DateTime.SpecifyKind(new DateTime(2015, 10, 24), DateTimeKind.Utc),
                 MatchweekNumber = 8, Season = 2015, Status = MatchStatus.Completed,
-                DivisionId = division.Id, Venue = chiefs.HomeGround
+                Venue = chiefs.HomeGround
             }
         };
 
@@ -305,14 +305,14 @@ public static class ComprehensiveHistoricalSeeder
                 HomeTeamId = manCity.Id, AwayTeamId = manUtd.Id, HomeScore = 2, AwayScore = 3,
                 MatchDate = DateTime.SpecifyKind(new DateTime(2012, 12, 9), DateTimeKind.Utc),
                 MatchweekNumber = 16, Season = 2012, Status = MatchStatus.Completed,
-                DivisionId = division.Id, Venue = manCity.HomeGround
+                Venue = manCity.HomeGround
             },
             new MatchResult
             {
                 HomeTeamId = arsenal.Id, AwayTeamId = chelsea.Id, HomeScore = 1, AwayScore = 2,
                 MatchDate = DateTime.SpecifyKind(new DateTime(2012, 9, 29), DateTimeKind.Utc),
                 MatchweekNumber = 6, Season = 2012, Status = MatchStatus.Completed,
-                DivisionId = division.Id, Venue = arsenal.HomeGround
+                Venue = arsenal.HomeGround
             }
         };
 
@@ -436,7 +436,7 @@ public static class ComprehensiveHistoricalSeeder
                 HomeTeamId = barcelona.Id, AwayTeamId = atletico.Id, HomeScore = 6, AwayScore = 1,
                 MatchDate = DateTime.SpecifyKind(new DateTime(2019, 11, 10), DateTimeKind.Utc),
                 MatchweekNumber = 9, Season = 2019, Status = MatchStatus.Completed,
-                DivisionId = division.Id, Venue = barcelona.HomeGround
+                Venue = barcelona.HomeGround
             }
         };
 

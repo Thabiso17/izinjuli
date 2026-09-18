@@ -32,28 +32,25 @@ public interface IRequirePlayerAccess
 }
 
 /// <summary>
-/// Implemented by commands scoped to a single fixture, whose division is not in the request
-/// payload — a score update carries only the match id. AuthorizationBehaviour resolves the
-/// fixture's division and applies DivisionOwnershipRequirement to it.
+/// Implemented by commands scoped to a single fixture, whose scope is not in the request
+/// payload — a score update carries only the match id.
 ///
-/// A fixture with no division resolves to Guid.Empty, which nobody but a SuperAdmin owns.
-/// That is the safe direction: an orphaned fixture predating the division guard can still be
-/// repaired, but only by somebody who can see the whole league.
+/// A fixture has no division of its own: it belongs to a competition, and a competition is
+/// contested by clubs from wherever it invited them. So the scope comes from the two clubs
+/// playing, and AuthorizationBehaviour lets through anybody who administers the division of
+/// either of them. That is what keeps a division admin able to record their own club's
+/// results, including in a cup tie against a club from another division — both sides'
+/// administrators can enter that score, which is the honest reading of a match that belongs
+/// to neither division.
+///
+/// A fixture with no clubs yet — an unplayed semi-final — resolves to nobody, leaving it to a
+/// SuperAdmin. Nothing to record there anyway until a winner arrives.
 /// </summary>
 public interface IRequireMatchAccess
 {
     Guid MatchId { get; }
 }
 
-/// <summary>
-/// Implemented by commands scoped to a single competition. AuthorizationBehaviour resolves the
-/// competition's owning division and applies DivisionOwnershipRequirement to it.
-///
-/// The owning division decides who administers a competition, not the entrants: a cup may
-/// field clubs invited from three other divisions, and their administrators do not thereby get
-/// a say in running it.
-/// </summary>
-public interface IRequireCompetitionAccess
-{
-    Guid CompetitionId { get; }
-}
+// Competitions have no ownership marker. They belong to no division, so there is nothing to
+// resolve them to: creating and running one is SuperAdmin work, enforced by policy on the
+// controller rather than by scope here.

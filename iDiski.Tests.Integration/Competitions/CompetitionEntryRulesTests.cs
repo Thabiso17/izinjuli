@@ -36,13 +36,13 @@ public class CompetitionEntryRulesTests : IClassFixture<IntegrationTestFixture>
     // ── Entering ──────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task AClubFromAnotherDivisionCanBeInvited()
+    public async Task AClubFromAnyDivisionCanBeEntered()
     {
-        var host = await CompetitionScenario.ADivisionAsync(_fixture.DbContext, name: "Host");
-        var elsewhere = await CompetitionScenario.ADivisionAsync(_fixture.DbContext, name: "Guest");
+        var elsewhere = await CompetitionScenario.ADivisionAsync(
+            _fixture.DbContext, name: "Division Three");
 
         var cup = await CompetitionScenario.ACompetitionAsync(
-            _fixture.DbContext, host, CompetitionFormat.Knockout);
+            _fixture.DbContext, CompetitionFormat.Knockout);
 
         var guest = (await CompetitionScenario.ClubsAsync(_fixture.DbContext, elsewhere, 1))[0];
 
@@ -67,7 +67,7 @@ public class CompetitionEntryRulesTests : IClassFixture<IntegrationTestFixture>
             _fixture.DbContext, Gender.Female, "Women");
 
         var cup = await CompetitionScenario.ACompetitionAsync(
-            _fixture.DbContext, boys, CompetitionFormat.Knockout);
+            _fixture.DbContext, CompetitionFormat.Knockout, gender: Gender.Male);
 
         var womensClub = (await CompetitionScenario.ClubsAsync(_fixture.DbContext, women, 1))[0];
 
@@ -116,7 +116,7 @@ public class CompetitionEntryRulesTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task AFixtureMadeByHandBelongsToItsCompetition()
     {
-        var (divisionId, cup, clubs) = await CompetitionScenario.AWholeAsync(
+        var (_, cup, clubs) = await CompetitionScenario.AWholeAsync(
             _fixture.DbContext, CompetitionFormat.League, 2);
 
         var id = await CreateFixture(cup, clubs[0], clubs[1]);
@@ -125,24 +125,24 @@ public class CompetitionEntryRulesTests : IClassFixture<IntegrationTestFixture>
             .AsNoTracking()
             .FirstAsync(m => m.Id == id);
 
+        // The competition and nothing else. Even here, where both clubs share a division,
+        // the fixture belongs to what is being played rather than to where they play it.
         match.CompetitionId.Should().Be(cup);
-
-        // And the division it carries is the competition's, not either club's — which is the
-        // same thing here, and deliberately is not when a guest is involved.
-        match.DivisionId.Should().Be(divisionId);
     }
 
     [Fact]
     public async Task TwoClubsFromDifferentDivisionsCanBeDrawnWhenBothAreEntered()
     {
         // The pairing the old rule refused outright, and the reason for the whole change.
-        var host = await CompetitionScenario.ADivisionAsync(_fixture.DbContext, name: "Host");
-        var elsewhere = await CompetitionScenario.ADivisionAsync(_fixture.DbContext, name: "Guest");
+        var first = await CompetitionScenario.ADivisionAsync(
+            _fixture.DbContext, name: "Division One");
+        var elsewhere = await CompetitionScenario.ADivisionAsync(
+            _fixture.DbContext, name: "Division Three");
 
         var cup = await CompetitionScenario.ACompetitionAsync(
-            _fixture.DbContext, host, CompetitionFormat.Knockout);
+            _fixture.DbContext, CompetitionFormat.Knockout);
 
-        var ours = (await CompetitionScenario.ClubsAsync(_fixture.DbContext, host, 1))[0];
+        var ours = (await CompetitionScenario.ClubsAsync(_fixture.DbContext, first, 1))[0];
         var theirs = (await CompetitionScenario.ClubsAsync(_fixture.DbContext, elsewhere, 1))[0];
 
         await CompetitionScenario.EnterAsync(_fixture.DbContext, cup, new[] { ours, theirs });
@@ -152,8 +152,9 @@ public class CompetitionEntryRulesTests : IClassFixture<IntegrationTestFixture>
         var match = await _fixture.DbContext.MatchResults.AsNoTracking()
             .FirstAsync(m => m.Id == id);
 
+        // It belongs to the competition, and to neither division. There is no third answer
+        // to give for a tie between clubs from two of them.
         match.CompetitionId.Should().Be(cup);
-        match.DivisionId.Should().Be(host, "a fixture belongs to the competition's division");
     }
 
     [Fact]
@@ -182,7 +183,7 @@ public class CompetitionEntryRulesTests : IClassFixture<IntegrationTestFixture>
         var clubs = await CompetitionScenario.ClubsAsync(_fixture.DbContext, divisionId, 8);
 
         var cup = await CompetitionScenario.ACompetitionAsync(
-            _fixture.DbContext, divisionId, CompetitionFormat.Knockout, name: "Top Four");
+            _fixture.DbContext, CompetitionFormat.Knockout, name: "Top Four");
 
         // Only half the division is in it.
         await CompetitionScenario.EnterAsync(_fixture.DbContext, cup, clubs.Take(4));

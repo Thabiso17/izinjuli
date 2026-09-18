@@ -40,24 +40,29 @@ public static class CompetitionScenario
         return id;
     }
 
-    /// <summary>Something for them to play. Entrants are added separately, on purpose.</summary>
+    /// <summary>
+    /// Something to play. It belongs to no division — divisions hold clubs — so it carries its
+    /// own gender, which is what the entry list is checked against.
+    /// </summary>
     public static async Task<Guid> ACompetitionAsync(
         ILeagueDbContext db,
-        Guid divisionId,
         CompetitionFormat format = CompetitionFormat.League,
         int season = 2040,
-        string name = "Competition")
+        string name = "Competition",
+        Gender gender = Gender.Male,
+        int? maxTeams = null)
     {
         var id = Guid.NewGuid();
 
         db.Competitions.Add(new Competition
         {
             Id = id,
-            DivisionId = divisionId,
             Name = $"{name} {TestIds.Code("N")}",
             ShortCode = TestIds.Code("CP"),
             Season = season,
             Format = format,
+            Gender = gender,
+            MaxTeams = maxTeams,
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
         });
@@ -102,7 +107,7 @@ public static class CompetitionScenario
         return ids;
     }
 
-    /// <summary>Puts clubs into a competition, whatever division they came from.</summary>
+    /// <summary>Puts clubs into a competition, from whatever division they came.</summary>
     public static async Task EnterAsync(
         ILeagueDbContext db,
         Guid competitionId,
@@ -122,7 +127,11 @@ public static class CompetitionScenario
         await db.SaveChangesAsync(default);
     }
 
-    /// <summary>The common case: a division, a competition, and everybody entered.</summary>
+    /// <summary>
+    /// The common case: a division of clubs, a competition, and all of them entered in it —
+    /// which is what a league looks like. The division is returned because the clubs still
+    /// belong to one; the competition does not.
+    /// </summary>
     public static async Task<(Guid DivisionId, Guid CompetitionId, List<Guid> TeamIds)> AWholeAsync(
         ILeagueDbContext db,
         CompetitionFormat format,
@@ -131,7 +140,7 @@ public static class CompetitionScenario
         int season = 2040)
     {
         var divisionId = await ADivisionAsync(db, gender, season: season);
-        var competitionId = await ACompetitionAsync(db, divisionId, format, season);
+        var competitionId = await ACompetitionAsync(db, format, season, gender: gender);
         var teamIds = await ClubsAsync(db, divisionId, teams, competitionId);
 
         return (divisionId, competitionId, teamIds);

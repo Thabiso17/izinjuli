@@ -37,11 +37,12 @@ public class CompetitionBackfillTests : IClassFixture<IntegrationTestFixture>
 
         var competition = await _fixture.DbContext.Competitions
             .AsNoTracking()
-            .SingleAsync(c => c.DivisionId == divisionId);
+            .SingleAsync(c => c.Entries.Any(e => e.Team.DivisionId == divisionId));
 
         // It carries the division's own details, so nothing reads differently afterwards.
         competition.Season.Should().Be(2039);
         competition.Format.Should().Be(CompetitionFormat.League);
+        competition.Gender.Should().Be(Gender.Male, "taken from the division it came from");
 
         var entered = await _fixture.DbContext.CompetitionEntries
             .AsNoTracking()
@@ -64,7 +65,7 @@ public class CompetitionBackfillTests : IClassFixture<IntegrationTestFixture>
 
         var competition = await _fixture.DbContext.Competitions
             .AsNoTracking()
-            .SingleAsync(c => c.DivisionId == divisionId);
+            .SingleAsync(c => c.Entries.Any(e => e.Team.DivisionId == divisionId));
 
         var fixture = await _fixture.DbContext.MatchResults
             .AsNoTracking()
@@ -77,17 +78,20 @@ public class CompetitionBackfillTests : IClassFixture<IntegrationTestFixture>
     public async Task ADivisionAlreadyRunningSomethingIsLeftAlone()
     {
         // Guarded, because the seeders call it one after another and a second pass must not
-        // hand a division a duplicate league.
+        // hand the same clubs a second league. The guard is whether they are already playing
+        // in something, since nothing else now ties a competition to where its clubs came from.
         var divisionId = await CompetitionScenario.ADivisionAsync(_fixture.DbContext, season: 2039);
         var existing = await CompetitionScenario.ACompetitionAsync(
-            _fixture.DbContext, divisionId, CompetitionFormat.Knockout, season: 2039);
+            _fixture.DbContext, CompetitionFormat.Knockout, season: 2039);
+
+        await CompetitionScenario.ClubsAsync(_fixture.DbContext, divisionId, 2, existing);
 
         await CompetitionBackfill.GiveEveryDivisionItsCompetitionAsync(_fixture.DbContext);
         await CompetitionBackfill.GiveEveryDivisionItsCompetitionAsync(_fixture.DbContext);
 
         var running = await _fixture.DbContext.Competitions
             .AsNoTracking()
-            .Where(c => c.DivisionId == divisionId)
+            .Where(c => c.Entries.Any(e => e.Team.DivisionId == divisionId))
             .ToListAsync();
 
         running.Should().ContainSingle().Which.Id.Should().Be(existing);
@@ -148,7 +152,6 @@ public class CompetitionBackfillTests : IClassFixture<IntegrationTestFixture>
         _fixture.DbContext.MatchResults.Add(new MatchResult
         {
             Id = id,
-            DivisionId = divisionId,
             // No competition: the column did not exist when this row was written.
             CompetitionId = null,
             Season = 2039,

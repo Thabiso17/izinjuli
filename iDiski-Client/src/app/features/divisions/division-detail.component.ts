@@ -123,9 +123,9 @@ import { ScopedVideosComponent } from '../../shared/components/scoped-videos.com
                                 <div>{{ formatLabel[competition.format] }}</div>
                                 <div>
                                   {{ competition.entrantCount }} entrants
-                                  @if (competition.externalEntrantCount > 0) {
+                                  @if (competition.divisionsRepresented > 1) {
                                     <span class="text-info">
-                                      · {{ competition.externalEntrantCount }} invited
+                                      · from {{ competition.divisionsRepresented }} divisions
                                     </span>
                                   }
                                 </div>

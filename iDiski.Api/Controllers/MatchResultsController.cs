@@ -52,7 +52,8 @@ public sealed class MatchResultsController : BaseApiController
     /// <response code="403">Not authorized (must be Division Admin assigned to the match's division).</response>
     /// <response code="422">Validation failure (e.g. same home and away team).</response>
     [HttpPost]
-    [Authorize(Policy = "CanManageDivisions")]
+    // Drawing a fixture is running the competition, and a competition belongs to no division.
+    [Authorize(Policy = "SuperAdminOnly")]
     [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]

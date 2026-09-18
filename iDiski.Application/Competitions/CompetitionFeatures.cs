@@ -18,7 +18,6 @@ public sealed class CreateCompetitionCommandValidator
 {
     public CreateCompetitionCommandValidator()
     {
-        RuleFor(x => x.DivisionId).NotEmpty();
         RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
         RuleFor(x => x.ShortCode).NotEmpty().MaximumLength(20);
         RuleFor(x => x.Season).InclusiveBetween(2000, 2100);
@@ -52,6 +51,16 @@ public sealed class UpdateCompetitionCommandValidator
     }
 }
 
+/// <summary>
+/// How a gender reads in a refusal. Shared because two places turn a club away over it: adding
+/// one by hand, and starting a competition off with a whole division's clubs.
+/// </summary>
+internal static class GenderWords
+{
+    public static string Describe(Gender? gender) =>
+        gender?.ToString().ToLowerInvariant() ?? "genderless";
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // CREATE
 // ═════════════════════════════════════════════════════════════════════════════
@@ -67,46 +76,63 @@ public sealed class CreateCompetitionCommandHandler
         Commands.CreateCompetitionCommand request,
         CancellationToken cancellationToken)
     {
-        var division = await _db.Divisions
-            .Include(d => d.Teams)
-            .FirstOrDefaultAsync(d => d.Id == request.DivisionId, cancellationToken)
-            ?? throw new NotFoundException(nameof(Division), request.DivisionId);
-
         var shortCode = request.ShortCode.Trim().ToUpperInvariant();
 
+        // Unique across the season. Nothing runs a competition, so there is no division to be
+        // unique within any more.
         var clash = await _db.Competitions.AnyAsync(
-            c => c.DivisionId == division.Id
-                 && c.Season == request.Season
-                 && c.ShortCode == shortCode,
+            c => c.Season == request.Season && c.ShortCode == shortCode,
             cancellationToken);
 
         if (clash)
         {
             throw new InvalidOperationException(
-                $"{division.Name} already runs a competition with the short code {shortCode} "
-                + $"in {request.Season}.");
+                $"A competition with the short code {shortCode} is already being played in "
+                + $"{request.Season}.");
         }
 
-        // Entering everybody into a competition that holds fewer would mean choosing which
-        // clubs to drop, and that is the organiser's decision rather than ours. Refused here,
-        // with the other refusals, so nothing has been built by the time it is turned down.
-        if (request.EnterAllDivisionTeams
-            && request.MaxTeams.HasValue
-            && division.Teams.Count > request.MaxTeams.Value)
+        // Optionally started off with a whole division's clubs. Loaded up front so both the
+        // gender rule and the size limit are answered before anything is written.
+        var starters = new List<Team>();
+
+        if (request.EnterTeamsFromDivisionId.HasValue)
         {
-            throw new InvalidOperationException(
-                $"{division.Name} has {division.Teams.Count} clubs and this competition "
-                + $"holds {request.MaxTeams.Value}. Create it empty and choose who plays.");
+            var division = await _db.Divisions
+                .Include(d => d.Teams)
+                .FirstOrDefaultAsync(
+                    d => d.Id == request.EnterTeamsFromDivisionId.Value, cancellationToken)
+                ?? throw new NotFoundException(
+                    nameof(Division), request.EnterTeamsFromDivisionId.Value);
+
+            if (division.Gender != request.Gender)
+            {
+                throw new InvalidOperationException(
+                    $"{division.Name} is a {GenderWords.Describe(division.Gender)} division "
+                    + $"and this is a {GenderWords.Describe(request.Gender)} competition. Its "
+                    + "clubs cannot be entered.");
+            }
+
+            // Entering everybody into a competition that holds fewer would mean choosing which
+            // clubs to drop, and that is the organiser's decision rather than ours.
+            if (request.MaxTeams.HasValue && division.Teams.Count > request.MaxTeams.Value)
+            {
+                throw new InvalidOperationException(
+                    $"{division.Name} has {division.Teams.Count} clubs and this competition "
+                    + $"holds {request.MaxTeams.Value}. Create it empty and choose who plays.");
+            }
+
+            starters.AddRange(division.Teams);
         }
 
         var competition = new Competition
         {
             Id = Guid.NewGuid(),
-            DivisionId = division.Id,
             Name = request.Name.Trim(),
             ShortCode = shortCode,
             Season = request.Season,
             Format = request.Format,
+            Gender = request.Gender,
+            AgeGroup = request.AgeGroup?.Trim(),
             MaxTeams = request.MaxTeams,
             StartDate = request.StartDate,
             EndDate = request.EndDate,
@@ -117,19 +143,15 @@ public sealed class CreateCompetitionCommandHandler
 
         _db.Competitions.Add(competition);
 
-        // A league wants everybody, and a cup is easier to trim down than to build up.
-        if (request.EnterAllDivisionTeams)
+        foreach (var team in starters)
         {
-            foreach (var team in division.Teams)
+            _db.CompetitionEntries.Add(new CompetitionEntry
             {
-                _db.CompetitionEntries.Add(new CompetitionEntry
-                {
-                    Id = Guid.NewGuid(),
-                    CompetitionId = competition.Id,
-                    TeamId = team.Id,
-                    CreatedAt = DateTime.UtcNow,
-                });
-            }
+                Id = Guid.NewGuid(),
+                CompetitionId = competition.Id,
+                TeamId = team.Id,
+                CreatedAt = DateTime.UtcNow,
+            });
         }
 
         await _db.SaveChangesAsync(cancellationToken);
@@ -161,8 +183,7 @@ public sealed class UpdateCompetitionCommandHandler
         if (shortCode != competition.ShortCode)
         {
             var clash = await _db.Competitions.AnyAsync(
-                c => c.DivisionId == competition.DivisionId
-                     && c.Season == competition.Season
+                c => c.Season == competition.Season
                      && c.ShortCode == shortCode
                      && c.Id != competition.Id,
                 cancellationToken);
@@ -170,8 +191,8 @@ public sealed class UpdateCompetitionCommandHandler
             if (clash)
             {
                 throw new InvalidOperationException(
-                    $"Another competition in this division already uses the short code "
-                    + $"{shortCode} in {competition.Season}.");
+                    $"Another competition already uses the short code {shortCode} in "
+                    + $"{competition.Season}.");
             }
         }
 
@@ -207,7 +228,25 @@ public sealed class UpdateCompetitionCommandHandler
             }
         }
 
+        // Changing who a competition is for, with clubs already entered, would leave sides in
+        // something they are not eligible for.
+        if (request.Gender != competition.Gender)
+        {
+            var entered = await _db.CompetitionEntries
+                .CountAsync(e => e.CompetitionId == competition.Id, cancellationToken);
+
+            if (entered > 0)
+            {
+                throw new InvalidOperationException(
+                    $"{competition.Name} already has {entered} clubs entered, so who it is for "
+                    + "cannot change. Withdraw them first.");
+            }
+
+            competition.Gender = request.Gender;
+        }
+
         competition.Name = request.Name.Trim();
+        competition.AgeGroup = request.AgeGroup?.Trim();
         competition.MaxTeams = request.MaxTeams;
         competition.ShortCode = shortCode;
         competition.StartDate = request.StartDate;
@@ -279,7 +318,6 @@ public sealed class EnterTeamCommandHandler : IRequestHandler<Commands.EnterTeam
         CancellationToken cancellationToken)
     {
         var competition = await _db.Competitions
-            .Include(c => c.Division)
             .FirstOrDefaultAsync(c => c.Id == request.CompetitionId, cancellationToken)
             ?? throw new NotFoundException(nameof(Competition), request.CompetitionId);
 
@@ -297,12 +335,12 @@ public sealed class EnterTeamCommandHandler : IRequestHandler<Commands.EnterTeam
         //
         // Compared strictly: a division with no gender recorded cannot be confirmed to match,
         // and guessing is exactly what must not happen here.
-        if (team.Division?.Gender != competition.Division.Gender)
+        if (team.Division?.Gender != competition.Gender)
         {
             throw new InvalidOperationException(
                 $"{team.Name} plays in a "
-                + $"{Describe(team.Division?.Gender)} division and {competition.Name} is a "
-                + $"{Describe(competition.Division.Gender)} competition. "
+                + $"{GenderWords.Describe(team.Division?.Gender)} division and {competition.Name} is a "
+                + $"{GenderWords.Describe(competition.Gender)} competition. "
                 + "They cannot be entered into it.");
         }
 
@@ -358,8 +396,6 @@ public sealed class EnterTeamCommandHandler : IRequestHandler<Commands.EnterTeam
         return Unit.Value;
     }
 
-    private static string Describe(Gender? gender) =>
-        gender?.ToString().ToLowerInvariant() ?? "genderless";
 }
 
 public sealed class WithdrawTeamCommandHandler : IRequestHandler<Commands.WithdrawTeamCommand, Unit>
@@ -415,8 +451,13 @@ public sealed class GetCompetitionsQueryHandler
     {
         var query = _db.Competitions.AsNoTracking();
 
+        // A division no longer owns competitions, so this asks the only question left that
+        // means anything: which ones are this division's clubs playing in?
         if (request.DivisionId.HasValue)
-            query = query.Where(c => c.DivisionId == request.DivisionId.Value);
+        {
+            query = query.Where(
+                c => c.Entries.Any(e => e.Team.DivisionId == request.DivisionId.Value));
+        }
 
         if (request.Season.HasValue)
             query = query.Where(c => c.Season == request.Season.Value);
@@ -441,19 +482,19 @@ public sealed class GetCompetitionsQueryHandler
     internal static readonly Expression<Func<Competition, CompetitionDto>> Projection = c =>
         new CompetitionDto(
         c.Id,
-        c.DivisionId,
-        c.Division.Name,
         c.Name,
         c.ShortCode,
         c.Season,
         c.Format,
+        c.Gender,
+        c.AgeGroup,
         c.MaxTeams,
         c.StartDate,
         c.EndDate,
         c.Description,
         c.IsActive,
         c.Entries.Count,
-        c.Entries.Count(e => e.Team.DivisionId != c.DivisionId),
+        c.Entries.Select(e => e.Team.DivisionId).Distinct().Count(),
         c.Matches.Count,
         c.Matches.Count(m => m.Status == MatchStatus.Completed),
         c.Matches.Count(m =>
@@ -507,8 +548,7 @@ public sealed class GetCompetitionEntrantsQueryHandler
                 e.Team.ShortCode,
                 e.Team.LogoUrl,
                 e.Team.DivisionId,
-                e.Team.Division != null ? e.Team.Division.Name : null,
-                e.Team.DivisionId != e.Competition.DivisionId
+                e.Team.Division != null ? e.Team.Division.Name : null
             ))
             .ToListAsync(cancellationToken);
     }

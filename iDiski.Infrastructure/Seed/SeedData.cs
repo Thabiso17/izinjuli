@@ -269,7 +269,6 @@ public static class SeedData
                     AwayTeamId = awayTeam.Id,
                     Venue = homeTeam.HomeGround,
                     Status = matchDate < DateTime.Now ? MatchStatus.Completed : MatchStatus.Scheduled,
-                    DivisionId = seniorDivision.Id
                 };
 
                 // For completed matches, add random scores
@@ -301,7 +300,6 @@ public static class SeedData
                     AwayTeamId = awayTeam.Id,
                     Venue = homeTeam.HomeGround,
                     Status = MatchStatus.Scheduled,
-                    DivisionId = seniorDivision.Id
                 });
             }
         }

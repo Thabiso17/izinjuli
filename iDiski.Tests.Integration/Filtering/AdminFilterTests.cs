@@ -108,7 +108,7 @@ public class AdminFilterTests : IClassFixture<IntegrationTestFixture>
         // competition is the only thing that separates them.
         var scenario = await LeagueScenario.CreateAsync(_fixture.DbContext);
 
-        var cup = await AddCompetitionAsync(scenario.DivisionOneId, CompetitionFormat.Knockout);
+        var cup = await AddCompetitionAsync(CompetitionFormat.Knockout);
 
         var inTheLeague = await AddMatchAsync(
             scenario.DivisionOneId, scenario.TeamAId, scenario.TeamBId);
@@ -253,7 +253,6 @@ public class AdminFilterTests : IClassFixture<IntegrationTestFixture>
         var match = new MatchResult
         {
             Id = Guid.NewGuid(),
-            DivisionId = divisionId,
             CompetitionId = competitionId ?? await TheLeagueOfAsync(divisionId),
             HomeTeamId = homeTeamId,
             AwayTeamId = awayTeamId,
@@ -273,23 +272,44 @@ public class AdminFilterTests : IClassFixture<IntegrationTestFixture>
     private async Task<Guid> TheLeagueOfAsync(Guid divisionId)
     {
         var existing = await _fixture.DbContext.Competitions
-            .Where(c => c.DivisionId == divisionId && c.Format == CompetitionFormat.League)
+            .Where(c => c.Format == CompetitionFormat.League
+                        && c.Entries.Any(e => e.Team.DivisionId == divisionId))
             .Select(c => c.Id)
             .FirstOrDefaultAsync();
 
         if (existing != Guid.Empty) return existing;
 
-        return await AddCompetitionAsync(divisionId, CompetitionFormat.League);
+        var id = await AddCompetitionAsync(CompetitionFormat.League);
+
+        // Entered rather than owned: this is the only thing that makes it the division's
+        // league, and it is what TheLeagueOfAsync looks for next time.
+        var teams = await _fixture.DbContext.Teams
+            .Where(t => t.DivisionId == divisionId)
+            .Select(t => t.Id)
+            .ToListAsync();
+
+        foreach (var teamId in teams)
+        {
+            _fixture.DbContext.CompetitionEntries.Add(new CompetitionEntry
+            {
+                Id = Guid.NewGuid(),
+                CompetitionId = id,
+                TeamId = teamId,
+                CreatedAt = DateTime.UtcNow,
+            });
+        }
+
+        await _fixture.DbContext.SaveChangesAsync();
+        return id;
     }
 
-    private async Task<Guid> AddCompetitionAsync(Guid divisionId, CompetitionFormat format)
+    private async Task<Guid> AddCompetitionAsync(CompetitionFormat format)
     {
         var id = Guid.NewGuid();
 
         _fixture.DbContext.Competitions.Add(new Competition
         {
             Id = id,
-            DivisionId = divisionId,
             Name = $"{format} {TestIds.Code("N")}",
             ShortCode = TestIds.Code("AF"),
             Season = 2026,

@@ -21,10 +21,9 @@ public class Division : BaseEntity
 
     // Navigation properties
     public ICollection<Team> Teams { get; set; } = new List<Team>();
-    public ICollection<MatchResult> Matches { get; set; } = new List<MatchResult>();
 
-    /// <summary>The competitions being run from this division.</summary>
-    public ICollection<Competition> Competitions { get; set; } = new List<Competition>();
+    // No competitions here. A division is the clubs; what they play is a competition, and a
+    // competition is contested by clubs from wherever it invited them.
 }
 
 public enum Gender

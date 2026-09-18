@@ -206,7 +206,6 @@ public class GroupStandingsTests : IClassFixture<IntegrationTestFixture>
         _fixture.DbContext.Competitions.Add(new Competition
         {
             Id = competitionId,
-            DivisionId = divisionId,
             Name = $"Groups of {teamCount}",
             ShortCode = TestIds.Code("GS"),
             Season = 2026,

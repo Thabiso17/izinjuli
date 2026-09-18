@@ -301,7 +301,6 @@ public class BracketProgressionTests : IClassFixture<IntegrationTestFixture>
         _fixture.DbContext.Competitions.Add(new Competition
         {
             Id = competitionId,
-            DivisionId = divisionId,
             Name = $"Competition {TestIds.Code("N")}",
             ShortCode = TestIds.Code("BP"),
             Season = 2026,

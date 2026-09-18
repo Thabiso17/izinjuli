@@ -10,8 +10,8 @@ namespace iDiski.Application.Common.Behaviours;
 
 /// <summary>
 /// Enforces resource-scoped authorization for requests implementing IRequireDivisionAccess,
-/// IRequireTeamAccess, IRequirePlayerAccess, IRequireMatchAccess or IRequireCompetitionAccess,
-/// by running them through the same
+/// IRequireTeamAccess, IRequirePlayerAccess or IRequireMatchAccess, by running them through
+/// the same
 /// TeamOwnershipHandler / DivisionOwnershipHandler registered for ASP.NET Core authorization.
 /// [Authorize(Policy = "CanManageTeams"/"CanManageDivisions")] on a controller action only
 /// checks role membership (e.g. "is this user a DivisionAdmin at all") — this behaviour is
@@ -48,27 +48,34 @@ public sealed class AuthorizationBehaviour<TRequest, TResponse>
         if (request is IRequireTeamAccess teamRequest)
             await EnsureAuthorizedAsync(new TeamOwnershipRequirement(teamRequest.TeamId));
 
-        if (request is IRequireCompetitionAccess competitionRequest)
-        {
-            var owningDivisionId = await _db.Competitions
-                .Where(c => c.Id == competitionRequest.CompetitionId)
-                .Select(c => c.DivisionId)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            await EnsureAuthorizedAsync(new DivisionOwnershipRequirement(owningDivisionId));
-        }
-
         if (request is IRequireMatchAccess matchRequest)
         {
-            // A fixture with no division resolves to Guid.Empty, which no DivisionAdmin is
-            // assigned to, so only a SuperAdmin gets through. Failing closed is the right
-            // direction for a row nobody's scope covers.
-            var divisionId = await _db.MatchResults
+            // A fixture has no division: it belongs to a competition, which may be contested
+            // across several. So its scope is the two clubs playing — whoever administers
+            // either side's division may record what happened between them.
+            var clubDivisions = await _db.MatchResults
                 .Where(m => m.Id == matchRequest.MatchId)
-                .Select(m => m.DivisionId ?? Guid.Empty)
+                .Select(m => new
+                {
+                    Home = m.HomeTeam != null ? m.HomeTeam.DivisionId : (Guid?)null,
+                    Away = m.AwayTeam != null ? m.AwayTeam.DivisionId : (Guid?)null,
+                })
                 .FirstOrDefaultAsync(cancellationToken);
 
-            await EnsureAuthorizedAsync(new DivisionOwnershipRequirement(divisionId));
+            // An empty bracket slot has no clubs and so nobody's scope covers it, leaving it
+            // to a SuperAdmin. Failing closed is the right direction, and there is nothing to
+            // record on a semi-final whose finalists have not arrived.
+            var candidates = new List<Guid>();
+
+            if (clubDivisions is not null)
+            {
+                if (clubDivisions.Home is Guid home) candidates.Add(home);
+                if (clubDivisions.Away is Guid away && away != clubDivisions.Home)
+                    candidates.Add(away);
+            }
+
+            await EnsureAnyAuthorizedAsync(
+                candidates.Select(id => new DivisionOwnershipRequirement(id)).ToList());
         }
 
         if (request is IRequirePlayerAccess playerRequest)
@@ -91,6 +98,32 @@ public sealed class AuthorizationBehaviour<TRequest, TResponse>
             if (!result.Succeeded)
                 throw new ForbiddenException(
                     $"You do not have permission to perform this action ({typeof(TRequest).Name}).");
+        }
+
+        // Passes if the requester satisfies any one of these — a fixture is reachable by
+        // either club's administrator.
+        async Task EnsureAnyAuthorizedAsync(IReadOnlyList<IAuthorizationRequirement> options)
+        {
+            var principal = _currentUserService.User ?? new ClaimsPrincipal();
+
+            foreach (var requirement in options)
+            {
+                var result = await _authorizationService.AuthorizeAsync(
+                    principal, resource: null, requirement);
+
+                if (result.Succeeded) return;
+            }
+
+            // A SuperAdmin passes any DivisionOwnershipRequirement, so give an unscopeable
+            // fixture one to pass rather than refusing them along with everybody else.
+            if (options.Count == 0)
+            {
+                await EnsureAuthorizedAsync(new DivisionOwnershipRequirement(Guid.Empty));
+                return;
+            }
+
+            throw new ForbiddenException(
+                $"You do not have permission to perform this action ({typeof(TRequest).Name}).");
         }
     }
 }

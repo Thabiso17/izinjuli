@@ -61,7 +61,7 @@ public class CompetitionCrudTests : IClassFixture<IntegrationTestFixture>
     }
 
     [Fact]
-    public async Task TwoCompetitionsInOneDivisionCannotShareAShortCode()
+    public async Task TwoCompetitionsInOneSeasonCannotShareAShortCode()
     {
         var divisionId = await CompetitionScenario.ADivisionAsync(_fixture.DbContext);
 
@@ -76,10 +76,11 @@ public class CompetitionCrudTests : IClassFixture<IntegrationTestFixture>
     }
 
     [Fact]
-    public async Task TheSameShortCodeIsFineInAnotherDivision()
+    public async Task TheSameShortCodeIsRefusedAcrossDivisionsToo()
     {
-        // Codes are unique per division and season, not league-wide: two divisions may each
-        // run something they both call "CUP".
+        // It used to be unique within a division and season, so two divisions could each call
+        // theirs "LGE". A competition belongs to no division now, so the season is the only
+        // scope left for a code to be unique within.
         var first = await CompetitionScenario.ADivisionAsync(_fixture.DbContext);
         var second = await CompetitionScenario.ADivisionAsync(_fixture.DbContext);
 
@@ -88,7 +89,21 @@ public class CompetitionCrudTests : IClassFixture<IntegrationTestFixture>
         await Create(first, enterAll: false, shortCode: code);
         var shared = async () => await Create(second, enterAll: false, shortCode: code);
 
-        await shared.Should().NotThrowAsync();
+        await shared.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task TheSameShortCodeIsFineInAnotherSeason()
+    {
+        // Next year's cup is the same cup, and reusing its code is the point of a code.
+        var divisionId = await CompetitionScenario.ADivisionAsync(_fixture.DbContext);
+        var code = TestIds.Code("YR");
+
+        await Create(divisionId, enterAll: false, shortCode: code);
+        var nextYear = async () =>
+            await Create(divisionId, enterAll: false, shortCode: code, season: 2041);
+
+        await nextYear.Should().NotThrowAsync();
     }
 
     // ── How many clubs it holds ───────────────────────────────────────────────
@@ -314,7 +329,8 @@ public class CompetitionCrudTests : IClassFixture<IntegrationTestFixture>
         bool enterAll,
         CompetitionFormat format = CompetitionFormat.League,
         string? shortCode = null,
-        int? maxTeams = null)
+        int? maxTeams = null,
+        int season = 2040)
     {
         _fixture.DbContext.ChangeTracker.Clear();
 
@@ -324,10 +340,11 @@ public class CompetitionCrudTests : IClassFixture<IntegrationTestFixture>
                 DivisionId = divisionId,
                 Name = $"Competition {TestIds.Code("N")}",
                 ShortCode = shortCode ?? TestIds.Code("CC"),
-                Season = 2040,
+                Season = season,
                 Format = format,
                 MaxTeams = maxTeams,
-                EnterAllDivisionTeams = enterAll,
+                Gender = Gender.Male,
+                EnterTeamsFromDivisionId = enterAll ? divisionId : null,
             },
             CancellationToken.None);
     }
@@ -340,6 +357,7 @@ public class CompetitionCrudTests : IClassFixture<IntegrationTestFixture>
                 Name = name,
                 ShortCode = TestIds.Code("UC"),
                 Format = format,
+                Gender = Gender.Male,
                 MaxTeams = maxTeams,
                 IsActive = true,
             },

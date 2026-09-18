@@ -64,14 +64,14 @@ test.describe('competitions', () => {
     const modal = page.locator('.modal.show');
     await expect(modal).toBeVisible();
 
-    // Reached this way there is no division in the route, so the form has to ask for one.
-    await selectByName(modal.locator('[data-testid="competition-division-picker"]'), division);
-
     await modal.locator('input[name="name"]').fill(name);
     await modal.locator('input[name="shortCode"]').fill(shortCode('M'));
     await modal.locator('[data-testid="competition-format"]').selectOption('Knockout');
     await modal.locator('[data-testid="competition-max-teams"]').fill('8');
-    await modal.locator('[data-testid="enter-all"]').uncheck();
+
+    // Nobody entered yet: a cup starts empty and the organiser chooses the field. The
+    // division only exists here to have clubs available to choose from later.
+    void division;
 
     await modal.locator('[data-testid="save-competition"]').click();
     await expect(modal).toBeHidden();
@@ -142,7 +142,7 @@ test.describe('competitions', () => {
     }
 
     // Started with nobody in it, then four entered by hand.
-    const competition = await createCompetition(page, division, 'Knockout', { enterAll: false });
+    const competition = await createCompetition(page, null, 'Knockout');
 
     await openEntrants(page, competition);
 
@@ -239,43 +239,39 @@ async function createDivision(page: Page): Promise<string> {
   return name;
 }
 
+/**
+ * A division's id, read off the edit button on its row. It used to come from the competitions
+ * link, which no longer points at one division — a division does not have competitions.
+ */
 async function divisionIdFor(page: Page, divisionName: string): Promise<string> {
   await page.goto('/admin/divisions');
   await page.waitForLoadState('networkidle');
 
-  const link = page
-    .locator('tr', { hasText: divisionName })
-    .locator('[data-testid="manage-competitions"]');
-
-  const href = await link.getAttribute('href');
-  const id = href?.split('/').filter(Boolean).at(-2);
+  const row = page.locator('tr', { hasText: divisionName });
+  const id = await row.getAttribute('data-division-id');
 
   expect(id, `could not find the id of ${divisionName}`).toBeTruthy();
   return id!;
 }
 
-/** Opens the competitions screen for a division and leaves the page there. */
-async function openCompetitions(page: Page, divisionName: string) {
-  await page.goto('/admin/divisions');
-  await page.waitForLoadState('networkidle');
-
-  await page
-    .locator('tr', { hasText: divisionName })
-    .locator('[data-testid="manage-competitions"]')
-    .click();
-
+/** The competitions screen. Not a division's — there is only one, from the admin menu. */
+async function openCompetitions(page: Page) {
+  await page.goto('/admin/competitions');
   await page.waitForLoadState('networkidle');
 }
 
+/**
+ * Starts a competition. It belongs to no division; passing one only fills the entry list with
+ * that division's clubs straight away, which is how a league gets set up.
+ */
 async function createCompetition(
   page: Page,
-  divisionName: string,
+  divisionName: string | null,
   format: string,
-  options: { enterAll?: boolean } = {},
 ): Promise<string> {
   const name = `${format} ${unique()}`;
 
-  await openCompetitions(page, divisionName);
+  await openCompetitions(page);
   await page.locator('[data-testid="add-competition"]').click();
 
   const modal = page.locator('.modal.show');
@@ -285,8 +281,8 @@ async function createCompetition(
   await modal.locator('input[name="shortCode"]').fill(shortCode('C'));
   await modal.locator('[data-testid="competition-format"]').selectOption(format);
 
-  if (options.enterAll === false) {
-    await modal.locator('[data-testid="enter-all"]').uncheck();
+  if (divisionName) {
+    await selectByName(modal.locator('[data-testid="enter-teams-from"]'), divisionName);
   }
 
   await modal.locator('[data-testid="save-competition"]').click();

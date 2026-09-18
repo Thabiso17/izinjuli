@@ -1,7 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { CompetitionService } from '../../../core/services/competition.service';
 import { DivisionService } from '../../../core/services/division.service';
 import { TeamService } from '../../../core/services/team.service';
@@ -11,6 +11,8 @@ import {
   CompetitionFormat,
   COMPETITION_FORMAT_HINT,
   COMPETITION_FORMAT_LABEL,
+  COMPETITION_GENDER_LABEL,
+  CompetitionGender,
   COMPETITION_STATUS_CLASS,
   COMPETITION_STATUS_LABEL,
   CreateCompetitionCommand,
@@ -34,22 +36,11 @@ import {
     <div class="container-fluid py-4">
       <div class="row mb-4">
         <div class="col">
-          @if (!allDivisions()) {
-            <a routerLink="/admin/divisions" class="text-decoration-none small">
-              <i class="bi bi-arrow-left me-1"></i>Divisions
-            </a>
-          }
-          <h1 class="display-6 mt-2">
-            {{ allDivisions() ? 'Competitions' : division()?.name || 'Competitions' }}
-          </h1>
+          <h1 class="display-6 mt-2">Competitions</h1>
           <p class="text-muted">
-            @if (allDivisions()) {
-              Everything being played, across every division. A league, a cup and a sponsor's
-              tournament can run side by side in one division, each with its own entrants.
-            } @else {
-              What this division is playing. A league, a cup and a sponsor's tournament can run
-              side by side, each with its own entrants.
-            }
+            <!-- Divisions hold the clubs; this is what they play. -->
+            What is being played. A league, a cup, a sponsor's tournament — each with its own
+            entry list, drawn from one division or from several.
           </p>
         </div>
         <div class="col-auto">
@@ -92,6 +83,11 @@ import {
                       <span class="badge bg-light text-dark border ms-1">
                         {{ formatLabel[competition.format] }}
                       </span>
+                      <span class="badge bg-light text-dark border ms-1">
+                        {{ genderLabel[competition.gender] }}@if (competition.ageGroup) {
+                          <span> · {{ competition.ageGroup }}</span>
+                        }
+                      </span>
                       <span [class]="'badge ms-1 ' + statusClass[competition.status]">
                         {{ statusLabel[competition.status] }}
                       </span>
@@ -117,25 +113,14 @@ import {
                     </div>
                   </div>
 
-                  @if (allDivisions()) {
-                    <div class="small mb-2">
-                      <i class="bi bi-diagram-3 me-1 text-muted"></i>
-                      <a
-                        [routerLink]="['/admin/divisions', competition.divisionId, 'competitions']"
-                        class="text-decoration-none"
-                        data-testid="competition-division"
-                      >{{ competition.divisionName }}</a>
-                    </div>
-                  }
-
                   <div class="text-muted small mb-3">
                     <span
                       [class.text-warning]="progress(competition).short > 0"
                       data-testid="entrant-progress"
                     >{{ progress(competition).text }}</span>
-                    @if (competition.externalEntrantCount > 0) {
+                    @if (competition.divisionsRepresented > 1) {
                       <span class="text-info">
-                        · {{ competition.externalEntrantCount }} invited
+                        · from {{ competition.divisionsRepresented }} divisions
                       </span>
                     }
                     · {{ competition.matchCount }} fixtures · {{ competition.season }}
@@ -158,12 +143,8 @@ import {
                   <i class="bi bi-trophy display-1 text-muted"></i>
                   <h3 class="mt-3">Nothing being played yet</h3>
                   <p class="text-muted mb-0">
-                    @if (allDivisions()) {
-                      A division holds the clubs; a competition is what they play. Add one to
-                      give them a league, a cup or a tournament.
-                    } @else {
-                      Add a competition to give this division's clubs something to play.
-                    }
+                    A division holds the clubs; a competition is what they play. Add one to
+                    give them a league, a cup or a tournament.
                   </p>
                 </div>
               </div>
@@ -183,30 +164,6 @@ import {
               </div>
               <div class="modal-body">
                 <div class="row g-3">
-                  @if (allDivisions()) {
-                    <div class="col-12">
-                      <label class="form-label">Division *</label>
-                      <select
-                        class="form-select"
-                        [(ngModel)]="form.divisionId"
-                        name="divisionId"
-                        data-testid="competition-division-picker"
-                        (ngModelChange)="divisionChosen()"
-                      >
-                        <option [ngValue]="''">Select a division…</option>
-                        @for (d of divisions(); track d.id) {
-                          <option [ngValue]="d.id">{{ d.name }} ({{ d.season }})</option>
-                        }
-                      </select>
-                      <small class="form-text text-muted">
-                        <!-- The organiser, not the entry list: a cup may field clubs from
-                             three divisions and is still run from one. -->
-                        The division running it. Clubs from elsewhere can be invited once it
-                        exists.
-                      </small>
-                    </div>
-                  }
-
                   <div class="col-md-8">
                     <label class="form-label">Name *</label>
                     <input
@@ -244,6 +201,37 @@ import {
                   </div>
 
                   <div class="col-md-6">
+                    <label class="form-label">For *</label>
+                    <select
+                      class="form-select"
+                      [(ngModel)]="form.gender"
+                      name="gender"
+                      data-testid="competition-gender"
+                    >
+                      @for (g of genders; track g) {
+                        <option [ngValue]="g">{{ genderLabel[g] }}</option>
+                      }
+                    </select>
+                    <small class="form-text text-muted">
+                      <!-- Checked at entry: a women's club cannot join a boys competition. -->
+                      A club from a division of a different gender cannot be entered.
+                    </small>
+                  </div>
+
+                  <div class="col-md-6">
+                    <label class="form-label">Age group</label>
+                    <input
+                      class="form-control"
+                      [(ngModel)]="form.ageGroup"
+                      name="ageGroup"
+                      placeholder="U17, Open"
+                    />
+                    <small class="form-text text-muted">
+                      Optional, and not enforced — clubs play up an age group all the time.
+                    </small>
+                  </div>
+
+                  <div class="col-md-6">
                     <label class="form-label">Number of teams</label>
                     <input
                       type="number"
@@ -274,28 +262,26 @@ import {
                   </div>
 
                   <div class="col-12">
-                    <div class="form-check">
-                      <input
-                        type="checkbox"
-                        class="form-check-input"
-                        [(ngModel)]="form.enterAllDivisionTeams"
-                        name="enterAll"
-                        id="enterAll"
-                        data-testid="enter-all"
-                      />
-                      <label class="form-check-label" for="enterAll">
-                        @if (chosenDivision(); as d) {
-                          Enter all {{ d.teamCount || 0 }} clubs in {{ d.name }}
-                        } @else {
-                          Enter every club in the division
-                        }
-                      </label>
-                    </div>
-                    <small class="text-muted">
-                      <!-- A league wants everybody; a cup is easier to trim down than to build
-                           up, and an invitational starts from nobody. -->
-                      Leave ticked for a league. Untick it for a cup only some of them enter,
-                      then add the entrants afterwards.
+                    <label class="form-label">Start the entry list with</label>
+                    <select
+                      class="form-select"
+                      [(ngModel)]="form.enterTeamsFromDivisionId"
+                      name="enterTeamsFrom"
+                      data-testid="enter-teams-from"
+                      (ngModelChange)="startingDivisionChosen()"
+                    >
+                      <option [ngValue]="null">Nobody — I will choose the clubs</option>
+                      @for (d of eligibleDivisions(); track d.id) {
+                        <option [ngValue]="d.id">
+                          Every club in {{ d.name }} ({{ d.teamCount || 0 }})
+                        </option>
+                      }
+                    </select>
+                    <small class="form-text text-muted">
+                      <!-- A convenience, not a relationship: nothing afterwards records that
+                           these clubs arrived together. -->
+                      A whole division is the quick way to set up its league. For a cup, start
+                      from nobody and add the clubs you want — from any division.
                     </small>
                   </div>
                 </div>
@@ -305,7 +291,7 @@ import {
                 <button
                   class="btn btn-primary"
                   data-testid="save-competition"
-                  [disabled]="!form.name || !form.shortCode || !form.divisionId || saving()"
+                  [disabled]="!form.name || !form.shortCode || saving()"
                   (click)="create()"
                 >
                   {{ saving() ? 'Saving…' : 'Create' }}
@@ -344,11 +330,11 @@ import {
                     >
                       <span class="badge bg-secondary">{{ entrant.shortCode }}</span>
                       <span class="flex-grow-1">{{ entrant.teamName }}</span>
-                      @if (entrant.isExternal) {
-                        <span class="badge bg-info text-dark" [title]="entrant.divisionName || ''">
-                          Invited
-                        </span>
-                      }
+                      <!-- Where each club comes from, rather than whether it is a guest:
+                           there is no host division for it to be a guest of. -->
+                      <span class="badge bg-light text-dark border">
+                        {{ entrant.divisionName || 'No division' }}
+                      </span>
                       @if (competition.matchCount === 0) {
                         <button
                           class="btn btn-sm btn-outline-danger"
@@ -367,18 +353,15 @@ import {
                 @if (competition.matchCount === 0) {
                   <h6 class="text-uppercase text-muted small">Add a club</h6>
                   <p class="text-muted small">
-                    Clubs from other divisions can be invited. One from a division of a
-                    different gender cannot, and the API refuses it.
+                    Any club from any division. One whose division is of a different gender
+                    cannot be entered, and the API refuses it.
                   </p>
                   <div class="input-group">
                     <select class="form-select" [(ngModel)]="teamToAdd" name="teamToAdd">
                       <option [ngValue]="null">Select a club</option>
                       @for (team of addableTeams(); track team.id) {
                         <option [ngValue]="team.id">
-                          {{ team.name }}
-                          @if (team.divisionId !== competition.divisionId) {
-                            — {{ team.divisionName || 'another division' }}
-                          }
+                          {{ team.name }} — {{ team.divisionName || 'no division' }}
                         </option>
                       }
                     </select>
@@ -404,17 +387,11 @@ import {
   `,
 })
 export class CompetitionsAdminComponent implements OnInit {
-  private readonly route = inject(ActivatedRoute);
   private readonly competitionService = inject(CompetitionService);
   private readonly divisionService = inject(DivisionService);
   private readonly teamService = inject(TeamService);
 
-  /**
-   * The division this screen is scoped to, or empty when it is showing every division —
-   * reached from the admin menu rather than from one division's row.
-   */
-  divisionId = '';
-  division = signal<DivisionDto | null>(null);
+  /** Only ever used to offer "start the entry list with every club in X". */
   divisions = signal<DivisionDto[]>([]);
   competitions = signal<CompetitionDto[]>([]);
   entrants = signal<CompetitionEntrantDto[]>([]);
@@ -430,6 +407,8 @@ export class CompetitionsAdminComponent implements OnInit {
   teamToAdd: string | null = null;
 
   readonly formats: CompetitionFormat[] = ['League', 'Knockout', 'GroupAndKnockout'];
+  readonly genders: CompetitionGender[] = ['Male', 'Female', 'Mixed'];
+  readonly genderLabel = COMPETITION_GENDER_LABEL;
   readonly formatLabel = COMPETITION_FORMAT_LABEL;
   readonly statusLabel = COMPETITION_STATUS_LABEL;
   readonly statusClass = COMPETITION_STATUS_CLASS;
@@ -437,24 +416,10 @@ export class CompetitionsAdminComponent implements OnInit {
   form: CreateCompetitionCommand = this.emptyForm();
 
   ngOnInit(): void {
-    this.divisionId = this.route.snapshot.paramMap.get('id') ?? '';
-
-    if (this.allDivisions()) {
-      // No division in the route, so the create form has to ask which one — and a competition
-      // always belongs to one, whoever it ends up inviting.
-      this.divisionService.getAll().subscribe({
-        next: (divisions) => this.divisions.set(divisions),
-        error: () => this.error.set('Failed to load divisions.'),
-      });
-    } else {
-      this.divisionService.getById(this.divisionId).subscribe({
-        next: (division) => {
-          this.division.set(division);
-          this.form = this.emptyForm();
-        },
-        error: () => this.error.set('Failed to load this division.'),
-      });
-    }
+    this.divisionService.getAll().subscribe({
+      next: (divisions) => this.divisions.set(divisions),
+      error: () => this.divisions.set([]),
+    });
 
     this.teamService.getAll().subscribe({
       next: (teams) => this.teams.set(teams),
@@ -464,24 +429,21 @@ export class CompetitionsAdminComponent implements OnInit {
     this.load();
   }
 
-  /** True when this screen is showing every division's competitions rather than one's. */
-  allDivisions(): boolean {
-    return this.divisionId === '';
-  }
-
-  /** The division the create form is pointed at, whichever way this screen was reached. */
-  chosenDivision(): DivisionDto | null {
-    if (!this.allDivisions()) return this.division();
-    return this.divisions().find((d) => d.id === this.form.divisionId) ?? null;
+  /**
+   * Divisions whose clubs could be entered wholesale — the ones whose gender matches, since
+   * the API refuses the rest and offering them would only produce an error.
+   */
+  eligibleDivisions(): DivisionDto[] {
+    return this.divisions().filter((d) => !d.gender || d.gender === this.form.gender);
   }
 
   /**
-   * Picking a division fixes the season: a competition belongs to the division's season, and
-   * asking the organiser to type it again is asking them to get it wrong.
+   * Taking a whole division's clubs fixes the season too: their league belongs to the year
+   * they are playing, and asking the organiser to type it again is asking them to get it wrong.
    */
-  divisionChosen(): void {
-    const division = this.chosenDivision();
-    if (division) this.form.season = division.season;
+  startingDivisionChosen(): void {
+    const chosen = this.divisions().find((d) => d.id === this.form.enterTeamsFromDivisionId);
+    if (chosen) this.form.season = chosen.season;
   }
 
   progress(competition: CompetitionDto) {
@@ -501,7 +463,7 @@ export class CompetitionsAdminComponent implements OnInit {
   load(): void {
     this.loading.set(true);
 
-    this.competitionService.getAll(this.divisionId || undefined).subscribe({
+    this.competitionService.getAll().subscribe({
       next: (competitions) => {
         this.competitions.set(competitions);
         this.loading.set(false);
@@ -595,13 +557,14 @@ export class CompetitionsAdminComponent implements OnInit {
 
   private emptyForm(): CreateCompetitionCommand {
     return {
-      divisionId: this.divisionId,
       name: '',
       shortCode: '',
-      season: this.division()?.season ?? new Date().getFullYear(),
+      season: new Date().getFullYear(),
       format: 'League',
+      gender: 'Male',
+      ageGroup: null,
       maxTeams: null,
-      enterAllDivisionTeams: true,
+      enterTeamsFromDivisionId: null,
     };
   }
 

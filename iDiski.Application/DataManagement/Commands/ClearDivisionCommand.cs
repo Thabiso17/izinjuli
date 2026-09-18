@@ -7,8 +7,9 @@ namespace iDiski.Application.DataManagement.Commands;
 
 // ── Command ───────────────────────────────────────────────────────────────────
 
-/// <summary>Permanently removes a division and everything nested under it: its competitions and
-/// their entry lists, teams, players, suspensions, match events and match history. Returns the
+/// <summary>Permanently removes a division and everything belonging to it: its teams, their
+/// players, suspensions, match events and fixtures, and the places those clubs held in any
+/// competition. The competitions themselves survive — a division does not own one. Returns the
 /// number of teams removed. SuperAdmin only.</summary>
 public sealed record ClearDivisionCommand(Guid DivisionId) : IRequest<int>;
 
@@ -36,21 +37,24 @@ public sealed class ClearDivisionCommandHandler : IRequestHandler<ClearDivisionC
             await ClearDataHelpers.ClearTeamDataAsync(_db, teamId, cancellationToken);
         }
 
-        // Safety net: a match can carry a DivisionId independent of its two teams' own
-        // division assignment. Clear those before removing the division itself.
+        // Any fixture either of this division's clubs was involved in, whatever competition it
+        // was part of. ClearTeamDataAsync above covers each club's own matches; this catches a
+        // fixture whose other side has already gone.
+        //
+        // Matched on the ids gathered above rather than through the navigation: ExecuteDelete
+        // issues one DELETE and cannot always translate a predicate that needs a join.
         await _db.MatchResults
-            .Where(m => m.DivisionId == request.DivisionId)
+            .Where(m =>
+                (m.HomeTeamId != null && teamIds.Contains(m.HomeTeamId.Value)) ||
+                (m.AwayTeamId != null && teamIds.Contains(m.AwayTeamId.Value)))
             .ExecuteDeleteAsync(cancellationToken);
 
-        // The competitions this division runs, and the places clubs held in them. Entries go
-        // first: a club from another division may hold one, and that club is not being
-        // deleted here, but its place in a competition that is disappearing must be.
+        // The places this division's clubs held in competitions. The competitions themselves
+        // stay: a division does not own one, and a cup contested across three divisions is
+        // not abandoned because one of them was cleared — it is left with fewer entrants,
+        // which is the truth of what happened.
         await _db.CompetitionEntries
-            .Where(e => e.Competition.DivisionId == request.DivisionId)
-            .ExecuteDeleteAsync(cancellationToken);
-
-        await _db.Competitions
-            .Where(c => c.DivisionId == request.DivisionId)
+            .Where(e => teamIds.Contains(e.TeamId))
             .ExecuteDeleteAsync(cancellationToken);
 
         var teamsRemoved = await _db.Teams

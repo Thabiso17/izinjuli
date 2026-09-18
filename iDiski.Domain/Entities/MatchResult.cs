@@ -52,16 +52,10 @@ public class MatchResult : BaseEntity
     public Guid? CompetitionId { get; set; }
     public Competition? Competition { get; set; }
 
-    /// <summary>
-    /// The division the competition belongs to, copied here rather than joined for.
-    ///
-    /// Derived, never chosen: it is always the owning division of <see cref="CompetitionId"/>.
-    /// It stays because a great deal reads it — the fixtures filter, clearing a division's
-    /// data, and the ownership check that decides who may write a result — and because a
-    /// competition can field clubs from elsewhere, so a fixture's division is a question about
-    /// the competition rather than about either club.
-    /// </summary>
-    public Guid? DivisionId { get; set; }
+    // A fixture has no division. It belongs to a competition, and a competition is contested
+    // by clubs from wherever it invited them — a cup tie between a Division 1 club and a
+    // Division 3 club sits in neither division, so there was never an honest answer to store.
+    // What used to read this now asks about the two clubs, or about the competition.
 
     // ── Home team ─────────────────────────────────────────────────────────────
     //
@@ -105,7 +99,6 @@ public class MatchResult : BaseEntity
     public int? AwayPenalties { get; set; }
 
     // ── Navigation ────────────────────────────────────────────────────────────
-    public Division? Division { get; set; }
     public ICollection<MatchEvent> MatchEvents { get; set; } = new List<MatchEvent>();
 
     // ── Computed helpers (not persisted) ──────────────────────────────────────

@@ -42,11 +42,8 @@ import { StandingsTableComponent } from '../divisions/standings-table.component'
         <!-- ── Heading ────────────────────────────────────────────────────── -->
         <div class="card shadow-sm mb-4">
           <div class="card-body">
-            <a
-              [routerLink]="['/divisions', comp.divisionId]"
-              class="text-decoration-none text-muted small"
-            >
-              <i class="bi bi-arrow-left me-1"></i>{{ comp.divisionName }}
+            <a routerLink="/competitions" class="text-decoration-none text-muted small">
+              <i class="bi bi-arrow-left me-1"></i>Competitions
             </a>
 
             <div class="d-flex justify-content-between align-items-start mt-2">
@@ -72,11 +69,12 @@ import { StandingsTableComponent } from '../divisions/standings-table.component'
                 <div data-testid="entrant-count">
                   <i class="bi bi-shield-fill me-1"></i>{{ comp.entrantCount }} entrants
                 </div>
-                @if (comp.externalEntrantCount > 0) {
-                  <!-- Worth saying plainly: otherwise an unfamiliar club in the draw looks
-                       like a mistake rather than an invitation. -->
-                  <div data-testid="invited-count">
-                    <i class="bi bi-envelope me-1"></i>{{ comp.externalEntrantCount }} invited
+                @if (comp.divisionsRepresented > 1) {
+                  <!-- Worth saying plainly: otherwise clubs from three divisions meeting
+                       looks like a mistake rather than the point of a cup. -->
+                  <div data-testid="divisions-represented">
+                    <i class="bi bi-diagram-3 me-1"></i>from
+                    {{ comp.divisionsRepresented }} divisions
                   </div>
                 }
                 <div>
@@ -216,13 +214,12 @@ import { StandingsTableComponent } from '../divisions/standings-table.component'
                         >
                           {{ entrant.teamName }}
                         </a>
-                        @if (entrant.isExternal) {
+                        @if (entrant.divisionName) {
                           <span
-                            class="badge bg-info text-dark"
-                            data-testid="invited-entrant"
-                            [title]="'Invited from ' + (entrant.divisionName ?? 'another division')"
+                            class="badge bg-light text-dark border"
+                            data-testid="entrant-division"
                           >
-                            Invited
+                            {{ entrant.divisionName }}
                           </span>
                         }
                       </div>
