@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { accounts, signInAndWaitForAdmin } from './helpers';
+import { createCompetition, createDivision, createTeam, generate, unique } from './admin-setup';
 
 /**
  * Drawing a competition up, and refusing to draw it twice.
@@ -16,22 +17,22 @@ import { accounts, signInAndWaitForAdmin } from './helpers';
 test.describe('generating fixtures', () => {
   test.beforeEach(async ({ page }) => {
     await signInAndWaitForAdmin(page, accounts.superAdmin);
-    await page.goto('/admin/matches');
-    await page.waitForLoadState('networkidle');
   });
 
   test('a competition that has already been drawn up refuses a second draw', async ({ page }) => {
-    const competition = await aSeededCompetition(page);
-    if (!competition) test.skip(true, 'nothing is seeded to generate against');
+    // Drawn up here rather than borrowed from the seeded league: every spec in this suite
+    // leaves competitions behind, so "the first one in the dropdown" stopped meaning "one that
+    // has fixtures" and the guard was being asked about a competition with no entrants.
+    const division = await createDivision(page);
+    await createTeam(page, division, `Drawn A ${unique()}`);
+    await createTeam(page, division, `Drawn B ${unique()}`);
 
-    await page.locator('button:has-text("Generate Fixtures")').first().click();
+    const competition = await createCompetition(page, division, 'League');
 
-    const modal = page.locator('.modal.show');
-    await expect(modal).toBeVisible();
+    const first = await generate(page, competition, { singleRound: true });
+    expect(first.fixturesGenerated, 'two clubs played once through is one fixture').toBe(1);
 
-    await modal.locator('select[name="competitionId"]').selectOption({ index: competition!.index });
-    await modal.locator('input[name="startDate"]').fill('2031-03-01');
-    await modal.locator('button:has-text("Generate Fixtures")').last().click();
+    await drawAgain(page, competition);
 
     const failure = page.locator('.alert-danger');
     await expect(failure).toBeVisible();
@@ -47,6 +48,9 @@ test.describe('generating fixtures', () => {
   test('the dialog asks for a competition rather than a division', async ({ page }) => {
     // A division runs several at once, so "which division" stopped identifying anything that
     // could be drawn up.
+    await page.goto('/admin/matches');
+    await page.waitForLoadState('networkidle');
+
     await page.locator('button:has-text("Generate Fixtures")').first().click();
 
     const modal = page.locator('.modal.show');
@@ -63,18 +67,25 @@ test.describe('generating fixtures', () => {
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * A competition from the seeded league, which by definition already has its fixtures — that is
- * what makes it the right subject for the double-draw guard.
+ * The same click as the first draw, without expecting it to succeed — which is the whole
+ * point, so this cannot go through the shared helper.
  */
-async function aSeededCompetition(page: Page): Promise<{ index: number } | null> {
+async function drawAgain(page: Page, competitionName: string) {
+  await page.goto('/admin/matches');
+  await page.waitForLoadState('networkidle');
   await page.locator('button:has-text("Generate Fixtures")').first().click();
 
   const modal = page.locator('.modal.show');
-  const options = await modal.locator('select[name="competitionId"] option').allInnerTexts();
+  await expect(modal).toBeVisible();
 
-  await modal.locator('button:has-text("Cancel")').first().click();
-  await expect(modal).toBeHidden();
+  const select = modal.locator('select[name="competitionId"]');
+  const labels = (await select.locator('option').allInnerTexts()).map((t) => t.trim());
+  const index = labels.findIndex((label) => label.includes(competitionName));
 
-  // Index 0 is the "Select Competition" placeholder.
-  return options.length > 1 ? { index: 1 } : null;
+  expect(index, `${competitionName} is not in the dropdown`).toBeGreaterThan(-1);
+
+  await select.selectOption({ index });
+  await modal.locator('input[name="startDate"]').fill('2033-06-01');
+  await modal.locator('label[for="singleRound"]').click();
+  await modal.locator('button:has-text("Generate Fixtures")').last().click();
 }

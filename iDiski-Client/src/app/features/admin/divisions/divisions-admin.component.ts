@@ -282,13 +282,25 @@ import {
                     />
                   </div>
                   <div class="col-md-4">
-                    <label class="form-label">Gender</label>
-                    <select class="form-select" [(ngModel)]="formData.gender" name="gender">
-                      <option value="">Not specified</option>
+                    <label class="form-label">Gender *</label>
+                    <select
+                      class="form-select"
+                      [(ngModel)]="formData.gender"
+                      name="gender"
+                      data-testid="division-gender"
+                      required
+                    >
+                      <option value="">Choose one</option>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                       <option value="Mixed">Mixed</option>
                     </select>
+                    <small class="form-text text-muted">
+                      <!-- Asked for rather than optional, because it is now what decides
+                           which competitions these clubs may be entered into. -->
+                      Decides what these clubs can play in — a women's side is refused entry
+                      to a boys competition.
+                    </small>
                   </div>
 
                   <div class="col-md-6">

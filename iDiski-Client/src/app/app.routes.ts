@@ -202,9 +202,8 @@ export const routes: Routes = [
       },
       {
         path: 'users',
-        // Only a super admin manages administrators. A division admin can still create team
-        // admins through the API within their own division, but the full list of everyone's
-        // access is not theirs to see.
+        // Only a super admin manages administrators — creating one is theirs alone now, and
+        // the full list of everyone's access is not a competition admin's to see.
         canActivate: [superAdminGuard],
         loadComponent: () =>
           import('./features/admin/users/users-admin.component').then(

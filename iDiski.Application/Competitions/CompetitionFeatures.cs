@@ -57,8 +57,7 @@ public sealed class UpdateCompetitionCommandValidator
 /// </summary>
 internal static class GenderWords
 {
-    public static string Describe(Gender? gender) =>
-        gender?.ToString().ToLowerInvariant() ?? "genderless";
+    public static string Describe(Gender gender) => gender.ToString().ToLowerInvariant();
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -104,10 +103,12 @@ public sealed class CreateCompetitionCommandHandler
                 ?? throw new NotFoundException(
                     nameof(Division), request.EnterTeamsFromDivisionId.Value);
 
-            if (division.Gender != request.Gender)
+            // Same rule as entering a club by hand: a recorded contradiction is refused, an
+            // unrecorded gender is not.
+            if (division.Gender is Gender startersGender && startersGender != request.Gender)
             {
                 throw new InvalidOperationException(
-                    $"{division.Name} is a {GenderWords.Describe(division.Gender)} division "
+                    $"{division.Name} is a {GenderWords.Describe(startersGender)} division "
                     + $"and this is a {GenderWords.Describe(request.Gender)} competition. Its "
                     + "clubs cannot be entered.");
             }
@@ -333,13 +334,17 @@ public sealed class EnterTeamCommandHandler : IRequestHandler<Commands.EnterTeam
         // draw, because by the time two sides are staring at a fixture list somebody has
         // already been told they are playing.
         //
-        // Compared strictly: a division with no gender recorded cannot be confirmed to match,
-        // and guessing is exactly what must not happen here.
-        if (team.Division?.Gender != competition.Gender)
+        // What is refused is a recorded contradiction, not an unanswered question. A
+        // division's gender is optional and every division written before this rule existed
+        // has it empty; refusing those would leave a whole league unable to enter the
+        // competitions it was already playing. The division form asks for it now, so the
+        // silence is historical rather than something new being created.
+        if (team.Division?.Gender is Gender divisionGender
+            && divisionGender != competition.Gender)
         {
             throw new InvalidOperationException(
                 $"{team.Name} plays in a "
-                + $"{GenderWords.Describe(team.Division?.Gender)} division and {competition.Name} is a "
+                + $"{GenderWords.Describe(divisionGender)} division and {competition.Name} is a "
                 + $"{GenderWords.Describe(competition.Gender)} competition. "
                 + "They cannot be entered into it.");
         }

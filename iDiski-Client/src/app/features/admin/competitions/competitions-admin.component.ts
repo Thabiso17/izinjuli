@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { CompetitionService } from '../../../core/services/competition.service';
 import { DivisionService } from '../../../core/services/division.service';
 import { TeamService } from '../../../core/services/team.service';
+import { AuthService } from '../../../core/services/auth.service';
 import {
   CompetitionDto,
   CompetitionEntrantDto,
@@ -43,11 +44,15 @@ import {
             entry list, drawn from one division or from several.
           </p>
         </div>
-        <div class="col-auto">
-          <button class="btn btn-primary" data-testid="add-competition" (click)="showAdd()">
-            <i class="bi bi-plus-circle"></i> Add Competition
-          </button>
-        </div>
+        @if (auth.isSuperAdmin()) {
+          <!-- Starting one is the organiser's, who then says who runs it. Offering the button
+               to a competition admin could only ever end in a refusal. -->
+          <div class="col-auto">
+            <button class="btn btn-primary" data-testid="add-competition" (click)="showAdd()">
+              <i class="bi bi-plus-circle"></i> Add Competition
+            </button>
+          </div>
+        }
       </div>
 
       @if (error()) {
@@ -390,6 +395,7 @@ export class CompetitionsAdminComponent implements OnInit {
   private readonly competitionService = inject(CompetitionService);
   private readonly divisionService = inject(DivisionService);
   private readonly teamService = inject(TeamService);
+  readonly auth = inject(AuthService);
 
   /** Only ever used to offer "start the entry list with every club in X". */
   divisions = signal<DivisionDto[]>([]);
@@ -465,7 +471,11 @@ export class CompetitionsAdminComponent implements OnInit {
 
     this.competitionService.getAll().subscribe({
       next: (competitions) => {
-        this.competitions.set(competitions);
+        // A role says somebody administers competitions, never which ones. Listing the rest
+        // would be a screen full of Edit buttons that all end in a refusal.
+        this.competitions.set(
+          competitions.filter((c) => this.auth.canAdministerCompetition(c.id)),
+        );
         this.loading.set(false);
       },
       error: (err) => {

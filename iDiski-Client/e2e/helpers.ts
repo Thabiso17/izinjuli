@@ -6,7 +6,9 @@ import { Page, expect } from '@playwright/test';
  */
 export const accounts = {
   superAdmin: { email: 'superadmin@test.com', password: 'Password123!' },
-  divisionAdmin: { email: 'divadmin@test.com', password: 'Password123!' },
+  // The address predates the role's name: divadmin@test.com is a competition admin now,
+  // assigned to the competitions they run rather than to a division.
+  competitionAdmin: { email: 'divadmin@test.com', password: 'Password123!' },
   teamAdmin: { email: 'teamadmin@test.com', password: 'Password123!' },
   inactive: { email: 'inactive@test.com', password: 'Password123!' },
 };

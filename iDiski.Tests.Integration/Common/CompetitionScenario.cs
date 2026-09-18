@@ -16,10 +16,14 @@ namespace iDiski.Tests.Integration.Common;
 /// </summary>
 public static class CompetitionScenario
 {
-    /// <summary>A pool of teams. No format: a division is not a competition any more.</summary>
+    /// <summary>
+    /// A pool of teams. No format: a division is not a competition any more. The gender is
+    /// nullable because the column is — an organiser may leave it blank, and what happens to
+    /// those clubs at entry is its own rule.
+    /// </summary>
     public static async Task<Guid> ADivisionAsync(
         ILeagueDbContext db,
-        Gender gender = Gender.Male,
+        Gender? gender = Gender.Male,
         string name = "Division",
         int season = 2040)
     {

@@ -155,7 +155,7 @@ test.describe('staying signed in', () => {
 });
 
 test.describe('what each role is shown', () => {
-  test('a team admin is not offered the division admin pages', async ({ page }) => {
+  test('a team admin is not offered the pages above their role', async ({ page }) => {
     await signInAndWaitForAdmin(page, accounts.teamAdmin);
 
     await page.goto('/admin/players');
@@ -168,8 +168,8 @@ test.describe('what each role is shown', () => {
     await expect(page).not.toHaveURL(/\/admin\/clear-data/);
   });
 
-  test('a division admin reaches the teams page', async ({ page }) => {
-    await signInAndWaitForAdmin(page, accounts.divisionAdmin);
+  test('a competition admin reaches the teams page', async ({ page }) => {
+    await signInAndWaitForAdmin(page, accounts.competitionAdmin);
 
     await page.goto('/admin/teams');
     await expect(page).toHaveURL(/\/admin\/teams/);

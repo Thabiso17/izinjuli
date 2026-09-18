@@ -81,6 +81,32 @@ public class CompetitionEntryRulesTests : IClassFixture<IntegrationTestFixture>
     }
 
     [Fact]
+    public async Task ADivisionThatRecordsNoGenderIsNotTurnedAway()
+    {
+        // The field is optional and most divisions predate the rule, so an empty one has to
+        // mean "nothing said" rather than "does not match". Reading it as a mismatch locked
+        // every one of those clubs out of every competition, which is how a league that had
+        // been playing all season suddenly could not enter anything.
+        var unrecorded = await CompetitionScenario.ADivisionAsync(
+            _fixture.DbContext, gender: null, name: "Unrecorded");
+
+        var cup = await CompetitionScenario.ACompetitionAsync(
+            _fixture.DbContext, CompetitionFormat.Knockout, gender: Gender.Male);
+
+        var club = (await CompetitionScenario.ClubsAsync(_fixture.DbContext, unrecorded, 1))[0];
+
+        var enter = async () => await Enter(cup, club);
+
+        await enter.Should().NotThrowAsync(
+            "a division that says nothing about gender contradicts nothing");
+
+        (await _fixture.DbContext.CompetitionEntries
+            .AsNoTracking()
+            .AnyAsync(e => e.CompetitionId == cup && e.TeamId == club))
+            .Should().BeTrue();
+    }
+
+    [Fact]
     public async Task AClubCannotBeEnteredTwice()
     {
         var (_, cup, clubs) = await CompetitionScenario.AWholeAsync(
