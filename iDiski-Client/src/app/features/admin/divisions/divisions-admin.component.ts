@@ -121,8 +121,12 @@ import {
                         [routerLink]="['/admin/divisions', division.id, 'competitions']"
                         class="btn btn-sm btn-outline-secondary"
                         data-testid="manage-competitions"
+                        title="The competitions this division runs"
                       >
+                        <!-- Labelled rather than a bare number: a trophy with a 0 beside it
+                             does not read as "start a competition here". -->
                         <i class="bi bi-trophy me-1"></i>{{ division.competitionCount }}
+                        {{ division.competitionCount === 1 ? 'competition' : 'competitions' }}
                       </a>
                     </td>
                     <td>

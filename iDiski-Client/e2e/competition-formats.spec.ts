@@ -38,6 +38,51 @@ test.describe('competitions', () => {
     ).toBeVisible();
   });
 
+  test('a competition can be started from the admin menu', async ({ page }) => {
+    // How an organiser actually looks for it. This screen existed behind a division's row
+    // long before it had a menu entry, which meant it may as well not have existed.
+    const division = await createDivision(page);
+    await createTeam(page, division, `Menu A ${unique()}`);
+    await createTeam(page, division, `Menu B ${unique()}`);
+
+    await page.goto('/');
+    await page.waitForLoadState('networkidle');
+
+    await page.locator('.nav-link.dropdown-toggle', { hasText: 'Admin' }).click();
+
+    const entry = page.locator('[data-testid="nav-competitions"]');
+    await expect(entry, 'competitions needs a way in that is not a division row').toBeVisible();
+
+    await entry.click();
+    await page.waitForLoadState('networkidle');
+    await expect(page).toHaveURL(/\/admin\/competitions/);
+
+    const name = `Menu Cup ${unique()}`;
+
+    await page.locator('[data-testid="add-competition"]').click();
+
+    const modal = page.locator('.modal.show');
+    await expect(modal).toBeVisible();
+
+    // Reached this way there is no division in the route, so the form has to ask for one.
+    await selectByName(modal.locator('[data-testid="competition-division-picker"]'), division);
+
+    await modal.locator('input[name="name"]').fill(name);
+    await modal.locator('input[name="shortCode"]').fill(shortCode('M'));
+    await modal.locator('[data-testid="competition-format"]').selectOption('Knockout');
+    await modal.locator('[data-testid="competition-max-teams"]').fill('8');
+    await modal.locator('[data-testid="enter-all"]').uncheck();
+
+    await modal.locator('[data-testid="save-competition"]').click();
+    await expect(modal).toBeHidden();
+
+    const row = page.locator('[data-testid="competition-row"]', { hasText: name });
+    await expect(row).toBeVisible();
+
+    // Eight places and nobody in them yet, which is what a cup looks like before the draw.
+    await expect(row.locator('[data-testid="entrant-progress"]')).toContainText('0 of 8 entered');
+  });
+
   test('a knockout competition draws a bracket on its own page', async ({ page }) => {
     const division = await createDivision(page);
 

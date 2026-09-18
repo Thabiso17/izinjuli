@@ -16,6 +16,7 @@ import {
   CreateCompetitionCommand,
   DivisionDto,
   TeamDto,
+  entrantProgress,
 } from '../../../core/models';
 
 /**
@@ -33,13 +34,22 @@ import {
     <div class="container-fluid py-4">
       <div class="row mb-4">
         <div class="col">
-          <a routerLink="/admin/divisions" class="text-decoration-none small">
-            <i class="bi bi-arrow-left me-1"></i>Divisions
-          </a>
-          <h1 class="display-6 mt-2">{{ division()?.name || 'Competitions' }}</h1>
+          @if (!allDivisions()) {
+            <a routerLink="/admin/divisions" class="text-decoration-none small">
+              <i class="bi bi-arrow-left me-1"></i>Divisions
+            </a>
+          }
+          <h1 class="display-6 mt-2">
+            {{ allDivisions() ? 'Competitions' : division()?.name || 'Competitions' }}
+          </h1>
           <p class="text-muted">
-            What this division is playing. A league, a cup and a sponsor's tournament can run
-            side by side, each with its own entrants.
+            @if (allDivisions()) {
+              Everything being played, across every division. A league, a cup and a sponsor's
+              tournament can run side by side in one division, each with its own entrants.
+            } @else {
+              What this division is playing. A league, a cup and a sponsor's tournament can run
+              side by side, each with its own entrants.
+            }
           </p>
         </div>
         <div class="col-auto">
@@ -107,8 +117,22 @@ import {
                     </div>
                   </div>
 
+                  @if (allDivisions()) {
+                    <div class="small mb-2">
+                      <i class="bi bi-diagram-3 me-1 text-muted"></i>
+                      <a
+                        [routerLink]="['/admin/divisions', competition.divisionId, 'competitions']"
+                        class="text-decoration-none"
+                        data-testid="competition-division"
+                      >{{ competition.divisionName }}</a>
+                    </div>
+                  }
+
                   <div class="text-muted small mb-3">
-                    {{ competition.entrantCount }} entrants
+                    <span
+                      [class.text-warning]="progress(competition).short > 0"
+                      data-testid="entrant-progress"
+                    >{{ progress(competition).text }}</span>
                     @if (competition.externalEntrantCount > 0) {
                       <span class="text-info">
                         · {{ competition.externalEntrantCount }} invited
@@ -134,7 +158,12 @@ import {
                   <i class="bi bi-trophy display-1 text-muted"></i>
                   <h3 class="mt-3">Nothing being played yet</h3>
                   <p class="text-muted mb-0">
-                    Add a competition to give this division's clubs something to play.
+                    @if (allDivisions()) {
+                      A division holds the clubs; a competition is what they play. Add one to
+                      give them a league, a cup or a tournament.
+                    } @else {
+                      Add a competition to give this division's clubs something to play.
+                    }
                   </p>
                 </div>
               </div>
@@ -154,6 +183,30 @@ import {
               </div>
               <div class="modal-body">
                 <div class="row g-3">
+                  @if (allDivisions()) {
+                    <div class="col-12">
+                      <label class="form-label">Division *</label>
+                      <select
+                        class="form-select"
+                        [(ngModel)]="form.divisionId"
+                        name="divisionId"
+                        data-testid="competition-division-picker"
+                        (ngModelChange)="divisionChosen()"
+                      >
+                        <option [ngValue]="''">Select a division…</option>
+                        @for (d of divisions(); track d.id) {
+                          <option [ngValue]="d.id">{{ d.name }} ({{ d.season }})</option>
+                        }
+                      </select>
+                      <small class="form-text text-muted">
+                        <!-- The organiser, not the entry list: a cup may field clubs from
+                             three divisions and is still run from one. -->
+                        The division running it. Clubs from elsewhere can be invited once it
+                        exists.
+                      </small>
+                    </div>
+                  }
+
                   <div class="col-md-8">
                     <label class="form-label">Name *</label>
                     <input
@@ -191,6 +244,25 @@ import {
                   </div>
 
                   <div class="col-md-6">
+                    <label class="form-label">Number of teams</label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      [(ngModel)]="form.maxTeams"
+                      name="maxTeams"
+                      data-testid="competition-max-teams"
+                      min="2"
+                      max="512"
+                      placeholder="Any"
+                    />
+                    <small class="form-text text-muted">
+                      <!-- A cap rather than a description: the ninth club is refused. -->
+                      How many clubs will play — 8 for a top-eight cup. Leave blank for a
+                      league, which is played by whoever is entered.
+                    </small>
+                  </div>
+
+                  <div class="col-md-6">
                     <label class="form-label">Season *</label>
                     <input
                       type="number"
@@ -212,7 +284,11 @@ import {
                         data-testid="enter-all"
                       />
                       <label class="form-check-label" for="enterAll">
-                        Enter all {{ division()?.teamCount || 0 }} clubs in this division
+                        @if (chosenDivision(); as d) {
+                          Enter all {{ d.teamCount || 0 }} clubs in {{ d.name }}
+                        } @else {
+                          Enter every club in the division
+                        }
                       </label>
                     </div>
                     <small class="text-muted">
@@ -229,7 +305,7 @@ import {
                 <button
                   class="btn btn-primary"
                   data-testid="save-competition"
-                  [disabled]="!form.name || !form.shortCode || saving()"
+                  [disabled]="!form.name || !form.shortCode || !form.divisionId || saving()"
                   (click)="create()"
                 >
                   {{ saving() ? 'Saving…' : 'Create' }}
@@ -333,8 +409,13 @@ export class CompetitionsAdminComponent implements OnInit {
   private readonly divisionService = inject(DivisionService);
   private readonly teamService = inject(TeamService);
 
+  /**
+   * The division this screen is scoped to, or empty when it is showing every division —
+   * reached from the admin menu rather than from one division's row.
+   */
   divisionId = '';
   division = signal<DivisionDto | null>(null);
+  divisions = signal<DivisionDto[]>([]);
   competitions = signal<CompetitionDto[]>([]);
   entrants = signal<CompetitionEntrantDto[]>([]);
   entrantsFor = signal<CompetitionDto | null>(null);
@@ -358,13 +439,22 @@ export class CompetitionsAdminComponent implements OnInit {
   ngOnInit(): void {
     this.divisionId = this.route.snapshot.paramMap.get('id') ?? '';
 
-    this.divisionService.getById(this.divisionId).subscribe({
-      next: (division) => {
-        this.division.set(division);
-        this.form = this.emptyForm();
-      },
-      error: () => this.error.set('Failed to load this division.'),
-    });
+    if (this.allDivisions()) {
+      // No division in the route, so the create form has to ask which one — and a competition
+      // always belongs to one, whoever it ends up inviting.
+      this.divisionService.getAll().subscribe({
+        next: (divisions) => this.divisions.set(divisions),
+        error: () => this.error.set('Failed to load divisions.'),
+      });
+    } else {
+      this.divisionService.getById(this.divisionId).subscribe({
+        next: (division) => {
+          this.division.set(division);
+          this.form = this.emptyForm();
+        },
+        error: () => this.error.set('Failed to load this division.'),
+      });
+    }
 
     this.teamService.getAll().subscribe({
       next: (teams) => this.teams.set(teams),
@@ -372,6 +462,30 @@ export class CompetitionsAdminComponent implements OnInit {
     });
 
     this.load();
+  }
+
+  /** True when this screen is showing every division's competitions rather than one's. */
+  allDivisions(): boolean {
+    return this.divisionId === '';
+  }
+
+  /** The division the create form is pointed at, whichever way this screen was reached. */
+  chosenDivision(): DivisionDto | null {
+    if (!this.allDivisions()) return this.division();
+    return this.divisions().find((d) => d.id === this.form.divisionId) ?? null;
+  }
+
+  /**
+   * Picking a division fixes the season: a competition belongs to the division's season, and
+   * asking the organiser to type it again is asking them to get it wrong.
+   */
+  divisionChosen(): void {
+    const division = this.chosenDivision();
+    if (division) this.form.season = division.season;
+  }
+
+  progress(competition: CompetitionDto) {
+    return entrantProgress(competition);
   }
 
   hintFor(format: CompetitionFormat): string {
@@ -387,7 +501,7 @@ export class CompetitionsAdminComponent implements OnInit {
   load(): void {
     this.loading.set(true);
 
-    this.competitionService.getAll(this.divisionId).subscribe({
+    this.competitionService.getAll(this.divisionId || undefined).subscribe({
       next: (competitions) => {
         this.competitions.set(competitions);
         this.loading.set(false);
@@ -408,7 +522,7 @@ export class CompetitionsAdminComponent implements OnInit {
     this.saving.set(true);
     this.error.set(null);
 
-    this.competitionService.create({ ...this.form, divisionId: this.divisionId }).subscribe({
+    this.competitionService.create({ ...this.form }).subscribe({
       next: () => {
         this.saving.set(false);
         this.showAddModal.set(false);
@@ -486,6 +600,7 @@ export class CompetitionsAdminComponent implements OnInit {
       shortCode: '',
       season: this.division()?.season ?? new Date().getFullYear(),
       format: 'League',
+      maxTeams: null,
       enterAllDivisionTeams: true,
     };
   }

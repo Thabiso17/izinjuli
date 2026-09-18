@@ -34,6 +34,17 @@ public class Competition : BaseEntity
     /// </summary>
     public CompetitionFormat Format { get; set; } = CompetitionFormat.League;
 
+    /// <summary>
+    /// How many clubs are meant to play in this, when the organiser has decided up front — a
+    /// top-eight cup is eight, whatever the division holds. Null means no limit was set, which
+    /// is the ordinary case for a league: it is played by whoever is entered.
+    ///
+    /// A cap on the entry list rather than a description of it. Entering a ninth club into an
+    /// eight-club cup is refused, because the alternative is a bracket quietly built around a
+    /// number nobody meant.
+    /// </summary>
+    public int? MaxTeams { get; set; }
+
     public DateTime? StartDate { get; set; }
     public DateTime? EndDate { get; set; }
     public string? Description { get; set; }

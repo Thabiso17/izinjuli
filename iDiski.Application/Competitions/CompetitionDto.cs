@@ -12,6 +12,10 @@ namespace iDiski.Application.Competitions;
 /// How many clubs are in it — which is not how many are in the division. A division of twenty
 /// can run a cup for eight, and that is the number that matters here.
 /// </param>
+/// <param name="MaxTeams">
+/// How many clubs the organiser said would play, or null when they did not say. Shown beside
+/// the entrant count so a half-filled cup reads as half-filled rather than as finished.
+/// </param>
 /// <param name="ExternalEntrantCount">
 /// How many of those come from outside the division running it. Worth saying plainly on a
 /// sponsor's cup, where a reader would otherwise wonder why an unfamiliar club is in the draw.
@@ -24,6 +28,7 @@ public record CompetitionDto(
     string ShortCode,
     int Season,
     CompetitionFormat Format,
+    int? MaxTeams,
     DateTime? StartDate,
     DateTime? EndDate,
     string? Description,

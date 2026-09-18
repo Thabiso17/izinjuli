@@ -58,6 +58,11 @@ export interface CompetitionDto {
   shortCode: string;
   season: number;
   format: CompetitionFormat;
+  /**
+   * How many clubs the organiser said would play, or null when they did not say. A cap on the
+   * entry list, not a description of it: a ninth club is refused from an eight-club cup.
+   */
+  maxTeams: number | null;
   startDate: string | null;
   endDate: string | null;
   description: string | null;
@@ -91,6 +96,8 @@ export interface CreateCompetitionCommand {
   shortCode: string;
   season: number;
   format: CompetitionFormat;
+  /** Blank for "however many are entered", which is the ordinary case for a league. */
+  maxTeams?: number | null;
   startDate?: string;
   endDate?: string;
   description?: string;
@@ -103,8 +110,25 @@ export interface UpdateCompetitionCommand {
   name: string;
   shortCode: string;
   format: CompetitionFormat;
+  maxTeams?: number | null;
   startDate?: string;
   endDate?: string;
   description?: string;
   isActive: boolean;
+}
+
+/**
+ * How full a competition is, for a screen that wants to say so. Null when the organiser set no
+ * number, in which case "entered" is the whole truth and there is nothing to be short of.
+ */
+export function entrantProgress(c: CompetitionDto): { text: string; full: boolean; short: number } {
+  if (c.maxTeams == null) {
+    return { text: `${c.entrantCount} entered`, full: false, short: 0 };
+  }
+
+  return {
+    text: `${c.entrantCount} of ${c.maxTeams} entered`,
+    full: c.entrantCount >= c.maxTeams,
+    short: Math.max(0, c.maxTeams - c.entrantCount),
+  };
 }

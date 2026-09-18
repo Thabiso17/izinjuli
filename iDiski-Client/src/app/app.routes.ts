@@ -192,8 +192,18 @@ export const routes: Routes = [
           ),
       },
       {
-        // A division's competitions. Nested under the division because that is what runs them
-        // and what decides who may administer them.
+        // Every competition, across every division — the way in from the admin menu, because
+        // "start a competition" is a thing an organiser sets out to do rather than something
+        // they think to look for under a division.
+        path: 'competitions',
+        loadComponent: () =>
+          import('./features/admin/competitions/competitions-admin.component').then(
+            (m) => m.CompetitionsAdminComponent
+          ),
+      },
+      {
+        // One division's, reached from its row. The same screen, scoped: a competition belongs
+        // to the division that runs it, and that is what decides who may administer it.
         path: 'divisions/:id/competitions',
         loadComponent: () =>
           import('./features/admin/competitions/competitions-admin.component').then(

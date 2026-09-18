@@ -23,6 +23,13 @@ public sealed class CreateCompetitionCommandValidator
         RuleFor(x => x.ShortCode).NotEmpty().MaximumLength(20);
         RuleFor(x => x.Season).InclusiveBetween(2000, 2100);
         RuleFor(x => x.Description).MaximumLength(1000);
+
+        // Two is the smallest thing that can be played at all; the ceiling is only there to
+        // catch a typo that would otherwise become a bracket of ten thousand.
+        RuleFor(x => x.MaxTeams)
+            .InclusiveBetween(2, 512)
+            .When(x => x.MaxTeams.HasValue)
+            .WithMessage("A competition holds between 2 and 512 clubs.");
     }
 }
 
@@ -35,6 +42,13 @@ public sealed class UpdateCompetitionCommandValidator
         RuleFor(x => x.Name).NotEmpty().MaximumLength(100);
         RuleFor(x => x.ShortCode).NotEmpty().MaximumLength(20);
         RuleFor(x => x.Description).MaximumLength(1000);
+
+        // Two is the smallest thing that can be played at all; the ceiling is only there to
+        // catch a typo that would otherwise become a bracket of ten thousand.
+        RuleFor(x => x.MaxTeams)
+            .InclusiveBetween(2, 512)
+            .When(x => x.MaxTeams.HasValue)
+            .WithMessage("A competition holds between 2 and 512 clubs.");
     }
 }
 
@@ -73,6 +87,18 @@ public sealed class CreateCompetitionCommandHandler
                 + $"in {request.Season}.");
         }
 
+        // Entering everybody into a competition that holds fewer would mean choosing which
+        // clubs to drop, and that is the organiser's decision rather than ours. Refused here,
+        // with the other refusals, so nothing has been built by the time it is turned down.
+        if (request.EnterAllDivisionTeams
+            && request.MaxTeams.HasValue
+            && division.Teams.Count > request.MaxTeams.Value)
+        {
+            throw new InvalidOperationException(
+                $"{division.Name} has {division.Teams.Count} clubs and this competition "
+                + $"holds {request.MaxTeams.Value}. Create it empty and choose who plays.");
+        }
+
         var competition = new Competition
         {
             Id = Guid.NewGuid(),
@@ -81,6 +107,7 @@ public sealed class CreateCompetitionCommandHandler
             ShortCode = shortCode,
             Season = request.Season,
             Format = request.Format,
+            MaxTeams = request.MaxTeams,
             StartDate = request.StartDate,
             EndDate = request.EndDate,
             Description = request.Description,
@@ -165,7 +192,23 @@ public sealed class UpdateCompetitionCommandHandler
             competition.Format = request.Format;
         }
 
+        // Shrinking a competition below the clubs already in it would leave entrants with no
+        // place, so the organiser withdraws somebody first and decides who.
+        if (request.MaxTeams.HasValue)
+        {
+            var entered = await _db.CompetitionEntries
+                .CountAsync(e => e.CompetitionId == competition.Id, cancellationToken);
+
+            if (entered > request.MaxTeams.Value)
+            {
+                throw new InvalidOperationException(
+                    $"{competition.Name} already has {entered} clubs entered, so it cannot be "
+                    + $"cut to {request.MaxTeams.Value}. Withdraw somebody first.");
+            }
+        }
+
         competition.Name = request.Name.Trim();
+        competition.MaxTeams = request.MaxTeams;
         competition.ShortCode = shortCode;
         competition.StartDate = request.StartDate;
         competition.EndDate = request.EndDate;
@@ -273,6 +316,21 @@ public sealed class EnterTeamCommandHandler : IRequestHandler<Commands.EnterTeam
         {
             throw new InvalidOperationException(
                 $"{team.Name} is already entered in {competition.Name}.");
+        }
+
+        // Full is full. A top-eight cup that quietly accepts a ninth club is a bracket built
+        // around a number nobody meant.
+        if (competition.MaxTeams.HasValue)
+        {
+            var entered = await _db.CompetitionEntries
+                .CountAsync(e => e.CompetitionId == competition.Id, cancellationToken);
+
+            if (entered >= competition.MaxTeams.Value)
+            {
+                throw new InvalidOperationException(
+                    $"{competition.Name} holds {competition.MaxTeams.Value} clubs and already "
+                    + $"has {entered}. Withdraw somebody, or raise the number of teams.");
+            }
         }
 
         // Adding an entrant to a competition already drawn would leave them with a place and
@@ -389,6 +447,7 @@ public sealed class GetCompetitionsQueryHandler
         c.ShortCode,
         c.Season,
         c.Format,
+        c.MaxTeams,
         c.StartDate,
         c.EndDate,
         c.Description,

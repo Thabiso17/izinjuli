@@ -15,6 +15,13 @@ public sealed record CreateCompetitionCommand : IRequest<Guid>, IRequireDivision
     public string ShortCode { get; init; } = string.Empty;
     public int Season { get; init; }
     public CompetitionFormat Format { get; init; } = CompetitionFormat.League;
+
+    /// <summary>
+    /// How many clubs are meant to play. Null for "however many are entered", which is the
+    /// ordinary case for a league; eight for a top-eight cup, whatever the division holds.
+    /// </summary>
+    public int? MaxTeams { get; init; }
+
     public DateTime? StartDate { get; init; }
     public DateTime? EndDate { get; init; }
     public string? Description { get; init; }
@@ -32,6 +39,7 @@ public sealed record UpdateCompetitionCommand : IRequest<Unit>, IRequireCompetit
     public string Name { get; init; } = string.Empty;
     public string ShortCode { get; init; } = string.Empty;
     public CompetitionFormat Format { get; init; } = CompetitionFormat.League;
+    public int? MaxTeams { get; init; }
     public DateTime? StartDate { get; init; }
     public DateTime? EndDate { get; init; }
     public string? Description { get; init; }
