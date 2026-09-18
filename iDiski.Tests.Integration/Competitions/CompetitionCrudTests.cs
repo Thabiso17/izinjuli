@@ -337,7 +337,6 @@ public class CompetitionCrudTests : IClassFixture<IntegrationTestFixture>
         return await new CreateCompetitionCommandHandler(_fixture.DbContext).Handle(
             new CreateCompetitionCommand
             {
-                DivisionId = divisionId,
                 Name = $"Competition {TestIds.Code("N")}",
                 ShortCode = shortCode ?? TestIds.Code("CC"),
                 Season = season,
