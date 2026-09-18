@@ -50,7 +50,7 @@ public sealed class CompetitionsController : BaseApiController
     /// <response code="403">Not an administrator of that division.</response>
     /// <response code="409">The short code is already used in that division and season.</response>
     [HttpPost]
-    [Authorize(Policy = "CanManageDivisions")]
+    [Authorize(Policy = "SuperAdminOnly")]
     [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -68,7 +68,7 @@ public sealed class CompetitionsController : BaseApiController
     /// <response code="403">Not an administrator of that division.</response>
     /// <response code="409">Already drawn up, or the short code clashes.</response>
     [HttpPut("{id:guid}")]
-    [Authorize(Policy = "CanManageDivisions")]
+    [Authorize(Policy = "CanManageCompetitions")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -90,7 +90,7 @@ public sealed class CompetitionsController : BaseApiController
     /// <response code="403">Not an administrator of that division.</response>
     /// <response code="409">It has fixtures.</response>
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = "CanManageDivisions")]
+    [Authorize(Policy = "CanManageCompetitions")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -109,7 +109,7 @@ public sealed class CompetitionsController : BaseApiController
     /// <response code="403">Not an administrator of that division.</response>
     /// <response code="409">Wrong gender, already entered, or already drawn up.</response>
     [HttpPost("{id:guid}/entrants/{teamId:guid}")]
-    [Authorize(Policy = "CanManageDivisions")]
+    [Authorize(Policy = "CanManageCompetitions")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -125,7 +125,7 @@ public sealed class CompetitionsController : BaseApiController
     /// <response code="403">Not an administrator of that division.</response>
     /// <response code="409">They already have fixtures.</response>
     [HttpDelete("{id:guid}/entrants/{teamId:guid}")]
-    [Authorize(Policy = "CanManageDivisions")]
+    [Authorize(Policy = "CanManageCompetitions")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]

@@ -30,7 +30,8 @@ public sealed class TeamsController : BaseApiController
     /// <response code="403">Not authorized (SuperAdmin, or DivisionAdmin for their own division).</response>
     /// <response code="422">Validation failure (e.g. duplicate ShortCode).</response>
     [HttpPost]
-    [Authorize(Policy = "CanManageDivisions")]
+    // A club is created and deleted by a SuperAdmin; its own admins edit it.
+    [Authorize(Policy = "SuperAdminOnly")]
     [ProducesResponseType(typeof(Guid), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
@@ -78,7 +79,8 @@ public sealed class TeamsController : BaseApiController
     /// <response code="404">Team not found.</response>
     /// <response code="409">Team has match history and cannot be deleted.</response>
     [HttpDelete("{id:guid}")]
-    [Authorize(Policy = "CanManageDivisions")]
+    // A club is created and deleted by a SuperAdmin; its own admins edit it.
+    [Authorize(Policy = "SuperAdminOnly")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]

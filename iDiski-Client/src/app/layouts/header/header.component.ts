@@ -141,6 +141,17 @@ import { AuthService } from '../../core/services/auth.service';
                   <li>
                     <a
                       class="dropdown-item"
+                      routerLink="/admin/competitions"
+                      routerLinkActive="active"
+                      (click)="closeMenu()"
+                      data-testid="nav-competitions"
+                    >
+                      <i class="bi bi-trophy me-2"></i>Competitions
+                    </a>
+                  </li>
+                  <li>
+                    <a
+                      class="dropdown-item"
                       routerLink="/admin/matches"
                       routerLinkActive="active"
                       (click)="closeMenu()"

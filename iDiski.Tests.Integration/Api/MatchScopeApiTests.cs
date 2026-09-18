@@ -13,14 +13,13 @@ using Xunit;
 namespace iDiski.Tests.Integration.Api;
 
 /// <summary>
-/// What a division admin may write outside their own division, and what they may not.
+/// What a competition admin may write outside the competitions they run, and what they may not.
 ///
-/// The endpoints are guarded by <c>CanManageDivisions</c>, which asks only whether somebody is
-/// a division admin at all — never which divisions. Four commands did not opt into the
-/// ownership behaviour, so any division admin could reach any competition in the league:
-/// entering a result, which moves a table and in a knockout puts a club into the next round;
-/// drawing a new fixture; recording the goals and cards behind a result; and suspending a
-/// player, which stops somebody playing at all.
+/// The endpoints are guarded by <c>CanManageCompetitions</c>, which asks only whether somebody
+/// holds the role — never which competitions. What narrows it is the ownership behaviour, and
+/// the writes that matter are: entering a result, which moves a table and in a knockout puts a
+/// club into the next round; drawing a new fixture; and recording the goals and cards behind a
+/// result. Suspending a player is not among them — that belongs to the club's own admins.
 ///
 /// Over HTTP rather than against a handler, because the thing being tested is the pipeline —
 /// calling a handler directly skips the behaviour that does the checking, and would pass just
@@ -42,7 +41,7 @@ public class MatchScopeApiTests : IAsyncLifetime
     private Guid _ownPlayer;
     private Guid _otherPlayer;
 
-    private User _divisionAdmin = null!;
+    private User _competitionAdmin = null!;
     private User _superAdmin = null!;
 
     public MatchScopeApiTests(ApiTestFixture fixture) => _fixture = fixture;
@@ -55,25 +54,26 @@ public class MatchScopeApiTests : IAsyncLifetime
         _ownClubs = await TwoClubsInAsync(_ownDivision);
         _otherClubs = await TwoClubsInAsync(_otherDivision);
 
-        _ownCompetition = await ACompetitionInAsync(_ownDivision, _ownClubs);
-        _otherCompetition = await ACompetitionInAsync(_otherDivision, _otherClubs);
+        _ownCompetition = await ACompetitionForAsync(_ownClubs);
+        _otherCompetition = await ACompetitionForAsync(_otherClubs);
 
-        _ownFixture = await AFixtureInAsync(_ownCompetition, _ownDivision, _ownClubs);
-        _otherFixture = await AFixtureInAsync(_otherCompetition, _otherDivision, _otherClubs);
+        _ownFixture = await AFixtureInAsync(_ownCompetition, _ownClubs);
+        _otherFixture = await AFixtureInAsync(_otherCompetition, _otherClubs);
 
         _ownPlayer = await APlayerInAsync(_ownClubs.Home);
         _otherPlayer = await APlayerInAsync(_otherClubs.Home);
 
-        _divisionAdmin = await _fixture.SeedUserAsync(Role.DivisionAdmin, divisionId: _ownDivision);
+        _competitionAdmin = await _fixture.SeedUserAsync(
+            Role.CompetitionAdmin, competitionId: _ownCompetition);
         _superAdmin = await _fixture.SeedUserAsync(Role.SuperAdmin);
     }
 
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task ADivisionAdminCannotScoreAMatchInSomebodyElsesDivision()
+    public async Task ACompetitionAdminCannotScoreAMatchInACompetitionTheyDoNotRun()
     {
-        var client = await _fixture.CreateClientAsAsync(_divisionAdmin);
+        var client = await _fixture.CreateClientAsAsync(_competitionAdmin);
 
         var response = await client.PutAsJsonAsync(
             $"/api/matchresults/{_otherFixture}/score",
@@ -88,10 +88,10 @@ public class MatchScopeApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ADivisionAdminCanStillScoreAMatchInTheirOwnDivision()
+    public async Task ACompetitionAdminScoresAMatchInTheirOwnCompetition()
     {
         // The half that stops this being a fix that simply refuses everybody.
-        var client = await _fixture.CreateClientAsAsync(_divisionAdmin);
+        var client = await _fixture.CreateClientAsAsync(_competitionAdmin);
 
         var response = await client.PutAsJsonAsync(
             $"/api/matchresults/{_ownFixture}/score",
@@ -105,9 +105,9 @@ public class MatchScopeApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ADivisionAdminCannotDrawAFixtureIntoSomebodyElsesDivision()
+    public async Task ACompetitionAdminCannotDrawAFixtureIntoAnothersCompetition()
     {
-        var client = await _fixture.CreateClientAsAsync(_divisionAdmin);
+        var client = await _fixture.CreateClientAsAsync(_competitionAdmin);
 
         var response = await client.PostAsJsonAsync("/api/matchresults", new
         {
@@ -138,11 +138,11 @@ public class MatchScopeApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ADivisionAdminCannotRecordGoalsInSomebodyElsesDivision()
+    public async Task ACompetitionAdminCannotRecordGoalsInAnothersCompetition()
     {
         // Scoping the score and leaving the goals open would have handed most of it straight
         // back: the events are the detail the score is made of.
-        var client = await _fixture.CreateClientAsAsync(_divisionAdmin);
+        var client = await _fixture.CreateClientAsAsync(_competitionAdmin);
 
         var response = await client.PostAsJsonAsync("/api/matchevents", new
         {
@@ -157,14 +157,17 @@ public class MatchScopeApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ADivisionAdminCannotSuspendAPlayerFromSomebodyElsesDivision()
+    public async Task ACompetitionAdminCannotSuspendAPlayerAtAll()
     {
-        var client = await _fixture.CreateClientAsAsync(_divisionAdmin);
+        // This one moved rather than narrowed. A suspension is about a player, and a player
+        // belongs to a club — so it is the club's administrators who hand one out, not the
+        // organiser of a competition the club happens to be entered in.
+        var client = await _fixture.CreateClientAsAsync(_competitionAdmin);
 
         var response = await client.PostAsJsonAsync("/api/suspensions", new
         {
-            playerId = _otherPlayer,
-            reason = "A ban nobody in this division may hand out",
+            playerId = _ownPlayer,
+            reason = "A ban that is not an organiser's to hand out",
             matchesSuspended = 3,
             startDate = (DateTime?)null,
         });
@@ -173,9 +176,11 @@ public class MatchScopeApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ADivisionAdminCanStillSuspendAPlayerInTheirOwnDivision()
+    public async Task ATeamAdminSuspendsTheirOwnPlayer()
     {
-        var client = await _fixture.CreateClientAsAsync(_divisionAdmin);
+        // The other half: somebody still has to be able to do it.
+        var teamAdmin = await _fixture.SeedUserAsync(Role.TeamAdmin, teamId: _ownClubs.Home);
+        var client = await _fixture.CreateClientAsAsync(teamAdmin);
 
         var response = await client.PostAsJsonAsync("/api/suspensions", new
         {
@@ -186,6 +191,23 @@ public class MatchScopeApiTests : IAsyncLifetime
         });
 
         response.IsSuccessStatusCode.Should().BeTrue(await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task ATeamAdminCannotSuspendSomebodyElsesPlayer()
+    {
+        var teamAdmin = await _fixture.SeedUserAsync(Role.TeamAdmin, teamId: _ownClubs.Home);
+        var client = await _fixture.CreateClientAsAsync(teamAdmin);
+
+        var response = await client.PostAsJsonAsync("/api/suspensions", new
+        {
+            playerId = _otherPlayer,
+            reason = "A ban on a club that is not theirs",
+            matchesSuspended = 3,
+            startDate = (DateTime?)null,
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
@@ -265,7 +287,7 @@ public class MatchScopeApiTests : IAsyncLifetime
         return id;
     });
 
-    private Task<Guid> ACompetitionInAsync(Guid divisionId, (Guid Home, Guid Away) clubs) =>
+    private Task<Guid> ACompetitionForAsync((Guid Home, Guid Away) clubs) =>
         _fixture.WithDbAsync(async db =>
         {
             var id = Guid.NewGuid();
@@ -273,11 +295,11 @@ public class MatchScopeApiTests : IAsyncLifetime
             db.Competitions.Add(new Competition
             {
                 Id = id,
-                DivisionId = divisionId,
                 Name = $"Competition {ApiTestFixture.Code("N")}",
                 ShortCode = ApiTestFixture.Code("MC"),
                 Season = 2041,
                 Format = CompetitionFormat.League,
+                Gender = Gender.Male,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
             });
@@ -297,8 +319,7 @@ public class MatchScopeApiTests : IAsyncLifetime
             return id;
         });
 
-    private Task<Guid> AFixtureInAsync(
-        Guid competitionId, Guid divisionId, (Guid Home, Guid Away) clubs) =>
+    private Task<Guid> AFixtureInAsync(Guid competitionId, (Guid Home, Guid Away) clubs) =>
         _fixture.WithDbAsync(async db =>
         {
             var id = Guid.NewGuid();
@@ -307,7 +328,6 @@ public class MatchScopeApiTests : IAsyncLifetime
             {
                 Id = id,
                 CompetitionId = competitionId,
-                DivisionId = divisionId,
                 HomeTeamId = clubs.Home,
                 AwayTeamId = clubs.Away,
                 MatchDate = new DateTime(2041, 3, 1, 0, 0, 0, DateTimeKind.Utc),

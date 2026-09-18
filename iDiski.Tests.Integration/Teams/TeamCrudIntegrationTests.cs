@@ -130,22 +130,22 @@ public class TeamCrudIntegrationTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task AssignmentToAUserThatDoesNotExist_IsRejected()
     {
-        var division = await SeedDivisionAsync("Orphan Division");
+        var competitionId = await CompetitionScenario.ACompetitionAsync(_fixture.DbContext);
 
-        var orphan = new UserDivision
+        var orphan = new UserCompetition
         {
             Id = Guid.NewGuid(),
             UserId = Guid.NewGuid(), // never created
-            DivisionId = division.Id,
+            CompetitionId = competitionId,
             AssignedAt = DateTime.UtcNow,
             CreatedAt = DateTime.UtcNow
         };
 
-        _fixture.DbContext.UserDivisions.Add(orphan);
+        _fixture.DbContext.UserCompetitions.Add(orphan);
 
         var save = async () => await _fixture.DbContext.SaveChangesAsync();
         await save.Should().ThrowAsync<DbUpdateException>(
-            "an assignment granting access to nobody would leave a division unreachable");
+            "an assignment granting access to nobody would leave a competition unreachable");
 
         // A failed insert stays tracked as Added and would be retried on the next save,
         // breaking whichever test saves after this one.
@@ -153,37 +153,37 @@ public class TeamCrudIntegrationTests : IClassFixture<IntegrationTestFixture>
     }
 
     [Fact]
-    public async Task Division_CanBeAssignedToMultipleDivisionAdmins()
+    public async Task ACompetition_CanBeRunByMoreThanOneAdmin()
     {
         // Arrange
-        var division = await SeedDivisionAsync("Test Division");
+        var competitionId = await CompetitionScenario.ACompetitionAsync(_fixture.DbContext);
 
-        var user1 = await SeedUserAsync("division-admin-1");
-        var user2 = await SeedUserAsync("division-admin-2");
+        var user1 = await SeedUserAsync("competition-admin-1");
+        var user2 = await SeedUserAsync("competition-admin-2");
 
-        _fixture.DbContext.UserDivisions.AddRange(
-            new UserDivision
+        _fixture.DbContext.UserCompetitions.AddRange(
+            new UserCompetition
             {
                 Id = Guid.NewGuid(),
                 UserId = user1.Id,
-                DivisionId = division.Id,
+                CompetitionId = competitionId,
                 AssignedAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow
             },
-            new UserDivision
+            new UserCompetition
             {
                 Id = Guid.NewGuid(),
                 UserId = user2.Id,
-                DivisionId = division.Id,
+                CompetitionId = competitionId,
                 AssignedAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow
             });
 
         await _fixture.DbContext.SaveChangesAsync();
 
-        // Act - Check both admins assigned to division
-        var admins = await _fixture.DbContext.UserDivisions
-            .Where(ud => ud.DivisionId == division.Id)
+        // Act - both organisers are on it
+        var admins = await _fixture.DbContext.UserCompetitions
+            .Where(uc => uc.CompetitionId == competitionId)
             .ToListAsync();
 
         // Assert

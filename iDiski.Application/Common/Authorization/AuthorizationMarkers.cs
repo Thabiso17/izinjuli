@@ -1,20 +1,26 @@
 namespace iDiski.Application.Common.Authorization;
 
 /// <summary>
-/// Implemented by commands/queries scoped to a single division. Picked up by
-/// AuthorizationBehaviour, which checks the requester against DivisionOwnershipRequirement
-/// for DivisionId (SuperAdmin always passes; DivisionAdmin must be assigned to it).
+/// Implemented by commands scoped to a single competition. Picked up by AuthorizationBehaviour,
+/// which checks the requester against CompetitionOwnershipRequirement: a SuperAdmin always
+/// passes, and a competition admin passes for the competitions they were assigned.
+///
+/// This is what running a competition means — its entry list, its draw, its results. A
+/// [Authorize(Policy = "CanManageCompetitions")] attribute on the endpoint only asks whether
+/// somebody is a competition admin at all, never which competitions.
 /// </summary>
-public interface IRequireDivisionAccess
+public interface IRequireCompetitionAccess
 {
-    Guid DivisionId { get; }
+    Guid CompetitionId { get; }
 }
 
 /// <summary>
 /// Implemented by commands/queries scoped to a single team. Picked up by
-/// AuthorizationBehaviour, which checks the requester against TeamOwnershipRequirement
-/// for TeamId (SuperAdmin always passes; DivisionAdmin passes via the team's division;
-/// TeamAdmin must be directly assigned to the team).
+/// AuthorizationBehaviour, which checks the requester against TeamOwnershipRequirement for
+/// TeamId: a SuperAdmin always passes, and a team admin must be directly assigned to the club.
+///
+/// A club's own administrators, and nobody else below SuperAdmin. Running a competition a club
+/// is entered in does not come with the right to edit the club.
 /// </summary>
 public interface IRequireTeamAccess
 {
@@ -32,28 +38,20 @@ public interface IRequirePlayerAccess
 }
 
 /// <summary>
-/// Implemented by commands scoped to a single fixture, whose division is not in the request
+/// Implemented by commands scoped to a single fixture, whose competition is not in the request
 /// payload — a score update carries only the match id. AuthorizationBehaviour resolves the
-/// fixture's division and applies DivisionOwnershipRequirement to it.
+/// fixture's competition and applies CompetitionOwnershipRequirement to it.
 ///
-/// A fixture with no division resolves to Guid.Empty, which nobody but a SuperAdmin owns.
-/// That is the safe direction: an orphaned fixture predating the division guard can still be
-/// repaired, but only by somebody who can see the whole league.
+/// Recording what happened in a match is part of running the competition it belongs to, so it
+/// reaches the same people the draw does. A fixture that belongs to no competition resolves to
+/// Guid.Empty, which nobody is assigned to, leaving it to a SuperAdmin — the safe direction for
+/// a row nobody's scope covers.
 /// </summary>
 public interface IRequireMatchAccess
 {
     Guid MatchId { get; }
 }
 
-/// <summary>
-/// Implemented by commands scoped to a single competition. AuthorizationBehaviour resolves the
-/// competition's owning division and applies DivisionOwnershipRequirement to it.
-///
-/// The owning division decides who administers a competition, not the entrants: a cup may
-/// field clubs invited from three other divisions, and their administrators do not thereby get
-/// a say in running it.
-/// </summary>
-public interface IRequireCompetitionAccess
-{
-    Guid CompetitionId { get; }
-}
+// There is no division marker. A division is a collection of clubs: it runs nothing, so being
+// assigned to one granted no coherent authority. Divisions themselves are SuperAdmin work, and
+// the clubs inside them answer to their own administrators.

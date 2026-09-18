@@ -6,7 +6,7 @@ import { accounts, signIn, signInAndWaitForAdmin } from './helpers';
  * to onboard anyone at all.
  *
  * The rules behind it are covered against the database in the API tests: who may create whom,
- * and that a division admin cannot mint a peer. These check the screen in front of those rules
+ * and that a competition admin cannot mint a peer. These check the screen in front of those rules
  * exists, reaches them, and reports back.
  */
 test.describe('administrators', () => {

@@ -26,7 +26,7 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<UserTeam> UserTeams => Set<UserTeam>();
-    public DbSet<UserDivision> UserDivisions => Set<UserDivision>();
+    public DbSet<UserCompetition> UserCompetitions => Set<UserCompetition>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     // ── Model Configuration ───────────────────────────────────────────────────
@@ -134,8 +134,9 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
                   .HasForeignKey(m => m.NextMatchId)
                   .OnDelete(DeleteBehavior.Restrict);
 
-            // Fixture lists for a knockout are read a round at a time.
-            entity.HasIndex(m => new { m.DivisionId, m.Season, m.Stage });
+            // Fixture lists for a knockout are read a round at a time, and a round belongs to
+            // a competition — which is also what the season now comes with.
+            entity.HasIndex(m => new { m.CompetitionId, m.Season, m.Stage });
         });
 
         // ── Article ───────────────────────────────────────────────────────────
@@ -360,12 +361,8 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
             .OnDelete(DeleteBehavior.Restrict);
 
         // ── Update MatchResult configuration ──────────────────────────────────
-        modelBuilder.Entity<MatchResult>()
-            .HasOne(m => m.Division)
-            .WithMany(d => d.Matches)
-            .HasForeignKey(m => m.DivisionId)
-            .OnDelete(DeleteBehavior.Restrict);
-
+        // A fixture belongs to a competition and to two clubs. It has no division of its own:
+        // a cup tie across two of them belongs to neither.
         modelBuilder.Entity<MatchResult>()
             .HasOne(m => m.Competition)
             .WithMany(c => c.Matches)
@@ -383,15 +380,12 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
             entity.Property(c => c.ShortCode).IsRequired().HasMaxLength(20);
             entity.Property(c => c.Description).HasMaxLength(1000);
             entity.Property(c => c.Format).HasConversion<string>().HasMaxLength(20);
+            entity.Property(c => c.Gender).HasConversion<string>().HasMaxLength(20);
+            entity.Property(c => c.AgeGroup).HasMaxLength(20);
 
-            // Unique within the division that runs it, rather than across the league: two
-            // divisions may each reasonably call their own competition "LGE".
-            entity.HasIndex(c => new { c.DivisionId, c.Season, c.ShortCode }).IsUnique();
-
-            entity.HasOne(c => c.Division)
-                  .WithMany(d => d.Competitions)
-                  .HasForeignKey(c => c.DivisionId)
-                  .OnDelete(DeleteBehavior.Restrict);
+            // Unique across the season. Nothing runs a competition now, so there is no smaller
+            // scope for a short code to be unique within.
+            entity.HasIndex(c => new { c.Season, c.ShortCode }).IsUnique();
         });
 
         // ── Who is in a competition ───────────────────────────────────────────
@@ -468,21 +462,23 @@ public class LeagueDbContext : DbContext, ILeagueDbContext
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
-        // ── UserDivision ──────────────────────────────────────────────────────
-        modelBuilder.Entity<UserDivision>(entity =>
+        // ── UserCompetition ───────────────────────────────────────────────────
+        modelBuilder.Entity<UserCompetition>(entity =>
         {
-            entity.HasKey(ud => ud.Id);
+            entity.HasKey(uc => uc.Id);
 
-            entity.HasIndex(ud => new { ud.UserId, ud.DivisionId }).IsUnique();
+            entity.HasIndex(uc => new { uc.UserId, uc.CompetitionId }).IsUnique();
 
-            entity.HasOne(ud => ud.User)
-                  .WithMany(u => u.UserDivisions)
-                  .HasForeignKey(ud => ud.UserId)
+            entity.HasOne(uc => uc.User)
+                  .WithMany(u => u.UserCompetitions)
+                  .HasForeignKey(uc => uc.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
 
-            entity.HasOne(ud => ud.Division)
+            // Deleting a competition takes its assignments with it: they describe a place in
+            // that competition and mean nothing without it.
+            entity.HasOne(uc => uc.Competition)
                   .WithMany()
-                  .HasForeignKey(ud => ud.DivisionId)
+                  .HasForeignKey(uc => uc.CompetitionId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

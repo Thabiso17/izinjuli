@@ -182,7 +182,7 @@ import { MatchResultDto, DivisionDto, MatchStatus } from '../../core/models';
                     </div>
 
                     <!-- Match Details -->
-                    @if (match.venue || match.divisionName) {
+                    @if (match.venue || match.competitionName) {
                       <div class="row mt-3">
                         <div class="col-12 text-center">
                           @if (match.venue) {
@@ -190,9 +190,9 @@ import { MatchResultDto, DivisionDto, MatchStatus } from '../../core/models';
                               <i class="bi bi-geo-alt"></i> {{ match.venue }}
                             </small>
                           }
-                          @if (match.divisionName) {
+                          @if (match.competitionName) {
                             <small class="text-muted">
-                              <i class="bi bi-trophy"></i> {{ match.divisionName }}
+                              <i class="bi bi-trophy"></i> {{ match.competitionName }}
                             </small>
                           }
                         </div>

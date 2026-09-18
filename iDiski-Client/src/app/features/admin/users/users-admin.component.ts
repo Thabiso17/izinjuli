@@ -3,13 +3,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { UserService } from '../../../core/services/user.service';
 import { TeamService } from '../../../core/services/team.service';
-import { DivisionService } from '../../../core/services/division.service';
+import { CompetitionService } from '../../../core/services/competition.service';
 import {
   AdminUserDto,
   AdminUserDetailDto,
   CreateAdminUserRequest,
   TeamDto,
-  DivisionDto,
+  CompetitionDto,
   ROLE_ID,
   ROLE_BY_ID,
   ROLE_LABEL,
@@ -230,21 +230,21 @@ import { Role } from '../../../core/models/auth.model';
                     </div>
                   }
 
-                  @if (form.role === Role.DivisionAdmin) {
+                  @if (form.role === Role.CompetitionAdmin) {
                     <div class="col-12">
-                      <label class="form-label">Divisions they manage *</label>
+                      <label class="form-label">Competitions they run *</label>
                       <div class="border rounded p-2" style="max-height: 220px; overflow-y: auto">
-                        @for (division of divisions(); track division.id) {
+                        @for (competition of competitions(); track competition.id) {
                           <div class="form-check">
                             <input
                               class="form-check-input"
                               type="checkbox"
-                              [id]="'division-' + division.id"
-                              [checked]="form.divisionIds.includes(division.id)"
-                              (change)="toggle(form.divisionIds, division.id)"
+                              [id]="'competition-' + competition.id"
+                              [checked]="form.competitionIds.includes(competition.id)"
+                              (change)="toggle(form.competitionIds, competition.id)"
                             />
-                            <label class="form-check-label" [for]="'division-' + division.id">
-                              {{ division.name }}
+                            <label class="form-check-label" [for]="'competition-' + competition.id">
+                              {{ competition.name }} ({{ competition.season }})
                             </label>
                           </div>
                         }
@@ -304,19 +304,19 @@ import { Role } from '../../../core/models/auth.model';
 
               <hr />
 
-              <h6>Divisions</h6>
+              <h6>Competitions</h6>
               <div class="border rounded p-2 mb-3" style="max-height: 180px; overflow-y: auto">
-                @for (division of divisions(); track division.id) {
+                @for (competition of competitions(); track competition.id) {
                   <div class="form-check">
                     <input
                       class="form-check-input"
                       type="checkbox"
-                      [id]="'edit-division-' + division.id"
-                      [checked]="user.assignedDivisionIds.includes(division.id)"
-                      (change)="toggleDivision(user, division.id)"
+                      [id]="'edit-competition-' + competition.id"
+                      [checked]="user.assignedCompetitionIds.includes(competition.id)"
+                      (change)="toggleCompetition(user, competition.id)"
                     />
-                    <label class="form-check-label" [for]="'edit-division-' + division.id">
-                      {{ division.name }}
+                    <label class="form-check-label" [for]="'edit-competition-' + competition.id">
+                      {{ competition.name }} ({{ competition.season }})
                     </label>
                   </div>
                 }
@@ -370,14 +370,14 @@ import { Role } from '../../../core/models/auth.model';
 export class UsersAdminComponent implements OnInit {
   private userService = inject(UserService);
   private teamService = inject(TeamService);
-  private divisionService = inject(DivisionService);
+  private competitionService = inject(CompetitionService);
 
   protected readonly Role = Role;
-  protected readonly assignableRoles = [Role.TeamAdmin, Role.DivisionAdmin, Role.SuperAdmin];
+  protected readonly assignableRoles = [Role.TeamAdmin, Role.CompetitionAdmin, Role.SuperAdmin];
 
   users = signal<AdminUserDto[]>([]);
   teams = signal<TeamDto[]>([]);
-  divisions = signal<DivisionDto[]>([]);
+  competitions = signal<CompetitionDto[]>([]);
 
   loading = signal(false);
   saving = signal(false);
@@ -399,8 +399,8 @@ export class UsersAdminComponent implements OnInit {
     switch (this.form.role) {
       case Role.TeamAdmin:
         return this.form.teamIds.length > 0;
-      case Role.DivisionAdmin:
-        return this.form.divisionIds.length > 0;
+      case Role.CompetitionAdmin:
+        return this.form.competitionIds.length > 0;
       case Role.SuperAdmin:
         return true;
       default:
@@ -411,7 +411,7 @@ export class UsersAdminComponent implements OnInit {
   ngOnInit() {
     this.loadUsers();
     this.loadTeams();
-    this.loadDivisions();
+    this.loadCompetitions();
   }
 
   loadUsers() {
@@ -435,10 +435,10 @@ export class UsersAdminComponent implements OnInit {
     });
   }
 
-  loadDivisions() {
-    this.divisionService.getAll().subscribe({
-      next: (data) => this.divisions.set(data),
-      error: (err) => this.error.set(this.messageFrom(err, 'Failed to load divisions')),
+  loadCompetitions() {
+    this.competitionService.getAll().subscribe({
+      next: (data) => this.competitions.set(data),
+      error: (err) => this.error.set(this.messageFrom(err, 'Failed to load competitions')),
     });
   }
 
@@ -456,14 +456,14 @@ export class UsersAdminComponent implements OnInit {
     // Switching role discards a scope that no longer applies, so a team admin cannot be
     // created carrying divisions the API would refuse.
     this.form.teamIds = [];
-    this.form.divisionIds = [];
+    this.form.competitionIds = [];
   }
 
   roleExplanation(): string {
     switch (this.form.role) {
       case Role.TeamAdmin:
         return 'Manages the players of the teams you assign, and can update those teams.';
-      case Role.DivisionAdmin:
+      case Role.CompetitionAdmin:
         return 'Manages the teams and players inside the divisions you assign.';
       case Role.SuperAdmin:
         return 'Unrestricted. Can manage every division, team and player, and create other administrators.';
@@ -485,7 +485,7 @@ export class UsersAdminComponent implements OnInit {
       lastName: this.form.lastName,
       roles: [this.form.role],
       assignedTeamIds: this.form.teamIds.length ? this.form.teamIds : undefined,
-      assignedDivisionIds: this.form.divisionIds.length ? this.form.divisionIds : undefined,
+      assignedCompetitionIds: this.form.competitionIds.length ? this.form.competitionIds : undefined,
     };
 
     this.userService.create(request).subscribe({
@@ -547,17 +547,17 @@ export class UsersAdminComponent implements OnInit {
     });
   }
 
-  toggleDivision(user: AdminUserDetailDto, divisionId: string) {
-    const has = user.assignedDivisionIds.includes(divisionId);
+  toggleCompetition(user: AdminUserDetailDto, competitionId: string) {
+    const has = user.assignedCompetitionIds.includes(competitionId);
 
     const call = has
-      ? this.userService.removeDivision(user.id, divisionId)
-      : this.userService.assignDivision(user.id, divisionId);
+      ? this.userService.removeCompetition(user.id, competitionId)
+      : this.userService.assignCompetition(user.id, competitionId);
 
     call.subscribe({
       next: () => this.refreshEditing(user.id),
       error: (err) => {
-        this.error.set(this.messageFrom(err, 'Failed to change that division'));
+        this.error.set(this.messageFrom(err, 'Failed to change that competition'));
         this.refreshEditing(user.id);
       },
     });
@@ -623,7 +623,7 @@ export class UsersAdminComponent implements OnInit {
       password: '',
       role: null as Role | null,
       teamIds: [] as string[],
-      divisionIds: [] as string[],
+      competitionIds: [] as string[],
     };
   }
 }

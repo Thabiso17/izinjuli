@@ -149,18 +149,10 @@ public sealed class UpdateTeamCommandHandler : IRequestHandler<UpdateTeamCommand
         if (isSuperAdmin)
             return;
 
-        // Get team and its division
-        var team = await _db.Teams.FindAsync([teamId], cancellationToken);
-        if (team == null)
-            throw new NotFoundException(nameof(Domain.Entities.Team), teamId);
-
-        // Division Admin can manage teams in their division
-        var isDivisionAdmin = await _db.UserDivisions
-            .AnyAsync(ud => ud.UserId == userId && ud.DivisionId == team.DivisionId, cancellationToken);
-
-        if (isDivisionAdmin)
-            return;
-
+        // A club answers to its own administrators. Running a competition it is entered in
+        // is not a reason to be able to edit it — a club in four competitions would otherwise
+        // be editable by four organisers who have nothing else to do with it.
+        //
         // Team Admin can only manage their assigned team
         var isTeamAdmin = await _db.UserTeams
             .AnyAsync(ut => ut.UserId == userId && ut.TeamId == teamId, cancellationToken);

@@ -61,7 +61,7 @@ public class CompetitionCrudTests : IClassFixture<IntegrationTestFixture>
     }
 
     [Fact]
-    public async Task TwoCompetitionsInOneDivisionCannotShareAShortCode()
+    public async Task TwoCompetitionsInOneSeasonCannotShareAShortCode()
     {
         var divisionId = await CompetitionScenario.ADivisionAsync(_fixture.DbContext);
 
@@ -76,10 +76,11 @@ public class CompetitionCrudTests : IClassFixture<IntegrationTestFixture>
     }
 
     [Fact]
-    public async Task TheSameShortCodeIsFineInAnotherDivision()
+    public async Task TheSameShortCodeIsRefusedAcrossDivisionsToo()
     {
-        // Codes are unique per division and season, not league-wide: two divisions may each
-        // run something they both call "CUP".
+        // It used to be unique within a division and season, so two divisions could each call
+        // theirs "LGE". A competition belongs to no division now, so the season is the only
+        // scope left for a code to be unique within.
         var first = await CompetitionScenario.ADivisionAsync(_fixture.DbContext);
         var second = await CompetitionScenario.ADivisionAsync(_fixture.DbContext);
 
@@ -88,7 +89,88 @@ public class CompetitionCrudTests : IClassFixture<IntegrationTestFixture>
         await Create(first, enterAll: false, shortCode: code);
         var shared = async () => await Create(second, enterAll: false, shortCode: code);
 
-        await shared.Should().NotThrowAsync();
+        await shared.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
+    public async Task TheSameShortCodeIsFineInAnotherSeason()
+    {
+        // Next year's cup is the same cup, and reusing its code is the point of a code.
+        var divisionId = await CompetitionScenario.ADivisionAsync(_fixture.DbContext);
+        var code = TestIds.Code("YR");
+
+        await Create(divisionId, enterAll: false, shortCode: code);
+        var nextYear = async () =>
+            await Create(divisionId, enterAll: false, shortCode: code, season: 2041);
+
+        await nextYear.Should().NotThrowAsync();
+    }
+
+    // ── How many clubs it holds ───────────────────────────────────────────────
+
+    [Fact]
+    public async Task ACupThatHoldsFourRefusesAFifth()
+    {
+        var divisionId = await CompetitionScenario.ADivisionAsync(_fixture.DbContext);
+        var clubs = await CompetitionScenario.ClubsAsync(_fixture.DbContext, divisionId, 5);
+
+        var id = await Create(
+            divisionId, enterAll: false, format: CompetitionFormat.Knockout, maxTeams: 4);
+
+        foreach (var club in clubs.Take(4)) await Enter(id, club);
+
+        var fifth = async () => await Enter(id, clubs[4]);
+
+        // Otherwise the bracket is quietly built around a number nobody meant.
+        (await fifth.Should().ThrowAsync<InvalidOperationException>())
+            .Which.Message.Should().Contain("holds 4");
+
+        (await EntrantsOf(id)).Should().HaveCount(4);
+    }
+
+    [Fact]
+    public async Task ADivisionTooBigForTheCupIsNotSilentlyTrimmed()
+    {
+        // Which four of the six get dropped is the organiser's decision, so "enter everybody"
+        // into a competition that cannot hold everybody is refused rather than guessed at.
+        var divisionId = await CompetitionScenario.ADivisionAsync(_fixture.DbContext);
+        await CompetitionScenario.ClubsAsync(_fixture.DbContext, divisionId, 6);
+
+        var overfull = async () => await Create(
+            divisionId, enterAll: true, format: CompetitionFormat.Knockout, maxTeams: 4);
+
+        (await overfull.Should().ThrowAsync<InvalidOperationException>())
+            .Which.Message.Should().Contain("choose who plays");
+    }
+
+    [Fact]
+    public async Task ALeagueWithNoNumberTakesEverybody()
+    {
+        // The ordinary case, and the reason the number is optional: a league is played by
+        // whoever is in the division.
+        var divisionId = await CompetitionScenario.ADivisionAsync(_fixture.DbContext);
+        await CompetitionScenario.ClubsAsync(_fixture.DbContext, divisionId, 7);
+
+        var id = await Create(divisionId, enterAll: true);
+
+        (await EntrantsOf(id)).Should().HaveCount(7);
+    }
+
+    [Fact]
+    public async Task ACompetitionCannotBeCutBelowTheClubsAlreadyInIt()
+    {
+        var divisionId = await CompetitionScenario.ADivisionAsync(_fixture.DbContext);
+        await CompetitionScenario.ClubsAsync(_fixture.DbContext, divisionId, 4);
+
+        var id = await Create(divisionId, enterAll: true, maxTeams: 4);
+
+        var shrink = async () =>
+            await Update(id, name: "Now Smaller", format: CompetitionFormat.League, maxTeams: 2);
+
+        // Two of the four would be left holding a place in something that no longer has room
+        // for them, and picking which two is not ours to do.
+        (await shrink.Should().ThrowAsync<InvalidOperationException>())
+            .Which.Message.Should().Contain("Withdraw somebody first");
     }
 
     // ── Changing one ──────────────────────────────────────────────────────────
@@ -246,24 +328,27 @@ public class CompetitionCrudTests : IClassFixture<IntegrationTestFixture>
         Guid divisionId,
         bool enterAll,
         CompetitionFormat format = CompetitionFormat.League,
-        string? shortCode = null)
+        string? shortCode = null,
+        int? maxTeams = null,
+        int season = 2040)
     {
         _fixture.DbContext.ChangeTracker.Clear();
 
         return await new CreateCompetitionCommandHandler(_fixture.DbContext).Handle(
             new CreateCompetitionCommand
             {
-                DivisionId = divisionId,
                 Name = $"Competition {TestIds.Code("N")}",
                 ShortCode = shortCode ?? TestIds.Code("CC"),
-                Season = 2040,
+                Season = season,
                 Format = format,
-                EnterAllDivisionTeams = enterAll,
+                MaxTeams = maxTeams,
+                Gender = Gender.Male,
+                EnterTeamsFromDivisionId = enterAll ? divisionId : null,
             },
             CancellationToken.None);
     }
 
-    private Task Update(Guid id, string name, CompetitionFormat format) =>
+    private Task Update(Guid id, string name, CompetitionFormat format, int? maxTeams = null) =>
         new UpdateCompetitionCommandHandler(_fixture.DbContext).Handle(
             new UpdateCompetitionCommand
             {
@@ -271,6 +356,8 @@ public class CompetitionCrudTests : IClassFixture<IntegrationTestFixture>
                 Name = name,
                 ShortCode = TestIds.Code("UC"),
                 Format = format,
+                Gender = Gender.Male,
+                MaxTeams = maxTeams,
                 IsActive = true,
             },
             CancellationToken.None);

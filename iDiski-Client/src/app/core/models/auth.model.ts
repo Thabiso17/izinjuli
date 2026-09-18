@@ -38,7 +38,7 @@ export interface CurrentUserDto {
    * Optional because the login response is a smaller payload than /me. Undefined means "not
    * known yet", which is not the same as "assigned to nothing".
    */
-  administeredDivisionIds?: string[];
+  administeredCompetitionIds?: string[];
   administeredTeamIds?: string[];
 }
 
@@ -59,11 +59,11 @@ export interface CreateUserRequest {
   lastName: string;
   roles: string[];
   assignedTeamIds?: string[];
-  assignedDivisionIds?: string[];
+  assignedCompetitionIds?: string[];
 }
 
 export enum Role {
   TeamAdmin = 'TeamAdmin',
-  DivisionAdmin = 'DivisionAdmin',
+  CompetitionAdmin = 'CompetitionAdmin',
   SuperAdmin = 'SuperAdmin'
 }

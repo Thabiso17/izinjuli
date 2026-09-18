@@ -90,7 +90,14 @@ public sealed class GetLeagueStandingsQueryHandler
         if (request.CompetitionId.HasValue)
             matchQuery = matchQuery.Where(m => m.CompetitionId == request.CompetitionId.Value);
         else if (request.DivisionId.HasValue)
-            matchQuery = matchQuery.Where(m => m.DivisionId == request.DivisionId.Value);
+        {
+            // A fixture has no division, so this means the matches this division's clubs
+            // played. A table honestly belongs to a competition; this is the fallback for a
+            // caller that only knows the division.
+            matchQuery = matchQuery.Where(m =>
+                (m.HomeTeam != null && m.HomeTeam.DivisionId == request.DivisionId.Value) ||
+                (m.AwayTeam != null && m.AwayTeam.DivisionId == request.DivisionId.Value));
+        }
 
         if (request.UpToMatchweek.HasValue)
             matchQuery = matchQuery.Where(m => m.MatchweekNumber <= request.UpToMatchweek.Value);
@@ -114,7 +121,9 @@ public sealed class GetLeagueStandingsQueryHandler
             }
             else if (request.DivisionId.HasValue)
             {
-                groupFixtures = groupFixtures.Where(m => m.DivisionId == request.DivisionId.Value);
+                groupFixtures = groupFixtures.Where(m =>
+                    (m.HomeTeam != null && m.HomeTeam.DivisionId == request.DivisionId.Value) ||
+                    (m.AwayTeam != null && m.AwayTeam.DivisionId == request.DivisionId.Value));
             }
 
             var drawn = await groupFixtures

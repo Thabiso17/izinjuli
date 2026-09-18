@@ -71,7 +71,7 @@ public class UsersController : BaseApiController
 
     /// <summary>
     /// Assign a role to a user (SuperAdmin only).
-    /// Role codes: 1=TeamAdmin, 2=DivisionAdmin, 3=SuperAdmin.
+    /// Role codes: 1=TeamAdmin, 2=CompetitionAdmin, 3=SuperAdmin.
     /// </summary>
     /// <response code="204">Role assigned.</response>
     /// <response code="401">Not authenticated.</response>
@@ -153,20 +153,21 @@ public class UsersController : BaseApiController
     }
 
     /// <summary>
-    /// Assign a division to a user (SuperAdmin only, typically for DivisionAdmin role).
+    /// Assign a competition to a user (SuperAdmin only) — what a Competition Admin runs.
     /// </summary>
-    /// <response code="204">Division assigned.</response>
+    /// <response code="204">Competition assigned.</response>
     /// <response code="401">Not authenticated.</response>
     /// <response code="403">Not authorized (SuperAdmin only).</response>
-    /// <response code="404">User or division not found.</response>
-    /// <response code="422">User already assigned to this division.</response>
-    [HttpPost("{id:guid}/divisions")]
+    /// <response code="404">User or competition not found.</response>
+    /// <response code="422">User already assigned to this competition.</response>
+    [HttpPost("{id:guid}/competitions")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
-    public async Task<IActionResult> AssignDivision(Guid id, [FromBody] AssignUserDivisionCommand command, CancellationToken ct)
+    public async Task<IActionResult> AssignCompetition(
+        Guid id, [FromBody] AssignUserCompetitionCommand command, CancellationToken ct)
     {
         if (id != command.UserId)
             return BadRequest("Route ID and body UserId do not match.");
@@ -176,20 +177,21 @@ public class UsersController : BaseApiController
     }
 
     /// <summary>
-    /// Remove a division assignment from a user (SuperAdmin only).
+    /// Remove a competition assignment from a user (SuperAdmin only).
     /// </summary>
-    /// <response code="204">Division assignment removed.</response>
+    /// <response code="204">Assignment removed.</response>
     /// <response code="401">Not authenticated.</response>
     /// <response code="403">Not authorized (SuperAdmin only).</response>
-    /// <response code="404">User or division assignment not found.</response>
-    [HttpDelete("{id:guid}/divisions/{divisionId:guid}")]
+    /// <response code="404">User or assignment not found.</response>
+    [HttpDelete("{id:guid}/competitions/{competitionId:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> RemoveDivision(Guid id, Guid divisionId, CancellationToken ct)
+    public async Task<IActionResult> RemoveCompetition(
+        Guid id, Guid competitionId, CancellationToken ct)
     {
-        await Sender.Send(new RemoveUserDivisionCommand(id, divisionId), ct);
+        await Sender.Send(new RemoveUserCompetitionCommand(id, competitionId), ct);
         return NoContent();
     }
 }

@@ -102,9 +102,9 @@ public class CompetitionStatusTests : IClassFixture<IntegrationTestFixture>
         var clubs = await CompetitionScenario.ClubsAsync(_fixture.DbContext, divisionId, 4);
 
         var league = await CompetitionScenario.ACompetitionAsync(
-            _fixture.DbContext, divisionId, CompetitionFormat.League, name: "League");
+            _fixture.DbContext, CompetitionFormat.League, name: "League");
         var cup = await CompetitionScenario.ACompetitionAsync(
-            _fixture.DbContext, divisionId, CompetitionFormat.Knockout, name: "Cup");
+            _fixture.DbContext, CompetitionFormat.Knockout, name: "Cup");
 
         await CompetitionScenario.EnterAsync(_fixture.DbContext, league, clubs);
         await CompetitionScenario.EnterAsync(_fixture.DbContext, cup, clubs);
@@ -134,7 +134,7 @@ public class CompetitionStatusTests : IClassFixture<IntegrationTestFixture>
         var clubs = await CompetitionScenario.ClubsAsync(_fixture.DbContext, divisionId, 20);
 
         var cup = await CompetitionScenario.ACompetitionAsync(
-            _fixture.DbContext, divisionId, CompetitionFormat.Knockout, name: "Top Eight");
+            _fixture.DbContext, CompetitionFormat.Knockout, name: "Top Eight");
 
         await CompetitionScenario.EnterAsync(_fixture.DbContext, cup, clubs.Take(8));
 
@@ -143,7 +143,7 @@ public class CompetitionStatusTests : IClassFixture<IntegrationTestFixture>
         var competition = await Read(cup);
 
         competition.EntrantCount.Should().Be(8, "the division's other twelve are not in this cup");
-        competition.ExternalEntrantCount.Should().Be(0);
+        competition.DivisionsRepresented.Should().Be(1, "every entrant plays in the same division");
 
         // Eight entrants make a bracket of seven ties, whatever the division holds.
         competition.MatchCount.Should().Be(7);
@@ -159,17 +159,20 @@ public class CompetitionStatusTests : IClassFixture<IntegrationTestFixture>
     }
 
     [Fact]
-    public async Task ACompetitionCanFieldClubsInvitedFromAnotherDivision()
+    public async Task ACompetitionCanBeContestedAcrossDivisions()
     {
-        // The sponsor's cup: twelve from the division running it, plus four invited.
-        var hostDivision = await CompetitionScenario.ADivisionAsync(_fixture.DbContext, name: "Host");
-        var guestDivision = await CompetitionScenario.ADivisionAsync(_fixture.DbContext, name: "Guest");
+        // The sponsor's cup, or the Nedbank: twelve clubs from one division and four from
+        // another, contesting something that belongs to neither.
+        var firstDivision = await CompetitionScenario.ADivisionAsync(
+            _fixture.DbContext, name: "Division One");
+        var secondDivision = await CompetitionScenario.ADivisionAsync(
+            _fixture.DbContext, name: "Division Three");
 
-        var hosts = await CompetitionScenario.ClubsAsync(_fixture.DbContext, hostDivision, 12);
-        var guests = await CompetitionScenario.ClubsAsync(_fixture.DbContext, guestDivision, 4);
+        var hosts = await CompetitionScenario.ClubsAsync(_fixture.DbContext, firstDivision, 12);
+        var guests = await CompetitionScenario.ClubsAsync(_fixture.DbContext, secondDivision, 4);
 
         var cup = await CompetitionScenario.ACompetitionAsync(
-            _fixture.DbContext, hostDivision, CompetitionFormat.Knockout, name: "Sponsor Cup");
+            _fixture.DbContext, CompetitionFormat.Knockout, name: "Sponsor Cup");
 
         await CompetitionScenario.EnterAsync(_fixture.DbContext, cup, hosts.Concat(guests));
 
@@ -178,7 +181,7 @@ public class CompetitionStatusTests : IClassFixture<IntegrationTestFixture>
         var competition = await Read(cup);
 
         competition.EntrantCount.Should().Be(16);
-        competition.ExternalEntrantCount.Should().Be(4, "four clubs were invited from elsewhere");
+        competition.DivisionsRepresented.Should().Be(2, "its entrants come from two divisions");
 
         // The invited clubs are really in the draw, not merely listed beside it.
         var drawn = (await FixturesFor(cup))
@@ -189,8 +192,9 @@ public class CompetitionStatusTests : IClassFixture<IntegrationTestFixture>
 
         drawn.Should().IntersectWith(guests);
 
-        // And the fixtures belong to the division running it, not to the guests' own.
-        (await FixturesFor(cup)).Should().OnlyContain(f => f.DivisionId == hostDivision);
+        // And every fixture belongs to the competition and to nothing else. There is no
+        // division on a tie between clubs from two of them, which is the whole point.
+        (await FixturesFor(cup)).Should().OnlyContain(f => f.CompetitionId == cup);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

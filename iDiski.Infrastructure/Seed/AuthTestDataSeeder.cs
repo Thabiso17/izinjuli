@@ -11,7 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace iDiski.Infrastructure.Seed;
 
 /// <summary>
-/// Seeds test authentication users (SuperAdmin, TeamAdmin, DivisionAdmin, InactiveUser)
+/// Seeds test authentication users (SuperAdmin, TeamAdmin, CompetitionAdmin, InactiveUser)
 /// for local development and testing.
 /// </summary>
 public static class AuthTestDataSeeder
@@ -61,11 +61,11 @@ public static class AuthTestDataSeeder
                 UpdatedAt = DateTime.UtcNow
             };
 
-            // DivisionAdmin User
-            var divisionAdminId = Guid.NewGuid();
-            var divisionAdmin = new User
+            // CompetitionAdmin User
+            var competitionAdminId = Guid.NewGuid();
+            var competitionAdmin = new User
             {
-                Id = divisionAdminId,
+                Id = competitionAdminId,
                 Email = "divadmin@test.com",
                 PasswordHash = hasher.HashPassword("Password123!"),
                 FirstName = "Division",
@@ -89,7 +89,7 @@ public static class AuthTestDataSeeder
                 UpdatedAt = DateTime.UtcNow
             };
 
-            db.Users.AddRange(superAdmin, teamAdmin, divisionAdmin, inactiveUser);
+            db.Users.AddRange(superAdmin, teamAdmin, competitionAdmin, inactiveUser);
             await db.SaveChangesAsync();
 
             Console.WriteLine("✅ Users created successfully");
@@ -113,23 +113,23 @@ public static class AuthTestDataSeeder
                 CreatedAt = DateTime.UtcNow
             };
 
-            var divisionAdminRole = new UserRole
+            var competitionAdminRole = new UserRole
             {
                 Id = Guid.NewGuid(),
-                UserId = divisionAdminId,
-                Role = Role.DivisionAdmin,
+                UserId = competitionAdminId,
+                Role = Role.CompetitionAdmin,
                 AssignedAt = DateTime.UtcNow,
                 CreatedAt = DateTime.UtcNow
             };
 
-            db.UserRoles.AddRange(superAdminRole, teamAdminRole, divisionAdminRole);
+            db.UserRoles.AddRange(superAdminRole, teamAdminRole, competitionAdminRole);
             await db.SaveChangesAsync();
 
             Console.WriteLine("✅ Roles assigned successfully");
             Console.WriteLine("\n🔐 Test Credentials:");
             Console.WriteLine("   SuperAdmin:    superadmin@test.com / Password123!");
             Console.WriteLine("   TeamAdmin:     teamadmin@test.com / Password123!");
-            Console.WriteLine("   DivisionAdmin: divadmin@test.com / Password123!");
+            Console.WriteLine("   CompetitionAdmin: divadmin@test.com / Password123!");
             Console.WriteLine("   InactiveUser:  inactive@test.com / Password123! (should fail)\n");
 
             await AssignSampleOwnershipAsync(db);
@@ -137,32 +137,33 @@ public static class AuthTestDataSeeder
     }
 
     /// <summary>
-    /// Scopes divadmin@test.com/teamadmin@test.com to a sample Division/Team so their
-    /// resource-ownership checks are actually exercisable in dev. Divisions/Teams are
+    /// Scopes divadmin@test.com/teamadmin@test.com to a sample Competition/Team so their
+    /// resource-ownership checks are actually exercisable in dev. Competitions/Teams are
     /// usually populated later via /api/seed, so this re-checks on every startup rather
     /// than only right after user creation, and no-ops once an assignment already exists.
     /// </summary>
     private static async Task AssignSampleOwnershipAsync(LeagueDbContext db)
     {
-        var divisionAdmin = await db.Users.FirstOrDefaultAsync(u => u.Email == "divadmin@test.com");
-        if (divisionAdmin != null && !await db.UserDivisions.AnyAsync(ud => ud.UserId == divisionAdmin.Id))
+        var competitionAdmin = await db.Users.FirstOrDefaultAsync(u => u.Email == "divadmin@test.com");
+        if (competitionAdmin != null
+            && !await db.UserCompetitions.AnyAsync(uc => uc.UserId == competitionAdmin.Id))
         {
-            var division = await db.Divisions.OrderBy(d => d.CreatedAt).FirstOrDefaultAsync();
-            if (division != null)
+            var competition = await db.Competitions.OrderBy(c => c.CreatedAt).FirstOrDefaultAsync();
+            if (competition != null)
             {
-                db.UserDivisions.Add(new UserDivision
+                db.UserCompetitions.Add(new UserCompetition
                 {
                     Id = Guid.NewGuid(),
-                    UserId = divisionAdmin.Id,
-                    DivisionId = division.Id,
+                    UserId = competitionAdmin.Id,
+                    CompetitionId = competition.Id,
                     AssignedAt = DateTime.UtcNow,
                     CreatedAt = DateTime.UtcNow
                 });
-                Console.WriteLine($"✅ Assigned divadmin@test.com to division '{division.Name}'");
+                Console.WriteLine($"✅ Assigned divadmin@test.com to competition '{competition.Name}'");
             }
             else
             {
-                Console.WriteLine("⚠️ No divisions exist yet — divadmin@test.com has no division assignment. Seed divisions (e.g. /api/seed) and restart.");
+                Console.WriteLine("⚠️ No competitions exist yet — divadmin@test.com runs nothing. Seed (e.g. /api/seed) and restart.");
             }
         }
 

@@ -7,19 +7,19 @@ import { Role } from './auth.model';
  */
 export const ROLE_ID: Record<Role, number> = {
   [Role.TeamAdmin]: 1,
-  [Role.DivisionAdmin]: 2,
+  [Role.CompetitionAdmin]: 2,
   [Role.SuperAdmin]: 3,
 };
 
 export const ROLE_BY_ID: Record<number, Role> = {
   1: Role.TeamAdmin,
-  2: Role.DivisionAdmin,
+  2: Role.CompetitionAdmin,
   3: Role.SuperAdmin,
 };
 
 export const ROLE_LABEL: Record<Role, string> = {
   [Role.TeamAdmin]: 'Team Admin',
-  [Role.DivisionAdmin]: 'Division Admin',
+  [Role.CompetitionAdmin]: 'Competition Admin',
   [Role.SuperAdmin]: 'Super Admin',
 };
 
@@ -39,7 +39,7 @@ export interface AdminUserDto {
 /** One administrator with everything they have been granted. */
 export interface AdminUserDetailDto extends AdminUserDto {
   assignedTeamIds: string[];
-  assignedDivisionIds: string[];
+  assignedCompetitionIds: string[];
 }
 
 /**
@@ -54,7 +54,7 @@ export interface CreateAdminUserRequest {
   lastName: string;
   roles: Role[];
   assignedTeamIds?: string[];
-  assignedDivisionIds?: string[];
+  assignedCompetitionIds?: string[];
 }
 
 export interface UpdateAdminUserRequest {

@@ -68,10 +68,10 @@ export interface MatchResultDto {
   awayTeamLogo: string | null;
   awayTeamShortCode: string | null;
   notes: string | null;
-  divisionId: string | null;
-  divisionName: string | null;
-  /** Which part of the competition this belongs to. */
-  /** Which competition this fixture is part of — the league, the cup. */
+  /**
+   * Which competition this fixture is part of — the league, the cup. The only thing a fixture
+   * belongs to: a tie between clubs from two divisions is played in neither of them.
+   */
   competitionId: string | null;
   competitionName: string | null;
   stage: MatchStage;

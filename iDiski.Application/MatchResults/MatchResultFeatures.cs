@@ -33,14 +33,9 @@ public sealed record MatchResultDto(
     string?     AwayTeamLogo,
     string?     AwayTeamShortCode,
     string?     Notes,
-    // The client has always declared these two and the projection never supplied them, so the
-    // division badge on the fixtures list had nothing to render. Required rather than
-    // defaulted: an optional argument cannot be omitted inside an expression tree, and a
-    // projection that tried would not compile — which is how the last one of these was found.
-    Guid?       DivisionId,
-    string?     DivisionName,
-    // Which competition this fixture is part of. A division runs several at once, so "a
-    // fixture in the U17 division" no longer says what anybody is playing for.
+    // What this fixture is part of, and the only thing it belongs to. There is no division
+    // here: a cup tie between a Division 1 club and a Division 3 club is played in neither,
+    // and the two clubs below say where each of them comes from.
     Guid?       CompetitionId,
     string?     CompetitionName,
     // Where this fixture sits in its competition.
@@ -63,8 +58,8 @@ public sealed record MatchResultDto(
 
 /// <summary>Returns a paginated fixture/results list, optionally filtered.</summary>
 /// <param name="DivisionId">
-/// Filter to one division. The matches admin page has always sent this, but neither the
-/// endpoint nor this query accepted it, so choosing a division changed nothing on screen.
+/// Narrow to the fixtures a division's clubs are playing — in anything, including a cup they
+/// contest against clubs from elsewhere. A fixture has no division of its own to filter on.
 /// </param>
 public sealed record GetFixturesQuery(
     int     Season,
@@ -74,8 +69,7 @@ public sealed record GetFixturesQuery(
     int     PageNumber  = 1,
     int     PageSize    = 20,
     Guid?   DivisionId  = null,
-    // Narrow to one competition — the league, or the cup, rather than everything the division
-    // is playing at once.
+    // Narrow to one competition — the league, or the cup, rather than everything at once.
     Guid?   CompetitionId = null
 ) : IRequest<PaginatedList<MatchResultDto>>;
 
@@ -105,8 +99,15 @@ public sealed class GetFixturesQueryHandler
         if (request.Status.HasValue)
             query = query.Where(m => m.Status == request.Status.Value);
 
+        // A fixture has no division of its own. Asking for a division's fixtures means the
+        // matches its clubs are playing — which is what the filter was always used to mean,
+        // and which now also finds them in a cup contested across several divisions.
         if (request.DivisionId.HasValue)
-            query = query.Where(m => m.DivisionId == request.DivisionId.Value);
+        {
+            query = query.Where(m =>
+                (m.HomeTeam != null && m.HomeTeam.DivisionId == request.DivisionId.Value) ||
+                (m.AwayTeam != null && m.AwayTeam.DivisionId == request.DivisionId.Value));
+        }
 
         if (request.CompetitionId.HasValue)
             query = query.Where(m => m.CompetitionId == request.CompetitionId.Value);
@@ -133,8 +134,6 @@ public sealed class GetFixturesQueryHandler
                 m.AwayTeam != null ? m.AwayTeam.LogoUrl : null,
                 m.AwayTeam != null ? m.AwayTeam.ShortCode : null,
                 m.Notes,
-                m.DivisionId,
-                m.Division != null ? m.Division.Name : null,
                 m.CompetitionId,
                 m.Competition != null ? m.Competition.Name : null,
                 m.Stage,
@@ -180,8 +179,6 @@ public sealed class GetMatchByIdQueryHandler
                 m.AwayTeam != null ? m.AwayTeam.LogoUrl : null,
                 m.AwayTeam != null ? m.AwayTeam.ShortCode : null,
                 m.Notes,
-                m.DivisionId,
-                m.Division != null ? m.Division.Name : null,
                 m.CompetitionId,
                 m.Competition != null ? m.Competition.Name : null,
                 m.Stage,
@@ -200,12 +197,11 @@ public sealed class GetMatchByIdQueryHandler
 // ═════════════════════════════════════════════════════════════════════════════
 
 /// <summary>
-/// Adds a fixture to a competition by hand.
+/// Adds a fixture to a competition by hand — this club plays that one, on this date.
 ///
-/// Scoped to the competition's division. [Authorize(Policy = "CanManageDivisions")] on the
-/// endpoint only asks whether the requester is a division admin at all — never which
-/// divisions — so without this any division admin could put a fixture into anybody's
-/// competition.
+/// Drawing a competition up is the organiser's job, so this is scoped to the competition
+/// itself: whoever was assigned to run it, and a SuperAdmin. Not to either club — deciding
+/// who meets whom is running the competition, not administering the sides.
 ///
 /// The season is the competition's rather than an argument: a fixture cannot belong to a
 /// different year from the competition it is part of.
@@ -299,7 +295,6 @@ public sealed class CreateMatchResultCommandHandler
             MatchweekNumber = request.MatchweekNumber,
             Season          = competition.Season,
             CompetitionId   = competition.Id,
-            DivisionId      = competition.DivisionId,
             HomeTeamId      = request.HomeTeamId,
             AwayTeamId      = request.AwayTeamId,
             Venue           = request.Venue,

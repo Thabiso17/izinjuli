@@ -50,11 +50,11 @@ export class UserService {
     return this.http.delete<void>(`${this.base}/${userId}/teams/${teamId}`);
   }
 
-  assignDivision(userId: string, divisionId: string): Observable<void> {
-    return this.http.post<void>(`${this.base}/${userId}/divisions`, { userId, divisionId });
+  assignCompetition(userId: string, competitionId: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/${userId}/competitions`, { userId, competitionId });
   }
 
-  removeDivision(userId: string, divisionId: string): Observable<void> {
-    return this.http.delete<void>(`${this.base}/${userId}/divisions/${divisionId}`);
+  removeCompetition(userId: string, competitionId: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/${userId}/competitions/${competitionId}`);
   }
 }

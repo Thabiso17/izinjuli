@@ -31,7 +31,7 @@ public sealed class GetUserByIdQueryHandler : IRequestHandler<GetUserByIdQuery, 
                 // type and so was null every time — the compiler warned about exactly this.
                 u.UserRoles.Select(ur => (int)ur.Role).ToList(),
                 u.UserTeams.Select(ut => ut.TeamId).ToList(),
-                u.UserDivisions.Select(ud => ud.DivisionId).ToList()
+                u.UserCompetitions.Select(uc => uc.CompetitionId).ToList()
             ))
             .FirstOrDefaultAsync(cancellationToken);
 

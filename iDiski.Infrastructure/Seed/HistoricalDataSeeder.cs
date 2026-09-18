@@ -86,7 +86,7 @@ public static class HistoricalDataSeeder
             HomeTeamId = sundowns.Id, AwayTeamId = chiefs.Id, HomeScore = 3, AwayScore = 1,
             MatchDate = DateTime.SpecifyKind(new DateTime(2015, 11, 7), DateTimeKind.Utc),
             MatchweekNumber = 10, Season = 2015,
-            Status = MatchStatus.Completed, DivisionId = division.Id, Venue = sundowns.HomeGround
+            Status = MatchStatus.Completed, Venue = sundowns.HomeGround
         });
 
         int matchweek = 1;
@@ -104,7 +104,6 @@ public static class HistoricalDataSeeder
                     MatchweekNumber = matchweek,
                     Season = 2015,
                     Status = MatchStatus.Completed,
-                    DivisionId = division.Id,
                     Venue = teams[i].HomeGround
                 });
                 matchweek++;
@@ -179,7 +178,6 @@ public static class HistoricalDataSeeder
                     MatchweekNumber = matchweek,
                     Season = 2012,
                     Status = MatchStatus.Completed,
-                    DivisionId = division.Id,
                     Venue = teams[i].HomeGround
                 });
                 matchweek++;
@@ -252,7 +250,6 @@ public static class HistoricalDataSeeder
                     MatchweekNumber = matchweek,
                     Season = 2019,
                     Status = MatchStatus.Completed,
-                    DivisionId = division.Id,
                     Venue = teams[i].HomeGround
                 });
                 matchweek++;

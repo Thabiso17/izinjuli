@@ -23,8 +23,8 @@ import { MatchResultDto, MatchEventDto } from '../../core/models';
               <small class="text-muted d-block mb-2">
                 {{ match()!.matchDate | date: 'EEEE, MMMM d, y - h:mm a' }}
               </small>
-              @if (match()!.divisionName) {
-                <span class="badge bg-primary mb-3">{{ match()!.divisionName }}</span>
+              @if (match()!.competitionName) {
+                <span class="badge bg-primary mb-3">{{ match()!.competitionName }}</span>
               }
               @switch (match()!.status) {
                 @case ('InProgress') {

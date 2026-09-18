@@ -1,5 +1,6 @@
 import { test, expect, type Browser, type Page } from '@playwright/test';
 import { accounts, signIn } from './helpers';
+import { createCompetition } from './admin-setup';
 
 /**
  * What an administrator sees, as opposed to what they may do.
@@ -27,29 +28,40 @@ test.describe('admin scope', () => {
     ).toBeLessThan(everything);
   });
 
-  test('a division admin sees only the competitions they administer', async ({
+  test('a competition admin sees only the competitions they administer', async ({
     browser,
     baseURL,
   }) => {
+    // Their assignment is a list of competitions, so this is the screen it has to narrow.
+    // Divisions are no longer assigned to anybody and are not what this role runs.
+    //
+    // A second one has to exist first: the seeded league puts every club in one division, so
+    // the backfill gives it a single competition and "only the ones they run" would be the
+    // whole list by accident. Started by the organiser, assigned to nobody.
+    await asRole(browser, baseURL, accounts.superAdmin, async (page) => {
+      await createCompetition(page, null, 'Knockout');
+    });
+
     const everything = await countIn(
       browser,
       baseURL,
       accounts.superAdmin,
-      '/admin/divisions',
-      DIVISION_ROW,
+      '/admin/competitions',
+      COMPETITION_ROW,
     );
     const theirs = await countIn(
       browser,
       baseURL,
-      accounts.divisionAdmin,
-      '/admin/divisions',
-      DIVISION_ROW,
+      accounts.competitionAdmin,
+      '/admin/competitions',
+      COMPETITION_ROW,
     );
 
-    expect(theirs, 'a division admin must still see their own division').toBeGreaterThan(0);
+    expect(theirs, 'a competition admin must still see the one they were given')
+      .toBeGreaterThan(0);
     expect(
       theirs,
-      'a division admin was seeing every division in the league',
+      'a competition admin was seeing every competition being played, not the ones they run',
     ).toBeLessThan(everything);
   });
 
@@ -71,15 +83,26 @@ test.describe('admin scope', () => {
     });
   });
 
-  test('a division admin is not offered division creation', async ({ browser, baseURL }) => {
-    await asRole(browser, baseURL, accounts.divisionAdmin, async (page) => {
+  test('a competition admin is offered neither a new division nor a new competition', async ({
+    browser,
+    baseURL,
+  }) => {
+    await asRole(browser, baseURL, accounts.competitionAdmin, async (page) => {
       await page.goto('/admin/divisions');
       await page.waitForLoadState('networkidle');
 
       // Creating, editing and deleting a division are all super-admin only at the API, so for
-      // a division admin this page is a scoped read-only view of their own competitions.
+      // a competition admin this page is a read-only look at where the clubs come from.
       await expect(page.locator('[data-testid="add-division"]')).toHaveCount(0);
       await expect(page.locator(DIVISION_ROW).first()).toBeVisible();
+
+      await page.goto('/admin/competitions');
+      await page.waitForLoadState('networkidle');
+
+      // Starting one is the organiser's: otherwise the role could hand itself a competition
+      // and then administer it.
+      await expect(page.locator('[data-testid="add-competition"]')).toHaveCount(0);
+      await expect(page.locator(COMPETITION_ROW).first()).toBeVisible();
     });
   });
 
@@ -104,6 +127,7 @@ test.describe('admin scope', () => {
 /** A team is a card on the teams board; a division is a row in the divisions table. */
 const TEAM_CARD = '[data-testid="team-card"]';
 const DIVISION_ROW = '[data-testid="division-competitions-cell"]';
+const COMPETITION_ROW = '[data-testid="competition-row"]';
 
 async function asRole(
   browser: Browser,

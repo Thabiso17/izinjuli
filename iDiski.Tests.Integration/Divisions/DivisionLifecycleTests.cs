@@ -15,12 +15,13 @@ using Xunit;
 namespace iDiski.Tests.Integration.Divisions;
 
 /// <summary>
-/// Removing a division, now that it is a pool of clubs rather than the competition itself.
+/// Removing a division, now that a division is its clubs and nothing else.
 ///
-/// Both paths gained a competition-shaped hole when the model changed. Deleting checked teams
-/// and matches, neither of which covers a division whose clubs have all left but which still
-/// runs a cup for invited sides. Clearing walked the division's teams, which would have left
-/// competitions and entry lists behind pointing at a division that no longer existed.
+/// Both paths used to reach into competitions, back when a division owned them. A division
+/// owns none: what its clubs play stands on its own and is contested by whoever was entered,
+/// which may be clubs from three other divisions. So deleting one asks only about its clubs,
+/// and clearing one takes its clubs and their places out of competitions without taking the
+/// competitions themselves.
 /// </summary>
 public class DivisionLifecycleTests : IClassFixture<IntegrationTestFixture>
 {
@@ -29,38 +30,44 @@ public class DivisionLifecycleTests : IClassFixture<IntegrationTestFixture>
     public DivisionLifecycleTests(IntegrationTestFixture fixture) => _fixture = fixture;
 
     [Fact]
-    public async Task ADivisionRunningACompetitionIsNotDeleted()
+    public async Task ADivisionWithClubsInItIsNotDeleted()
     {
-        // Deliberately empty of clubs: the old guard asked about teams and matches, and this
-        // division has neither. What it has is a competition.
         var divisionId = await CompetitionScenario.ADivisionAsync(_fixture.DbContext);
-        await CompetitionScenario.ACompetitionAsync(_fixture.DbContext, divisionId);
+        await CompetitionScenario.ClubsAsync(_fixture.DbContext, divisionId, 3);
 
         var delete = async () => await new DeleteDivisionCommandHandler(_fixture.DbContext)
             .Handle(new DeleteDivisionCommand(divisionId), CancellationToken.None);
 
         (await delete.Should().ThrowAsync<InvalidOperationException>())
-            .Which.Message.Should().Contain("competition");
+            .Which.Message.Should().Contain("clubs");
 
         (await _fixture.DbContext.Divisions.AsNoTracking().AnyAsync(d => d.Id == divisionId))
             .Should().BeTrue();
     }
 
     [Fact]
-    public async Task AnEmptyDivisionRunningNothingIsDeleted()
+    public async Task AnEmptyDivisionIsDeletedEvenWhileCompetitionsAreBeingPlayed()
     {
-        // The other half, so the guard above is a rule rather than a blanket refusal.
+        // The rule that changed. A competition being played elsewhere is no business of this
+        // division's: it holds no clubs, so there is nothing left in it to lose.
         var divisionId = await CompetitionScenario.ADivisionAsync(_fixture.DbContext);
+        var elsewhere = await CompetitionScenario.ADivisionAsync(_fixture.DbContext);
+
+        var competitionId = await CompetitionScenario.ACompetitionAsync(_fixture.DbContext);
+        await CompetitionScenario.ClubsAsync(_fixture.DbContext, elsewhere, 2, competitionId);
 
         await new DeleteDivisionCommandHandler(_fixture.DbContext)
             .Handle(new DeleteDivisionCommand(divisionId), CancellationToken.None);
 
         (await _fixture.DbContext.Divisions.AsNoTracking().AnyAsync(d => d.Id == divisionId))
             .Should().BeFalse();
+
+        (await _fixture.DbContext.Competitions.AsNoTracking().AnyAsync(c => c.Id == competitionId))
+            .Should().BeTrue("a competition is not a division's to take with it");
     }
 
     [Fact]
-    public async Task ClearingADivisionTakesItsCompetitionsAndTheirEntryListsWithIt()
+    public async Task ClearingADivisionTakesItsClubsAndTheirPlacesButNotTheCompetition()
     {
         var (divisionId, competitionId, _) = await CompetitionScenario.AWholeAsync(
             _fixture.DbContext, CompetitionFormat.League, 4);
@@ -82,20 +89,23 @@ public class DivisionLifecycleTests : IClassFixture<IntegrationTestFixture>
         await new ClearDivisionCommandHandler(_fixture.DbContext)
             .Handle(new ClearDivisionCommand(divisionId), CancellationToken.None);
 
-        (await _fixture.DbContext.Competitions.AsNoTracking()
-            .AnyAsync(c => c.DivisionId == divisionId))
-            .Should().BeFalse("a competition belongs to the division that was cleared");
-
-        (await _fixture.DbContext.CompetitionEntries.AsNoTracking()
-            .AnyAsync(e => e.CompetitionId == competitionId))
-            .Should().BeFalse("an entry list outlives nothing");
-
-        (await _fixture.DbContext.MatchResults.AsNoTracking()
-            .AnyAsync(m => m.CompetitionId == competitionId))
-            .Should().BeFalse();
-
         (await _fixture.DbContext.Teams.AsNoTracking()
             .AnyAsync(t => t.DivisionId == divisionId))
             .Should().BeFalse();
+
+        (await _fixture.DbContext.CompetitionEntries.AsNoTracking()
+            .AnyAsync(e => e.CompetitionId == competitionId))
+            .Should().BeFalse("a club that no longer exists holds no place in anything");
+
+        (await _fixture.DbContext.MatchResults.AsNoTracking()
+            .AnyAsync(m => m.CompetitionId == competitionId))
+            .Should().BeFalse("its fixtures went with the clubs that were to play them");
+
+        // The competition itself survives, empty. A cup contested across three divisions is
+        // not abandoned because one of them was cleared — it has fewer entrants, which is the
+        // truth of what happened.
+        (await _fixture.DbContext.Competitions.AsNoTracking()
+            .AnyAsync(c => c.Id == competitionId))
+            .Should().BeTrue();
     }
 }

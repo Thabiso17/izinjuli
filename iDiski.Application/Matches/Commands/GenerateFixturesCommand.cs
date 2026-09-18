@@ -1,4 +1,5 @@
 using iDiski.Application.Common.Exceptions;
+using iDiski.Application.Common.Authorization;
 using iDiski.Application.Common.Interfaces;
 using iDiski.Domain.Entities;
 using iDiski.Domain.Services;
@@ -46,7 +47,7 @@ public sealed record GenerateFixturesCommand(
     bool     ReplaceExisting = false,
     int?     GroupCount = null,
     int      TeamsAdvancingPerGroup = 2
-) : IRequest<GenerateFixturesResult>;
+) : IRequest<GenerateFixturesResult>, IRequireCompetitionAccess;
 
 public sealed record GenerateFixturesResult(
     int FixturesGenerated,
@@ -155,7 +156,6 @@ public sealed class GenerateFixturesCommandHandler
         {
             CompetitionFormat.Knockout => KnockoutBracket.Build(
                 teams.Select(t => t.Id).ToList(),
-                competition.DivisionId,
                 competition.Season,
                 request.StartDate,
                 request.DaysBetweenMatchweeks),
@@ -165,7 +165,6 @@ public sealed class GenerateFixturesCommandHandler
 
             _ => GenerateRoundRobinFixtures(
                 teams,
-                competition.DivisionId,
                 competition.Season,
                 request.IsHomeAndAway,
                 request.StartDate,
@@ -245,7 +244,6 @@ public sealed class GenerateFixturesCommandHandler
 
             var groupFixtures = GenerateRoundRobinFixtures(
                 groups[i],
-                competition.DivisionId,
                 competition.Season,
                 request.IsHomeAndAway,
                 request.StartDate,
@@ -270,7 +268,6 @@ public sealed class GenerateFixturesCommandHandler
 
         fixtures.AddRange(KnockoutBracket.BuildEmpty(
             qualifiers,
-            competition.DivisionId,
             competition.Season,
             bracketStart,
             request.DaysBetweenMatchweeks,
@@ -285,7 +282,6 @@ public sealed class GenerateFixturesCommandHandler
     /// </summary>
     private static List<MatchResult> GenerateRoundRobinFixtures(
         List<Team> teams,
-        Guid divisionId,
         int season,
         bool isHomeAndAway,
         DateTime startDate,
@@ -343,7 +339,6 @@ public sealed class GenerateFixturesCommandHandler
                 {
                     HomeTeamId = homeTeamId,
                     AwayTeamId = awayTeamId,
-                    DivisionId = divisionId,
                     Season = season,
                     MatchweekNumber = matchweek,
                     MatchDate = matchDate,
@@ -380,7 +375,6 @@ public sealed class GenerateFixturesCommandHandler
                 {
                     HomeTeamId = fixture.AwayTeamId, // Swap home/away
                     AwayTeamId = fixture.HomeTeamId,
-                    DivisionId = divisionId,
                     Season = season,
                     MatchweekNumber = returnMatchweek,
                     MatchDate = returnMatchDate,

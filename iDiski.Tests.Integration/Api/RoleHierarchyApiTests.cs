@@ -21,10 +21,12 @@ namespace iDiski.Tests.Integration.Api;
 /// the behaviour agree with each other.
 ///
 /// The shape being asserted, from the brief:
-///   SuperAdmin    — everything, everywhere.
-///   DivisionAdmin — teams and players inside their division; no creating or deleting divisions.
-///   TeamAdmin     — players of their teams, and updates to their team; never creating or
-///                   deleting a team, since teams are handed to them.
+///   SuperAdmin       — everything, everywhere, including creating clubs and users.
+///   CompetitionAdmin — the competitions they were assigned, and nothing else. Not clubs, not
+///                      players, not divisions, not users: running a cup a club is entered in
+///                      is no reason to be able to edit the club.
+///   TeamAdmin        — players of their clubs, and updates to their club; never creating or
+///                      deleting one, since clubs are handed to them.
 /// </summary>
 [Collection(ApiCollection.Name)]
 public class RoleHierarchyApiTests : IAsyncLifetime
@@ -37,7 +39,8 @@ public class RoleHierarchyApiTests : IAsyncLifetime
     private Guid _outsideTeamId;    // in the other division, outside both admins' reach
 
     private User _superAdmin = null!;
-    private User _divisionAdmin = null!;
+    private Guid _competitionId;
+    private User _competitionAdmin = null!;
     private User _teamAdmin = null!;
 
     /// <summary>Jersey numbers are unique per team, so no two tests may pick the same one.</summary>
@@ -49,6 +52,7 @@ public class RoleHierarchyApiTests : IAsyncLifetime
     {
         _divisionId = Guid.NewGuid();
         _otherDivisionId = Guid.NewGuid();
+        _competitionId = Guid.NewGuid();
         _teamAId = Guid.NewGuid();
         _outsideTeamId = Guid.NewGuid();
 
@@ -82,11 +86,23 @@ public class RoleHierarchyApiTests : IAsyncLifetime
                     DivisionId = _otherDivisionId, Founded = 2020, CreatedAt = now
                 });
 
+            db.Competitions.Add(new Competition
+            {
+                Id = _competitionId,
+                Name = $"Competition {ApiTestFixture.Code("N")}",
+                ShortCode = ApiTestFixture.Code("RH"),
+                Season = 2026,
+                Format = CompetitionFormat.League,
+                Gender = Gender.Male,
+                IsActive = true,
+                CreatedAt = now,
+            });
+
             await db.SaveChangesAsync();
         });
 
         _superAdmin = await _fixture.SeedUserAsync(Role.SuperAdmin);
-        _divisionAdmin = await _fixture.SeedUserAsync(Role.DivisionAdmin, divisionId: _divisionId);
+        _competitionAdmin = await _fixture.SeedUserAsync(Role.CompetitionAdmin);
         _teamAdmin = await _fixture.SeedUserAsync(Role.TeamAdmin, teamId: _teamAId);
     }
 
@@ -96,10 +112,11 @@ public class RoleHierarchyApiTests : IAsyncLifetime
 
     [Theory]
     [InlineData(Role.SuperAdmin, HttpStatusCode.Created)]
-    [InlineData(Role.DivisionAdmin, HttpStatusCode.Created)]
-    // Teams are assigned to a team admin, not created by one.
+    // A competition admin runs competitions and administers no clubs; a team admin is given
+    // one rather than making it.
+    [InlineData(Role.CompetitionAdmin, HttpStatusCode.Forbidden)]
     [InlineData(Role.TeamAdmin, HttpStatusCode.Forbidden)]
-    public async Task CreatingATeam_IsOpenToDivisionAdminsAndAbove(
+    public async Task CreatingAClub_IsSuperAdminOnly(
         Role role, HttpStatusCode expected)
     {
         var client = await ClientFor(role);
@@ -114,28 +131,13 @@ public class RoleHierarchyApiTests : IAsyncLifetime
         response.StatusCode.Should().Be(expected);
     }
 
-    [Fact]
-    public async Task ADivisionAdmin_CannotCreateATeamInSomeoneElsesDivision()
-    {
-        var client = await ClientFor(Role.DivisionAdmin);
-
-        var response = await client.PostAsJsonAsync("/api/teams", new CreateTeamCommand(
-            Name: $"Trespassing {Guid.NewGuid():N}",
-            ShortCode: ApiTestFixture.Code("T"),
-            LogoUrl: null, Founded: 2021, HomeGround: null, City: null,
-            PrimaryColour: null, SecondaryColour: null,
-            DivisionId: _otherDivisionId));
-
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden,
-            "a division admin works only inside the division they were given");
-    }
-
     [Theory]
     [InlineData(Role.SuperAdmin, HttpStatusCode.NoContent)]
-    [InlineData(Role.DivisionAdmin, HttpStatusCode.NoContent)]
-    // Updating their own team is how a team admin sets a crest and colours.
+    // Updating their own club is how a team admin sets a crest and colours.
     [InlineData(Role.TeamAdmin, HttpStatusCode.NoContent)]
-    public async Task UpdatingTheirOwnTeam_IsOpenToEveryAdminOverIt(
+    // And a competition admin has no business in a club's record at all.
+    [InlineData(Role.CompetitionAdmin, HttpStatusCode.Forbidden)]
+    public async Task UpdatingAClub_IsForItsOwnAdminsAndSuperAdmins(
         Role role, HttpStatusCode expected)
     {
         var client = await ClientFor(role);
@@ -152,7 +154,7 @@ public class RoleHierarchyApiTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData(Role.DivisionAdmin)]
+    [InlineData(Role.CompetitionAdmin)]
     [InlineData(Role.TeamAdmin)]
     public async Task NeitherAdmin_CanTouchATeamOutsideTheirScope(Role role)
     {
@@ -169,10 +171,11 @@ public class RoleHierarchyApiTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData(Role.DivisionAdmin, HttpStatusCode.NoContent)]
-    // Deleting a team would take its players and history with it.
+    [InlineData(Role.SuperAdmin, HttpStatusCode.NoContent)]
+    // Deleting a club would take its players and history with it, so neither of the others.
+    [InlineData(Role.CompetitionAdmin, HttpStatusCode.Forbidden)]
     [InlineData(Role.TeamAdmin, HttpStatusCode.Forbidden)]
-    public async Task DeletingATeam_IsClosedToTeamAdmins(Role role, HttpStatusCode expected)
+    public async Task DeletingAClub_IsSuperAdminOnly(Role role, HttpStatusCode expected)
     {
         var doomedTeamId = Guid.NewGuid();
         await _fixture.WithDbAsync(async db =>
@@ -197,9 +200,10 @@ public class RoleHierarchyApiTests : IAsyncLifetime
 
     [Theory]
     [InlineData(Role.SuperAdmin, HttpStatusCode.Created)]
-    [InlineData(Role.DivisionAdmin, HttpStatusCode.Created)]
     [InlineData(Role.TeamAdmin, HttpStatusCode.Created)]
-    public async Task EveryAdminOverATeam_CanAddAPlayerToIt(Role role, HttpStatusCode expected)
+    // A player is their club's, and a competition admin administers no clubs.
+    [InlineData(Role.CompetitionAdmin, HttpStatusCode.Forbidden)]
+    public async Task AddingAPlayer_IsForTheClubsOwnAdmins(Role role, HttpStatusCode expected)
     {
         var client = await ClientFor(role);
 
@@ -209,7 +213,7 @@ public class RoleHierarchyApiTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData(Role.DivisionAdmin)]
+    [InlineData(Role.CompetitionAdmin)]
     [InlineData(Role.TeamAdmin)]
     public async Task NeitherAdmin_CanAddAPlayerToATeamOutsideTheirScope(Role role)
     {
@@ -224,7 +228,7 @@ public class RoleHierarchyApiTests : IAsyncLifetime
 
     [Theory]
     // Divisions are the league's own structure: only a super admin shapes them.
-    [InlineData(Role.DivisionAdmin)]
+    [InlineData(Role.CompetitionAdmin)]
     [InlineData(Role.TeamAdmin)]
     public async Task CreatingADivision_IsRefusedToEveryoneBelowSuperAdmin(Role role)
     {
@@ -242,7 +246,7 @@ public class RoleHierarchyApiTests : IAsyncLifetime
     }
 
     [Theory]
-    [InlineData(Role.DivisionAdmin)]
+    [InlineData(Role.CompetitionAdmin)]
     [InlineData(Role.TeamAdmin)]
     public async Task DeletingADivision_IsRefusedToEveryoneBelowSuperAdmin(Role role)
     {
@@ -256,70 +260,56 @@ public class RoleHierarchyApiTests : IAsyncLifetime
     // ── Creating other admins ─────────────────────────────────────────────────
 
     [Fact]
-    public async Task ASuperAdmin_CanCreateADivisionAdmin()
+    public async Task ASuperAdmin_CreatesACompetitionAdminAndGivesThemACompetition()
     {
         var client = await ClientFor(Role.SuperAdmin);
 
         var response = await client.PostAsJsonAsync("/api/auth/create-user", new
         {
-            email = $"new-division-admin-{Guid.NewGuid():N}@test.com",
+            email = $"new-competition-admin-{Guid.NewGuid():N}@test.com",
             password = ApiTestFixture.Password,
             firstName = "New",
             lastName = "Admin",
-            roles = new[] { nameof(Role.DivisionAdmin) },
-            assignedDivisionIds = new[] { _divisionId }
+            roles = new[] { nameof(Role.CompetitionAdmin) },
+            assignedCompetitionIds = new[] { _competitionId }
         });
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
     [Fact]
-    public async Task ADivisionAdmin_CanCreateATeamAdminForTheirOwnTeam()
+    public async Task ACompetitionAdminWithNoCompetitionIsRefused()
     {
-        var client = await ClientFor(Role.DivisionAdmin);
+        // The role is the set. Somebody assigned to nothing administers nothing, and making
+        // one is more likely a mistake than an intention.
+        var client = await ClientFor(Role.SuperAdmin);
 
         var response = await client.PostAsJsonAsync("/api/auth/create-user", new
         {
-            email = $"new-team-admin-{Guid.NewGuid():N}@test.com",
+            email = $"empty-competition-admin-{Guid.NewGuid():N}@test.com",
             password = ApiTestFixture.Password,
-            firstName = "New",
+            firstName = "Empty",
             lastName = "Admin",
-            roles = new[] { nameof(Role.TeamAdmin) },
-            assignedTeamIds = new[] { _teamAId }
+            roles = new[] { nameof(Role.CompetitionAdmin) },
         });
 
-        response.StatusCode.Should().Be(HttpStatusCode.Created);
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 
-    [Fact]
-    public async Task ADivisionAdmin_CannotMintAnotherDivisionAdmin()
+    [Theory]
+    // Appointing administrators is a super admin's job. A competition admin runs competitions
+    // and administers no clubs, so there is nobody for them to appoint.
+    [InlineData(Role.CompetitionAdmin)]
+    [InlineData(Role.TeamAdmin)]
+    public async Task CreatingUsers_IsRefusedToEveryoneBelowSuperAdmin(Role role)
     {
-        var client = await ClientFor(Role.DivisionAdmin);
+        var client = await ClientFor(role);
 
         var response = await client.PostAsJsonAsync("/api/auth/create-user", new
         {
-            email = $"escalation-{Guid.NewGuid():N}@test.com",
+            email = $"minted-{Guid.NewGuid():N}@test.com",
             password = ApiTestFixture.Password,
-            firstName = "Escalated",
-            lastName = "Admin",
-            roles = new[] { nameof(Role.DivisionAdmin) },
-            assignedDivisionIds = new[] { _divisionId }
-        });
-
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden,
-            "an admin must not be able to grant themselves a peer");
-    }
-
-    [Fact]
-    public async Task ATeamAdmin_CannotCreateUsersAtAll()
-    {
-        var client = await ClientFor(Role.TeamAdmin);
-
-        var response = await client.PostAsJsonAsync("/api/auth/create-user", new
-        {
-            email = $"team-admin-spawn-{Guid.NewGuid():N}@test.com",
-            password = ApiTestFixture.Password,
-            firstName = "Spawned",
+            firstName = "Minted",
             lastName = "Admin",
             roles = new[] { nameof(Role.TeamAdmin) },
             assignedTeamIds = new[] { _teamAId }
@@ -333,7 +323,7 @@ public class RoleHierarchyApiTests : IAsyncLifetime
     private Task<HttpClient> ClientFor(Role role) => _fixture.CreateClientAsAsync(role switch
     {
         Role.SuperAdmin => _superAdmin,
-        Role.DivisionAdmin => _divisionAdmin,
+        Role.CompetitionAdmin => _competitionAdmin,
         Role.TeamAdmin => _teamAdmin,
         _ => throw new ArgumentOutOfRangeException(nameof(role)),
     });

@@ -37,7 +37,8 @@ public class SuspensionsController : BaseApiController
     /// Manually create a suspension for a player
     /// </summary>
     [HttpPost]
-    [Authorize(Policy = "CanManageDivisions")]
+    // A suspension is about a player, so it belongs to the club's administrators.
+    [Authorize(Policy = "CanManageTeams")]
     public async Task<IActionResult> Create([FromBody] CreateSuspensionCommand command)
     {
         var suspensionId = await Sender.Send(command);

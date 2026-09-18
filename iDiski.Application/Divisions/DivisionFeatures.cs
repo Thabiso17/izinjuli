@@ -166,27 +166,16 @@ public sealed class DeleteDivisionCommandHandler
     {
         var division = await _db.Divisions
             .Include(d => d.Teams)
-            .Include(d => d.Matches)
             .FirstOrDefaultAsync(d => d.Id == request.Id, cancellationToken)
             ?? throw new KeyNotFoundException($"Division with ID {request.Id} not found.");
 
-        if (division.Teams.Any() || division.Matches.Any())
+        // A division is its clubs, so emptying it of them is all it takes. There is no
+        // competition to check for: a division runs none, and the clubs take their places in
+        // whatever they were entered into with them.
+        if (division.Teams.Any())
         {
             throw new InvalidOperationException(
-                "Cannot delete division with assigned teams or matches.");
-        }
-
-        // A division running a competition is not empty, even with no teams left in it: the
-        // competition may be fielding clubs invited from elsewhere.
-        var competitions = await _db.Competitions
-            .CountAsync(c => c.DivisionId == division.Id, cancellationToken);
-
-        if (competitions > 0)
-        {
-            throw new InvalidOperationException(
-                $"Cannot delete a division running {competitions} "
-                + (competitions == 1 ? "competition" : "competitions")
-                + ". Delete those first.");
+                "Cannot delete a division that still has clubs in it.");
         }
 
         _db.Divisions.Remove(division);
@@ -234,10 +223,14 @@ public sealed class GetDivisionsQueryHandler
                 d.EndDate,
                 d.Description,
                 d.Teams.Count,
-                d.Matches.Count,
+                // Matches its clubs have played. A fixture belongs to a competition, not to a
+                // division, so this is counted from the two sides rather than looked up.
+                _db.MatchResults.Count(m =>
+                    (m.HomeTeam != null && m.HomeTeam.DivisionId == d.Id) ||
+                    (m.AwayTeam != null && m.AwayTeam.DivisionId == d.Id)),
                 // What is being played here. A division no longer has a status of its own —
                 // each competition has one, and they disagree by design.
-                d.Competitions.Count
+                _db.Competitions.Count(c => c.Entries.Any(e => e.Team.DivisionId == d.Id))
             ))
             .ToListAsync(cancellationToken);
     }
@@ -272,10 +265,14 @@ public sealed class GetDivisionByIdQueryHandler
                 d.EndDate,
                 d.Description,
                 d.Teams.Count,
-                d.Matches.Count,
+                // Matches its clubs have played. A fixture belongs to a competition, not to a
+                // division, so this is counted from the two sides rather than looked up.
+                _db.MatchResults.Count(m =>
+                    (m.HomeTeam != null && m.HomeTeam.DivisionId == d.Id) ||
+                    (m.AwayTeam != null && m.AwayTeam.DivisionId == d.Id)),
                 // What is being played here. A division no longer has a status of its own —
                 // each competition has one, and they disagree by design.
-                d.Competitions.Count
+                _db.Competitions.Count(c => c.Entries.Any(e => e.Team.DivisionId == d.Id))
             ))
             .FirstOrDefaultAsync(cancellationToken);
     }

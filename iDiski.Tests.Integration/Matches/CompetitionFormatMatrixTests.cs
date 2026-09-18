@@ -333,7 +333,6 @@ public class CompetitionFormatMatrixTests : IClassFixture<IntegrationTestFixture
         _fixture.DbContext.Competitions.Add(new Competition
         {
             Id = competitionId,
-            DivisionId = divisionId,
             Name = $"{format} of {Entrants}",
             ShortCode = TestIds.Code("FM"),
             Season = 2026,

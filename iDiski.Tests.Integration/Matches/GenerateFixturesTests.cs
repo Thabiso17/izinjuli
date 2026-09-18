@@ -312,7 +312,6 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
         _fixture.DbContext.Competitions.Add(new Competition
         {
             Id = id,
-            DivisionId = source.DivisionId,
             Name = $"Second {TestIds.Code("N")}",
             ShortCode = TestIds.Code("S"),
             Season = source.Season,
@@ -369,7 +368,6 @@ public class GenerateFixturesTests : IClassFixture<IntegrationTestFixture>
         _fixture.DbContext.Competitions.Add(new Competition
         {
             Id = competitionId,
-            DivisionId = divisionId,
             Name = $"Competition {TestIds.Code("N")}",
             ShortCode = TestIds.Code("GF"),
             Season = 2026,

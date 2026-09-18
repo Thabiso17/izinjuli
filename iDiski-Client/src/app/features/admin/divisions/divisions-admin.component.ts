@@ -94,7 +94,9 @@ import {
               </thead>
               <tbody>
                 @for (division of divisions(); track division.id) {
-                  <tr>
+                  <!-- The id is on the row so a test can find the division it just made;
+                       there is no longer a per-division link to read it off. -->
+                  <tr [attr.data-division-id]="division.id">
                     <td class="fw-semibold">{{ division.name }}</td>
                     <td>
                       <span class="badge bg-secondary">{{ division.shortCode }}</span>
@@ -118,11 +120,15 @@ import {
                            Each competition carries its own status, and they disagree by
                            design, so there is nothing honest to put in a single badge here. -->
                       <a
-                        [routerLink]="['/admin/divisions', division.id, 'competitions']"
+                        routerLink="/admin/competitions"
                         class="btn btn-sm btn-outline-secondary"
                         data-testid="manage-competitions"
+                        title="What this division's clubs are playing in"
                       >
+                        <!-- A count, not a possession: a division runs nothing. These are the
+                             competitions its clubs have been entered into. -->
                         <i class="bi bi-trophy me-1"></i>{{ division.competitionCount }}
+                        {{ division.competitionCount === 1 ? 'competition' : 'competitions' }}
                       </a>
                     </td>
                     <td>
@@ -276,13 +282,25 @@ import {
                     />
                   </div>
                   <div class="col-md-4">
-                    <label class="form-label">Gender</label>
-                    <select class="form-select" [(ngModel)]="formData.gender" name="gender">
-                      <option value="">Not specified</option>
+                    <label class="form-label">Gender *</label>
+                    <select
+                      class="form-select"
+                      [(ngModel)]="formData.gender"
+                      name="gender"
+                      data-testid="division-gender"
+                      required
+                    >
+                      <option value="">Choose one</option>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                       <option value="Mixed">Mixed</option>
                     </select>
+                    <small class="form-text text-muted">
+                      <!-- Asked for rather than optional, because it is now what decides
+                           which competitions these clubs may be entered into. -->
+                      Decides what these clubs can play in — a women's side is refused entry
+                      to a boys competition.
+                    </small>
                   </div>
 
                   <div class="col-md-6">
@@ -395,10 +413,10 @@ export class DivisionsAdminComponent implements OnInit {
 
     this.divisionService.getAll(this.filterSeason, this.filterActive).subscribe({
       next: (data) => {
-        // Narrowed to what this administrator actually administers. Creating a division is
-        // super-admin only, so for everybody else this list is exactly the competitions they
-        // were assigned — not the whole league with an Edit button on every row.
-        this.divisions.set(data.filter(d => this.auth.canAdministerDivision(d.id)));
+        // Divisions are super-admin work end to end — creating, editing and deleting them —
+        // so there is nothing to narrow. Everybody else sees the list and can open a division
+        // to look at its clubs; the API refuses the rest.
+        this.divisions.set(data);
         this.loading.set(false);
       },
       error: (err) => {

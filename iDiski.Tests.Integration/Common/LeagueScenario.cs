@@ -9,7 +9,8 @@ namespace iDiski.Tests.Integration.Common;
 /// <summary>
 /// Two divisions, a team in each, a player, and one admin of every role wired to the right
 /// scope: the team admin owns TeamA, the division admin owns DivisionOne. That wiring is the
-/// whole point — the ownership handlers resolve access by reading UserTeams and UserDivisions,
+/// whole point — the ownership handlers resolve access by reading UserTeams and
+/// UserCompetitions,
 /// so a scenario whose assignments point at the wrong user proves nothing.
 ///
 /// Everything is created fresh per call with new ids, so tests sharing a fixture cannot
@@ -18,14 +19,17 @@ namespace iDiski.Tests.Integration.Common;
 public sealed class LeagueScenario
 {
     public Guid SuperAdminId { get; } = Guid.NewGuid();
-    public Guid DivisionAdminId { get; } = Guid.NewGuid();
+    public Guid CompetitionAdminId { get; } = Guid.NewGuid();
     public Guid TeamAdminId { get; } = Guid.NewGuid();
 
-    /// <summary>The division the division admin is assigned to.</summary>
+    /// <summary>The division whose clubs play in the scenario's competition.</summary>
     public Guid DivisionOneId { get; } = Guid.NewGuid();
 
-    /// <summary>A division nobody in this scenario administers.</summary>
+    /// <summary>A second division, whose clubs are in nothing.</summary>
     public Guid DivisionTwoId { get; } = Guid.NewGuid();
+
+    /// <summary>The competition the competition admin was assigned.</summary>
+    public Guid CompetitionOneId { get; } = Guid.NewGuid();
 
     /// <summary>In DivisionOne, and the team the team admin is assigned to.</summary>
     public Guid TeamAId { get; } = Guid.NewGuid();
@@ -77,7 +81,7 @@ public sealed class LeagueScenario
 
         foreach (var (id, first) in new[]
                  {
-                     (s.SuperAdminId, "Super"), (s.DivisionAdminId, "Division"), (s.TeamAdminId, "Team")
+                     (s.SuperAdminId, "Super"), (s.CompetitionAdminId, "Competition"), (s.TeamAdminId, "Team")
                  })
         {
             db.Users.Add(new User
@@ -90,12 +94,36 @@ public sealed class LeagueScenario
 
         db.UserRoles.AddRange(
             new UserRole { Id = Guid.NewGuid(), UserId = s.SuperAdminId, Role = Role.SuperAdmin, AssignedAt = now, CreatedAt = now },
-            new UserRole { Id = Guid.NewGuid(), UserId = s.DivisionAdminId, Role = Role.DivisionAdmin, AssignedAt = now, CreatedAt = now },
+            new UserRole { Id = Guid.NewGuid(), UserId = s.CompetitionAdminId, Role = Role.CompetitionAdmin, AssignedAt = now, CreatedAt = now },
             new UserRole { Id = Guid.NewGuid(), UserId = s.TeamAdminId, Role = Role.TeamAdmin, AssignedAt = now, CreatedAt = now });
 
-        db.UserDivisions.Add(new UserDivision
+        // Something for them to run. A competition admin assigned to nothing administers
+        // nothing, so the scenario gives them one and enters DivisionOne's clubs in it.
+        db.Competitions.Add(new Competition
         {
-            Id = Guid.NewGuid(), UserId = s.DivisionAdminId, DivisionId = s.DivisionOneId,
+            Id = s.CompetitionOneId,
+            Name = $"League {Suffix()}",
+            ShortCode = TestIds.Code("LS"),
+            Season = 2026,
+            Format = CompetitionFormat.League,
+            Gender = Gender.Male,
+            IsActive = true,
+            CreatedAt = now,
+        });
+
+        foreach (var teamId in new[] { s.TeamAId, s.TeamBId })
+        {
+            db.CompetitionEntries.Add(new CompetitionEntry
+            {
+                Id = Guid.NewGuid(), CompetitionId = s.CompetitionOneId, TeamId = teamId,
+                CreatedAt = now
+            });
+        }
+
+        db.UserCompetitions.Add(new UserCompetition
+        {
+            Id = Guid.NewGuid(), UserId = s.CompetitionAdminId,
+            CompetitionId = s.CompetitionOneId,
             AssignedAt = now, CreatedAt = now
         });
 
@@ -115,7 +143,7 @@ public sealed class LeagueScenario
     public Guid UserFor(Role role) => role switch
     {
         Role.SuperAdmin => SuperAdminId,
-        Role.DivisionAdmin => DivisionAdminId,
+        Role.CompetitionAdmin => CompetitionAdminId,
         Role.TeamAdmin => TeamAdminId,
         _ => throw new ArgumentOutOfRangeException(nameof(role)),
     };

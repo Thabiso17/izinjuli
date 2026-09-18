@@ -83,29 +83,51 @@ test.describe('admin filters', () => {
     }
   });
 
-  test('the matches list only shows fixtures from the chosen division', async ({ page }) => {
-    await page.goto('/admin/matches');
-    await settle(page);
-
-    const division = filterBar(page).locator('select').first();
-    const divisionNames = await labels(division);
-    let cardsSeen = 0;
-
-    // Index 0 is "All Divisions", which has nothing to check.
-    for (let i = 1; i < divisionNames.length; i++) {
-      await division.selectOption({ index: i });
+  test('the matches list only shows fixtures a club of the chosen division is playing in',
+    async ({ page }) => {
+      // A fixture no longer belongs to a division — it belongs to a competition, and a cup
+      // draws clubs from several divisions at once. So narrowing by division means "the ones
+      // my clubs are playing in", and what the card names is the competition.
+      await page.goto('/admin/matches');
       await settle(page);
 
-      const shown = await texts(page, 'match-division');
-      cardsSeen += shown.length;
+      const filters = filterBar(page);
+      const division = filters.locator('select').first();
+      const team = filters.locator('select').nth(1);
 
-      for (const name of shown) {
-        expect(name).toBe(divisionNames[i]);
+      const divisionCount = await division.locator('option').count();
+      let cardsSeen = 0;
+
+      // Index 0 is "All Divisions", which has nothing to check.
+      for (let i = 1; i < divisionCount; i++) {
+        await division.selectOption({ index: i });
+        await settle(page);
+
+        // The team filter is the division's roster, which is what the fixtures are checked
+        // against — the page never names the division on a fixture any more.
+        const clubs = (await labels(team)).slice(1);
+        const cards = page.locator('[data-testid="match-card"]');
+        const count = await cards.count();
+        cardsSeen += count;
+
+        for (let card = 0; card < count; card++) {
+          const home = (
+            await cards.nth(card).locator('[data-testid="match-home"]').innerText()
+          ).trim();
+          const away = (
+            await cards.nth(card).locator('[data-testid="match-away"]').innerText()
+          ).trim();
+
+          expect(
+            clubs.some((club) => club === home || club === away),
+            `neither side of ${home} v ${away} is in this division, so the list widened past it`,
+          ).toBe(true);
+        }
       }
-    }
 
-    expect(cardsSeen, 'no fixtures were listed at all, so this proved nothing').toBeGreaterThan(0);
-  });
+      expect(cardsSeen, 'no fixtures were listed at all, so this proved nothing')
+        .toBeGreaterThan(0);
+    });
 
   test('the matches team filter keeps away fixtures, not just home ones', async ({ page }) => {
     await page.goto('/admin/matches');
@@ -187,12 +209,20 @@ test.describe('admin filters', () => {
       await competition.selectOption({ index: i });
       await settle(page);
 
-      const homeOptions = await labels(home);
-      const awayOptions = await labels(away);
+      // Polled rather than read once: both pickers are filled from the same entrant list, so
+      // they can only disagree while it is still arriving, and reading them a moment apart is
+      // what made this flake rather than fail.
+      await expect
+        .poll(
+          async () => {
+            const [h, a] = [await labels(home), await labels(away)];
+            return h.join('|') === a.join('|');
+          },
+          { message: 'the two pickers should offer the same clubs' },
+        )
+        .toBe(true);
 
-      expect(homeOptions, 'the two pickers should offer the same clubs').toEqual(awayOptions);
-
-      if (homeOptions.length > 1) offeredSomebody = true;
+      if ((await labels(home)).length > 1) offeredSomebody = true;
     }
 
     expect(

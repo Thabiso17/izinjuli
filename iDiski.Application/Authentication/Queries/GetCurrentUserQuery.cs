@@ -7,12 +7,12 @@ namespace iDiski.Application.Authentication.Queries;
 
 public sealed record GetCurrentUserQuery : IRequest<CurrentUserDto>;
 
-/// <param name="AdministeredDivisionIds">
-/// The divisions this user is assigned to, and <paramref name="AdministeredTeamIds"/> the
-/// teams. Roles alone say what kind of administrator somebody is, never which competitions
-/// they administer — so every admin screen showed every division and every club, with an Edit
-/// button on rows the API would refuse to save. Empty for a super admin, who administers
-/// everything and is told so by <paramref name="IsSuperAdmin"/> rather than by a list.
+/// <param name="AdministeredCompetitionIds">
+/// The competitions this user runs, and <paramref name="AdministeredTeamIds"/> the clubs they
+/// administer. Roles alone say what kind of administrator somebody is, never which ones — so
+/// every admin screen used to show everything, with an Edit button on rows the API would
+/// refuse to save. Empty for a super admin, who administers everything and is told so by
+/// <paramref name="IsSuperAdmin"/> rather than by a list.
 /// </param>
 public sealed record CurrentUserDto(
     Guid Id,
@@ -22,7 +22,7 @@ public sealed record CurrentUserDto(
     string? ProfileImageUrl,
     string[] Roles,
     bool IsSuperAdmin,
-    Guid[] AdministeredDivisionIds,
+    Guid[] AdministeredCompetitionIds,
     Guid[] AdministeredTeamIds
 );
 
@@ -48,7 +48,7 @@ public sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQ
         // 2. Fetch user with roles
         var user = await _db.Users
             .Include(u => u.UserRoles)
-            .Include(u => u.UserDivisions)
+            .Include(u => u.UserCompetitions)
             .Include(u => u.UserTeams)
             .FirstOrDefaultAsync(u => u.Id == _currentUserService.UserId, cancellationToken)
             ?? throw new NotFoundException(nameof(Domain.Entities.User), _currentUserService.UserId);
@@ -69,12 +69,12 @@ public sealed class GetCurrentUserQueryHandler : IRequestHandler<GetCurrentUserQ
             ProfileImageUrl: user.ProfileImageUrl,
             Roles: roles,
             IsSuperAdmin: isSuperAdmin,
-            // Left empty for a super admin rather than listing every division in the league:
-            // they are not scoped to a set, and a caller that treated the list as the scope
-            // would silently narrow them the moment a new division was created.
-            AdministeredDivisionIds: isSuperAdmin
+            // Left empty for a super admin rather than listing every competition being
+            // played: they are not scoped to a set, and a caller that treated the list as the
+            // scope would silently narrow them the moment a new one was created.
+            AdministeredCompetitionIds: isSuperAdmin
                 ? Array.Empty<Guid>()
-                : user.UserDivisions.Select(ud => ud.DivisionId).ToArray(),
+                : user.UserCompetitions.Select(uc => uc.CompetitionId).ToArray(),
             AdministeredTeamIds: isSuperAdmin
                 ? Array.Empty<Guid>()
                 : user.UserTeams.Select(ut => ut.TeamId).ToArray()

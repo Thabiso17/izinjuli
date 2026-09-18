@@ -16,7 +16,7 @@ public sealed class RemoveUserRoleCommandValidator : AbstractValidator<RemoveUse
     public RemoveUserRoleCommandValidator()
     {
         RuleFor(x => x.UserId).NotEmpty();
-        RuleFor(x => x.Role).InclusiveBetween(1, 3).WithMessage("Role must be 1 (TeamAdmin), 2 (DivisionAdmin), or 3 (SuperAdmin)");
+        RuleFor(x => x.Role).InclusiveBetween(1, 3).WithMessage("Role must be 1 (TeamAdmin), 2 (CompetitionAdmin), or 3 (SuperAdmin)");
     }
 }
 

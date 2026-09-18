@@ -116,7 +116,8 @@ public class ApiTestFixture : IAsyncLifetime
     /// Creates a user who can genuinely log in: the password is hashed with the application's
     /// own hasher, so the login endpoint verifies it the same way it would in production.
     /// </summary>
-    public async Task<User> SeedUserAsync(Role role, Guid? teamId = null, Guid? divisionId = null)
+    public async Task<User> SeedUserAsync(
+        Role role, Guid? teamId = null, Guid? competitionId = null)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<LeagueDbContext>();
@@ -151,11 +152,11 @@ public class ApiTestFixture : IAsyncLifetime
             });
         }
 
-        if (divisionId is not null)
+        if (competitionId is not null)
         {
-            db.UserDivisions.Add(new UserDivision
+            db.UserCompetitions.Add(new UserCompetition
             {
-                Id = Guid.NewGuid(), UserId = id, DivisionId = divisionId.Value,
+                Id = Guid.NewGuid(), UserId = id, CompetitionId = competitionId.Value,
                 AssignedAt = now, CreatedAt = now
             });
         }

@@ -7,6 +7,18 @@
  */
 export type CompetitionFormat = 'League' | 'Knockout' | 'GroupAndKnockout';
 
+/**
+ * Who a competition is for. A string rather than the numeric Gender enum because the API
+ * serialises enums by name, which is how divisions already send theirs.
+ */
+export type CompetitionGender = 'Male' | 'Female' | 'Mixed';
+
+export const COMPETITION_GENDER_LABEL: Record<CompetitionGender, string> = {
+  Male: 'Boys / Men',
+  Female: 'Girls / Women',
+  Mixed: 'Mixed',
+};
+
 export const COMPETITION_FORMAT_LABEL: Record<CompetitionFormat, string> = {
   League: 'League',
   Knockout: 'Knockout',
@@ -52,20 +64,27 @@ export function isCurrentCompetition(status: CompetitionStatus): boolean {
  */
 export interface CompetitionDto {
   id: string;
-  divisionId: string;
-  divisionName: string;
   name: string;
   shortCode: string;
   season: number;
   format: CompetitionFormat;
+  /** Who it is for. Checked against every club entered. */
+  gender: CompetitionGender;
+  /** "U17", "Open" — informational; age is not enforced at entry. */
+  ageGroup: string | null;
+  /**
+   * How many clubs the organiser said would play, or null when they did not say. A cap on the
+   * entry list, not a description of it: a ninth club is refused from an eight-club cup.
+   */
+  maxTeams: number | null;
   startDate: string | null;
   endDate: string | null;
   description: string | null;
   isActive: boolean;
-  /** How many clubs are in it — which is not how many are in the division. */
+  /** How many clubs are in it. Nothing else says: a competition is its entry list. */
   entrantCount: number;
-  /** How many of those were invited from outside the division running it. */
-  externalEntrantCount: number;
+  /** How many different divisions those clubs come from. More than one means a cup. */
+  divisionsRepresented: number;
   matchCount: number;
   playedCount: number;
   pendingCount: number;
@@ -81,21 +100,25 @@ export interface CompetitionEntrantDto {
   logoUrl: string | null;
   divisionId: string | null;
   divisionName: string | null;
-  /** True when this club plays in a different division from the one running it. */
-  isExternal: boolean;
 }
 
 export interface CreateCompetitionCommand {
-  divisionId: string;
   name: string;
   shortCode: string;
   season: number;
   format: CompetitionFormat;
+  gender: CompetitionGender;
+  ageGroup?: string | null;
+  /** Blank for "however many are entered", which is the ordinary case for a league. */
+  maxTeams?: number | null;
   startDate?: string;
   endDate?: string;
   description?: string;
-  /** A league wants everybody; a cup is easier to trim down than to build up. */
-  enterAllDivisionTeams: boolean;
+  /**
+   * Optionally start the entry list off with every club in this division — what a league
+   * wants. A convenience only: nothing afterwards records that they arrived together.
+   */
+  enterTeamsFromDivisionId?: string | null;
 }
 
 export interface UpdateCompetitionCommand {
@@ -103,8 +126,27 @@ export interface UpdateCompetitionCommand {
   name: string;
   shortCode: string;
   format: CompetitionFormat;
+  gender: CompetitionGender;
+  ageGroup?: string | null;
+  maxTeams?: number | null;
   startDate?: string;
   endDate?: string;
   description?: string;
   isActive: boolean;
+}
+
+/**
+ * How full a competition is, for a screen that wants to say so. Null when the organiser set no
+ * number, in which case "entered" is the whole truth and there is nothing to be short of.
+ */
+export function entrantProgress(c: CompetitionDto): { text: string; full: boolean; short: number } {
+  if (c.maxTeams == null) {
+    return { text: `${c.entrantCount} entered`, full: false, short: 0 };
+  }
+
+  return {
+    text: `${c.entrantCount} of ${c.maxTeams} entered`,
+    full: c.entrantCount >= c.maxTeams,
+    short: Math.max(0, c.maxTeams - c.entrantCount),
+  };
 }
