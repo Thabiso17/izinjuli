@@ -136,7 +136,7 @@ public class UserManagementApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ADivisionCanBeAssignedAndRemoved()
+    public async Task ACompetitionCanBeAssignedAndRemoved()
     {
         var client = await _fixture.CreateClientAsAsync(_superAdmin);
         var user = await _fixture.SeedUserAsync(Role.CompetitionAdmin, competitionId: _competitionId);
@@ -144,24 +144,26 @@ public class UserManagementApiTests : IAsyncLifetime
         var other = Guid.NewGuid();
         await _fixture.WithDbAsync(async db =>
         {
-            db.Divisions.Add(new Division
+            db.Competitions.Add(new Competition
             {
-                Id = other, Name = "Second Division", ShortCode = ApiTestFixture.Code("SD"),
-                Season = 2026, Gender = Gender.Male, IsActive = true, CreatedAt = DateTime.UtcNow
+                Id = other, Name = "Second Competition", ShortCode = ApiTestFixture.Code("SC"),
+                Season = 2026, Format = CompetitionFormat.League, Gender = Gender.Male,
+                IsActive = true, CreatedAt = DateTime.UtcNow
             });
             await db.SaveChangesAsync();
         });
 
         var assigned = await client.PostAsJsonAsync(
-            $"/api/users/{user.Id}/divisions", new { userId = user.Id, divisionId = other });
+            $"/api/users/{user.Id}/competitions",
+            new { userId = user.Id, competitionId = other });
         assigned.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NoContent);
 
-        (await DivisionIdsOf(client, user.Id)).Should().Contain(other);
+        (await CompetitionIdsOf(client, user.Id)).Should().Contain(other);
 
-        var removed = await client.DeleteAsync($"/api/users/{user.Id}/divisions/{other}");
+        var removed = await client.DeleteAsync($"/api/users/{user.Id}/competitions/{other}");
         removed.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.NoContent);
 
-        (await DivisionIdsOf(client, user.Id)).Should().NotContain(other);
+        (await CompetitionIdsOf(client, user.Id)).Should().NotContain(other);
     }
 
     [Fact]
@@ -213,7 +215,7 @@ public class UserManagementApiTests : IAsyncLifetime
             .EnumerateArray().Select(r => r.GetInt32()).ToArray();
     }
 
-    private static async Task<Guid[]> DivisionIdsOf(HttpClient client, Guid userId)
+    private static async Task<Guid[]> CompetitionIdsOf(HttpClient client, Guid userId)
     {
         var response = await client.GetAsync($"/api/users/{userId}");
         response.EnsureSuccessStatusCode();

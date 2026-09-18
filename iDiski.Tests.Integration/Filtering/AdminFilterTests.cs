@@ -84,12 +84,17 @@ public class AdminFilterTests : IClassFixture<IntegrationTestFixture>
     [Fact]
     public async Task Matches_NarrowToADivision()
     {
+        // A fixture has no division of its own now, so this filter means the matches a
+        // division's clubs are playing. Both sides of the second fixture have to be from
+        // elsewhere for it to be excluded — a club of Division One's playing away in
+        // somebody else's competition is still Division One's match.
         var scenario = await LeagueScenario.CreateAsync(_fixture.DbContext);
+        var otherClub = await AddTeamInAsync(scenario.DivisionTwoId);
 
         var inDivisionOne = await AddMatchAsync(
             scenario.DivisionOneId, scenario.TeamAId, scenario.TeamBId);
         var elsewhere = await AddMatchAsync(
-            scenario.DivisionTwoId, scenario.TeamCId, scenario.TeamAId);
+            scenario.DivisionTwoId, scenario.TeamCId, otherClub);
 
         var result = await new GetFixturesQueryHandler(_fixture.DbContext).Handle(
             new GetFixturesQuery(Season: 2026, PageSize: 100, DivisionId: scenario.DivisionOneId),
@@ -97,7 +102,30 @@ public class AdminFilterTests : IClassFixture<IntegrationTestFixture>
 
         result.Items.Should().Contain(m => m.Id == inDivisionOne.Id);
         result.Items.Should().NotContain(m => m.Id == elsewhere.Id,
-            "the page has offered this filter all along without it doing anything");
+            "neither club in it belongs to the division being asked about");
+    }
+
+    [Fact]
+    public async Task Matches_NarrowToADivision_FindsACupTieAgainstAnotherDivision()
+    {
+        // The other half of that meaning, and the case the old stored-division filter got
+        // wrong: a Division One club drawn against a Division Three club in a cup is a
+        // fixture both divisions' organisers want to see, and belongs to neither.
+        var scenario = await LeagueScenario.CreateAsync(_fixture.DbContext);
+
+        var cup = await AddCompetitionAsync(CompetitionFormat.Knockout);
+        var tie = await AddMatchAsync(
+            scenario.DivisionOneId, scenario.TeamAId, scenario.TeamCId, competitionId: cup);
+
+        foreach (var divisionId in new[] { scenario.DivisionOneId, scenario.DivisionTwoId })
+        {
+            var result = await new GetFixturesQueryHandler(_fixture.DbContext).Handle(
+                new GetFixturesQuery(Season: 2026, PageSize: 100, DivisionId: divisionId),
+                CancellationToken.None);
+
+            result.Items.Should().Contain(m => m.Id == tie.Id,
+                "one of its two clubs plays in this division");
+        }
     }
 
     [Fact]
@@ -298,6 +326,24 @@ public class AdminFilterTests : IClassFixture<IntegrationTestFixture>
                 CreatedAt = DateTime.UtcNow,
             });
         }
+
+        await _fixture.DbContext.SaveChangesAsync();
+        return id;
+    }
+
+    private async Task<Guid> AddTeamInAsync(Guid divisionId)
+    {
+        var id = Guid.NewGuid();
+
+        _fixture.DbContext.Teams.Add(new Team
+        {
+            Id = id,
+            Name = $"Club {TestIds.Code("N")}",
+            ShortCode = TestIds.Code("AX"),
+            DivisionId = divisionId,
+            Founded = 2020,
+            CreatedAt = DateTime.UtcNow,
+        });
 
         await _fixture.DbContext.SaveChangesAsync();
         return id;
